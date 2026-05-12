@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: ai-resume-match
+  datasource:
+    url: jdbc:mysql://localhost:3306/ai_resume_match?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+ai:
+  endpoint: https://api.openai.com/v1/chat/completions
+  api-key: ${AI_API_KEY:demo-key}
+  model: gpt-4o-mini
