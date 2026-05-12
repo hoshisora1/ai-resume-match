@@ -16,12 +16,15 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AnalysisWorkerTest {
+    private final AnalysisTaskService taskService = mock(AnalysisTaskService.class);
     private final AnalysisTaskRepository taskRepository = mock(AnalysisTaskRepository.class);
     private final ResumeRepository resumeRepository = mock(ResumeRepository.class);
     private final JobDescriptionRepository jobRepository = mock(JobDescriptionRepository.class);
@@ -31,6 +34,7 @@ class AnalysisWorkerTest {
     @Test
     void createsReportAndMarksTaskSuccess() {
         AnalysisTask task = task(99L);
+        when(taskService.tryStart(99L)).thenReturn(true);
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
         when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume(
             "resume.docx",
@@ -41,35 +45,54 @@ class AnalysisWorkerTest {
             "要求：Java 后端，熟悉 Redis 和 Kafka",
             "Java,Redis,Kafka"
         )));
-        when(aiClient.complete(anyString())).thenReturn("匹配分数：88\n技能匹配：Redis Kafka");
+        when(aiClient.complete(anyString())).thenReturn("1. 匹配分数：88\n技能匹配：Redis Kafka");
 
         worker().handle(99L);
 
         ArgumentCaptor<MatchReport> reportCaptor = ArgumentCaptor.forClass(MatchReport.class);
         verify(reportRepository).save(reportCaptor.capture());
-        assertThat(task.getStatus()).isEqualTo(AnalysisTask.Status.SUCCESS);
+        verify(taskService).markSuccess(99L);
         assertThat(reportCaptor.getValue().getTaskId()).isEqualTo(99L);
         assertThat(reportCaptor.getValue().getMatchScore()).isEqualTo(88);
         assertThat(reportCaptor.getValue().getReportContent()).contains("Redis Kafka");
     }
 
     @Test
-    void marksTaskFailedWhenAiCallFails() {
+    void marksTaskFailedWithoutRethrowingWhenAiCallFails() {
         AnalysisTask task = task(99L);
+        when(taskService.tryStart(99L)).thenReturn(true);
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
         when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis", "summary")));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis", "Redis")));
         when(aiClient.complete(anyString())).thenThrow(new IllegalStateException("AI unavailable"));
 
-        assertThatThrownBy(() -> worker().handle(99L))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("AI unavailable");
+        worker().handle(99L);
 
-        assertThat(task.getStatus()).isEqualTo(AnalysisTask.Status.FAILED);
+        verify(taskService).markFailed(99L);
+        verify(reportRepository, never()).save(any());
+    }
+
+    @Test
+    void skipsTaskWhenItCannotStart() {
+        when(taskService.tryStart(99L)).thenReturn(false);
+
+        worker().handle(99L);
+
+        verify(taskRepository, never()).findById(99L);
+        verify(aiClient, never()).complete(anyString());
+        verify(reportRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsReportWithoutMatchScore() {
+        assertThatThrownBy(() -> worker().extractScore("技能匹配：Redis Kafka"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("匹配分数");
     }
 
     private AnalysisWorker worker() {
         return new AnalysisWorker(
+            taskService,
             taskRepository,
             resumeRepository,
             jobRepository,

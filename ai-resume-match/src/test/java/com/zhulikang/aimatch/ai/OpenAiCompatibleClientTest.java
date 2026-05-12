@@ -7,6 +7,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -32,5 +33,17 @@ class OpenAiCompatibleClientTest {
 
         assertThat(result).isEqualTo("匹配分数：88");
         server.verify();
+    }
+
+    @Test
+    void rejectsBlankApiKey() {
+        assertThatThrownBy(() -> new OpenAiCompatibleClient(
+            new RestTemplate(),
+            "https://example.test/v1/chat/completions",
+            " ",
+            "test-model"
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("AI API key");
     }
 }

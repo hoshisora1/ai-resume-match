@@ -17,3 +17,9 @@ ai:
   endpoint: http://localhost/mock
   api-key: test-key
   model: test-model
+
+api:
+  token: test-token
+
+report:
+  cache-ttl: 10m

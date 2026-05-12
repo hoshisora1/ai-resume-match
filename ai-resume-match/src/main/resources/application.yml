@@ -21,5 +21,11 @@ spring:
 
 ai:
   endpoint: https://api.openai.com/v1/chat/completions
-  api-key: ${AI_API_KEY:demo-key}
+  api-key: ${AI_API_KEY}
   model: gpt-4o-mini
+
+api:
+  token: ${API_TOKEN}
+
+report:
+  cache-ttl: 10m

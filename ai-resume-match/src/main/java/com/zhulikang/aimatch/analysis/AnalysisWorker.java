@@ -11,14 +11,21 @@ import com.zhulikang.aimatch.rag.VectorSearchResult;
 import com.zhulikang.aimatch.resume.Resume;
 import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class AnalysisWorker {
+    private static final Logger log = LoggerFactory.getLogger(AnalysisWorker.class);
+    private static final Pattern SCORE_PATTERN = Pattern.compile("匹配分数\\s*[:：]\\s*(\\d{1,3})");
+
+    private final AnalysisTaskService taskService;
     private final AnalysisTaskRepository taskRepository;
     private final ResumeRepository resumeRepository;
     private final JobDescriptionRepository jobRepository;
@@ -29,6 +36,7 @@ public class AnalysisWorker {
     private final AiClient aiClient;
 
     public AnalysisWorker(
+        AnalysisTaskService taskService,
         AnalysisTaskRepository taskRepository,
         ResumeRepository resumeRepository,
         JobDescriptionRepository jobRepository,
@@ -38,6 +46,7 @@ public class AnalysisWorker {
         RagContextBuilder ragContextBuilder,
         AiClient aiClient
     ) {
+        this.taskService = taskService;
         this.taskRepository = taskRepository;
         this.resumeRepository = resumeRepository;
         this.jobRepository = jobRepository;
@@ -48,12 +57,14 @@ public class AnalysisWorker {
         this.aiClient = aiClient;
     }
 
-    @Transactional
     @RabbitListener(queues = RabbitConfig.ANALYSIS_QUEUE)
     public void handle(Long taskId) {
-        AnalysisTask task = taskRepository.findById(taskId).orElseThrow();
+        if (!taskService.tryStart(taskId)) {
+            log.info("Skip analysis task {} because it is not pending", taskId);
+            return;
+        }
         try {
-            task.markRunning();
+            AnalysisTask task = taskRepository.findById(taskId).orElseThrow();
             Resume resume = resumeRepository.findById(task.getResumeId()).orElseThrow();
             JobDescription job = jobRepository.findById(task.getJobDescriptionId()).orElseThrow();
 
@@ -70,16 +81,19 @@ public class AnalysisWorker {
             );
             String report = aiClient.complete(prompt);
             reportRepository.save(new MatchReport(task.getId(), extractScore(report), report));
-            task.markSuccess();
+            taskService.markSuccess(taskId);
         } catch (RuntimeException ex) {
-            task.markFailed();
-            throw ex;
+            taskService.markFailed(taskId);
+            log.warn("Analysis task {} failed: {}", taskId, ex.getMessage());
         }
     }
 
     int extractScore(String report) {
-        String digits = report.replaceAll("(?s).*?(\\d{1,3}).*", "$1");
-        int score = Integer.parseInt(digits);
+        Matcher matcher = SCORE_PATTERN.matcher(report == null ? "" : report);
+        if (!matcher.find()) {
+            throw new IllegalArgumentException("AI report does not contain 匹配分数");
+        }
+        int score = Integer.parseInt(matcher.group(1));
         return Math.max(0, Math.min(100, score));
     }
 }

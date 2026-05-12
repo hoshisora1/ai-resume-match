@@ -2,13 +2,14 @@ package com.zhulikang.aimatch.api;
 
 import com.zhulikang.aimatch.analysis.AnalysisService;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
-import com.zhulikang.aimatch.analysis.MatchReport;
+import com.zhulikang.aimatch.analysis.MatchReportView;
 import com.zhulikang.aimatch.document.DocumentTextExtractor;
 import com.zhulikang.aimatch.job.JdTagExtractor;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.resume.Resume;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,21 +53,26 @@ public class ResumeMatchController {
     }
 
     @PostMapping("/jobs")
-    public Map<String, Long> createJob(@RequestBody Map<String, String> request) {
-        String content = request.getOrDefault("content", "");
-        String tags = jdTagExtractor.toStorageValue(jdTagExtractor.extractTags(content));
-        JobDescription job = jobRepository.save(new JobDescription(content, tags));
+    public Map<String, Long> createJob(@Valid @RequestBody CreateJobRequest request) {
+        String tags = jdTagExtractor.toStorageValue(jdTagExtractor.extractTags(request.content()));
+        JobDescription job = jobRepository.save(new JobDescription(request.content(), tags));
         return Map.of("jobDescriptionId", job.getId());
     }
 
     @PostMapping("/analysis")
-    public Map<String, Long> createAnalysis(@RequestBody Map<String, Long> request) {
-        AnalysisTask task = analysisService.createTask(request.get("resumeId"), request.get("jobDescriptionId"));
+    public Map<String, Long> createAnalysis(@Valid @RequestBody CreateAnalysisRequest request) {
+        if (!resumeRepository.existsById(request.resumeId())) {
+            throw new ResourceNotFoundException("Resume not found");
+        }
+        if (!jobRepository.existsById(request.jobDescriptionId())) {
+            throw new ResourceNotFoundException("Job description not found");
+        }
+        AnalysisTask task = analysisService.createTask(request.resumeId(), request.jobDescriptionId());
         return Map.of("taskId", task.getId());
     }
 
     @GetMapping("/analysis/{taskId}/report")
-    public ResponseEntity<MatchReport> report(@PathVariable Long taskId) {
+    public ResponseEntity<MatchReportView> report(@PathVariable Long taskId) {
         return analysisService.findReport(taskId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());

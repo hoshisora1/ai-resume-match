@@ -1,12 +1,14 @@
 package com.zhulikang.aimatch.ai;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -18,14 +20,26 @@ public class OpenAiCompatibleClient implements AiClient {
     private final String model;
 
     public OpenAiCompatibleClient(
+        RestTemplateBuilder restTemplateBuilder,
         @Value("${ai.endpoint}") String endpoint,
         @Value("${ai.api-key}") String apiKey,
         @Value("${ai.model}") String model
     ) {
-        this(new RestTemplate(), endpoint, apiKey, model);
+        this(
+            restTemplateBuilder
+                .setConnectTimeout(Duration.ofSeconds(3))
+                .setReadTimeout(Duration.ofSeconds(30))
+                .build(),
+            endpoint,
+            apiKey,
+            model
+        );
     }
 
     OpenAiCompatibleClient(RestTemplate restTemplate, String endpoint, String apiKey, String model) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalArgumentException("AI API key must not be blank");
+        }
         this.restTemplate = restTemplate;
         this.endpoint = endpoint;
         this.apiKey = apiKey;
