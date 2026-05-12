@@ -29,3 +29,6 @@ api:
 
 report:
   cache-ttl: 10m
+
+analysis:
+  running-timeout: 15m

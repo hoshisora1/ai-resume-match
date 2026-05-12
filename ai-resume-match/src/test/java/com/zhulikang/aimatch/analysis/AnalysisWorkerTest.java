@@ -28,13 +28,12 @@ class AnalysisWorkerTest {
     private final AnalysisTaskRepository taskRepository = mock(AnalysisTaskRepository.class);
     private final ResumeRepository resumeRepository = mock(ResumeRepository.class);
     private final JobDescriptionRepository jobRepository = mock(JobDescriptionRepository.class);
-    private final MatchReportRepository reportRepository = mock(MatchReportRepository.class);
     private final AiClient aiClient = mock(AiClient.class);
 
     @Test
     void createsReportAndMarksTaskSuccess() {
         AnalysisTask task = task(99L);
-        when(taskService.tryStart(99L)).thenReturn(true);
+        when(taskService.tryStart(99L, false)).thenReturn(true);
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
         when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume(
             "resume.docx",
@@ -50,8 +49,7 @@ class AnalysisWorkerTest {
         worker().handle(99L);
 
         ArgumentCaptor<MatchReport> reportCaptor = ArgumentCaptor.forClass(MatchReport.class);
-        verify(reportRepository).save(reportCaptor.capture());
-        verify(taskService).markSuccess(99L);
+        verify(taskService).completeSuccess(reportCaptor.capture());
         assertThat(reportCaptor.getValue().getTaskId()).isEqualTo(99L);
         assertThat(reportCaptor.getValue().getMatchScore()).isEqualTo(88);
         assertThat(reportCaptor.getValue().getReportContent()).contains("Redis Kafka");
@@ -60,7 +58,7 @@ class AnalysisWorkerTest {
     @Test
     void marksTaskFailedWithoutRethrowingWhenAiCallFails() {
         AnalysisTask task = task(99L);
-        when(taskService.tryStart(99L)).thenReturn(true);
+        when(taskService.tryStart(99L, false)).thenReturn(true);
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
         when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis", "summary")));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis", "Redis")));
@@ -69,18 +67,32 @@ class AnalysisWorkerTest {
         worker().handle(99L);
 
         verify(taskService).markFailed(99L);
-        verify(reportRepository, never()).save(any());
+        verify(taskService, never()).completeSuccess(any());
     }
 
     @Test
     void skipsTaskWhenItCannotStart() {
-        when(taskService.tryStart(99L)).thenReturn(false);
+        when(taskService.tryStart(99L, false)).thenReturn(false);
 
         worker().handle(99L);
 
         verify(taskRepository, never()).findById(99L);
         verify(aiClient, never()).complete(anyString());
-        verify(reportRepository, never()).save(any());
+        verify(taskService, never()).completeSuccess(any());
+    }
+
+    @Test
+    void reprocessesRedeliveredRunningTask() {
+        AnalysisTask task = task(99L);
+        when(taskService.tryStart(99L, true)).thenReturn(true);
+        when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis Kafka", "summary")));
+        when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis Kafka", "Redis,Kafka")));
+        when(aiClient.complete(anyString())).thenReturn("匹配分数：90");
+
+        worker().handle(99L, true);
+
+        verify(taskService).completeSuccess(any(MatchReport.class));
     }
 
     @Test
@@ -96,7 +108,6 @@ class AnalysisWorkerTest {
             taskRepository,
             resumeRepository,
             jobRepository,
-            reportRepository,
             new TextChunker(),
             new HashingEmbeddingClient(),
             new RagContextBuilder(),

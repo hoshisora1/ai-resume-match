@@ -39,7 +39,7 @@ public class RedisReportCache implements ReportCache {
             }
             return Optional.of(objectMapper.readValue(value, MatchReportView.class));
         } catch (RuntimeException | JsonProcessingException ex) {
-            log.warn("Failed to read match report cache for task {}", taskId, ex);
+            log.warn("Failed to read match report cache for task {}: {}", taskId, ex.getMessage());
             return Optional.empty();
         }
     }
@@ -49,7 +49,7 @@ public class RedisReportCache implements ReportCache {
         try {
             redisTemplate.opsForValue().set(key(report.taskId()), objectMapper.writeValueAsString(report), ttl);
         } catch (RuntimeException | JsonProcessingException ex) {
-            log.warn("Failed to write match report cache for task {}", report.taskId(), ex);
+            log.warn("Failed to write match report cache for task {}: {}", report.taskId(), ex.getMessage());
         }
     }
 

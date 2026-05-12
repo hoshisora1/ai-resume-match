@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -17,6 +18,7 @@ import java.util.Optional;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,6 +68,31 @@ class ResumeMatchControllerTest {
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returnsBadRequestWhenAnalysisIdsAreNotPositive() throws Exception {
+        mockMvc.perform(post("/api/analysis")
+                .header("X-API-Token", "test-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"resumeId\":0,\"jobDescriptionId\":-1}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returnsBadRequestWhenUploadedResumeHasNoText() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "empty.pdf",
+            "application/pdf",
+            new byte[] {1, 2, 3}
+        );
+        when(extractor.extract(file)).thenReturn("   ");
+
+        mockMvc.perform(multipart("/api/resumes")
+                .file(file)
+                .header("X-API-Token", "test-token"))
             .andExpect(status().isBadRequest());
     }
 

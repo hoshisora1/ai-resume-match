@@ -29,6 +29,9 @@ public class AnalysisTask {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(nullable = false)
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
     public enum Status {
         PENDING,
         RUNNING,
@@ -46,14 +49,17 @@ public class AnalysisTask {
 
     public void markRunning() {
         this.status = Status.RUNNING;
+        this.updatedAt = LocalDateTime.now();
     }
 
     public void markSuccess() {
         this.status = Status.SUCCESS;
+        this.updatedAt = LocalDateTime.now();
     }
 
     public void markFailed() {
         this.status = Status.FAILED;
+        this.updatedAt = LocalDateTime.now();
     }
 
     public Long getId() {
@@ -74,5 +80,9 @@ public class AnalysisTask {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
     }
 }

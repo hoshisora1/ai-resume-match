@@ -47,7 +47,13 @@ public class ResumeMatchController {
 
     @PostMapping("/resumes")
     public Map<String, Long> uploadResume(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("Resume file must not be empty");
+        }
         String rawText = extractor.extract(file);
+        if (rawText.isBlank()) {
+            throw new IllegalArgumentException("Resume text must not be blank");
+        }
         Resume resume = resumeRepository.save(new Resume(file.getOriginalFilename(), rawText, rawText));
         return Map.of("resumeId", resume.getId());
     }

@@ -10,9 +10,11 @@ import com.zhulikang.aimatch.rag.TextChunker;
 import com.zhulikang.aimatch.rag.VectorSearchResult;
 import com.zhulikang.aimatch.resume.Resume;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
@@ -29,7 +31,6 @@ public class AnalysisWorker {
     private final AnalysisTaskRepository taskRepository;
     private final ResumeRepository resumeRepository;
     private final JobDescriptionRepository jobRepository;
-    private final MatchReportRepository reportRepository;
     private final TextChunker textChunker;
     private final EmbeddingClient embeddingClient;
     private final RagContextBuilder ragContextBuilder;
@@ -40,7 +41,6 @@ public class AnalysisWorker {
         AnalysisTaskRepository taskRepository,
         ResumeRepository resumeRepository,
         JobDescriptionRepository jobRepository,
-        MatchReportRepository reportRepository,
         TextChunker textChunker,
         EmbeddingClient embeddingClient,
         RagContextBuilder ragContextBuilder,
@@ -50,16 +50,20 @@ public class AnalysisWorker {
         this.taskRepository = taskRepository;
         this.resumeRepository = resumeRepository;
         this.jobRepository = jobRepository;
-        this.reportRepository = reportRepository;
         this.textChunker = textChunker;
         this.embeddingClient = embeddingClient;
         this.ragContextBuilder = ragContextBuilder;
         this.aiClient = aiClient;
     }
 
-    @RabbitListener(queues = RabbitConfig.ANALYSIS_QUEUE)
     public void handle(Long taskId) {
-        if (!taskService.tryStart(taskId)) {
+        handle(taskId, false);
+    }
+
+    @RabbitListener(queues = RabbitConfig.ANALYSIS_QUEUE)
+    public void handle(Long taskId, @Header(name = AmqpHeaders.REDELIVERED, required = false) Boolean redelivered) {
+        boolean isRedelivered = Boolean.TRUE.equals(redelivered);
+        if (!taskService.tryStart(taskId, isRedelivered)) {
             log.info("Skip analysis task {} because it is not pending", taskId);
             return;
         }
@@ -80,8 +84,7 @@ public class AnalysisWorker {
                 Arrays.stream(job.getSkillTags().split(",")).filter(tag -> !tag.isBlank()).toList()
             );
             String report = aiClient.complete(prompt);
-            reportRepository.save(new MatchReport(task.getId(), extractScore(report), report));
-            taskService.markSuccess(taskId);
+            taskService.completeSuccess(new MatchReport(task.getId(), extractScore(report), report));
         } catch (RuntimeException ex) {
             taskService.markFailed(taskId);
             log.warn("Analysis task {} failed: {}", taskId, ex.getMessage());
