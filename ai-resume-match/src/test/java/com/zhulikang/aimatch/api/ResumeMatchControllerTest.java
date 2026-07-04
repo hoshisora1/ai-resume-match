@@ -128,7 +128,7 @@ class ResumeMatchControllerTest {
         MatchReportView report = new MatchReportView(
             30L,
             88,
-            "鍖归厤鍒嗘暟锛?8",
+            "匹配分数：88",
             LocalDateTime.of(2026, 7, 4, 9, 30)
         );
         when(analysisService.findReport(30L)).thenReturn(Optional.of(report));
@@ -137,7 +137,7 @@ class ResumeMatchControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.taskId").value(30))
             .andExpect(jsonPath("$.matchScore").value(88))
-            .andExpect(jsonPath("$.reportContent").value("鍖归厤鍒嗘暟锛?8"))
+            .andExpect(jsonPath("$.reportContent").value("匹配分数：88"))
             .andExpect(jsonPath("$.createdAt").exists());
     }
 
