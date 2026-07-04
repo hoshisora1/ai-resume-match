@@ -15,7 +15,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -95,13 +94,6 @@ class AnalysisWorkerTest {
         verify(taskService).completeSuccess(any(MatchReport.class));
     }
 
-    @Test
-    void rejectsReportWithoutMatchScore() {
-        assertThatThrownBy(() -> worker().extractScore("技能匹配：Redis Kafka"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("匹配分数");
-    }
-
     private AnalysisWorker worker() {
         return new AnalysisWorker(
             taskService,
@@ -111,7 +103,8 @@ class AnalysisWorkerTest {
             new TextChunker(),
             new HashingEmbeddingClient(),
             new RagContextBuilder(),
-            aiClient
+            aiClient,
+            new ReportParser()
         );
     }
 
