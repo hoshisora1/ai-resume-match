@@ -34,6 +34,10 @@ public class AnalysisService {
         return task;
     }
 
+    public Optional<AnalysisTask> findTask(Long taskId) {
+        return taskRepository.findById(taskId);
+    }
+
     public Optional<MatchReportView> findReport(Long taskId) {
         Optional<MatchReportView> cached = reportCache.get(taskId);
         if (cached.isPresent()) {

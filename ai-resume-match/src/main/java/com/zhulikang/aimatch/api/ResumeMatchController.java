@@ -77,6 +77,14 @@ public class ResumeMatchController {
         return AnalysisTaskResponse.from(task);
     }
 
+    @GetMapping("/analysis/{taskId}")
+    public ResponseEntity<AnalysisTaskResponse> analysisTask(@PathVariable Long taskId) {
+        return analysisService.findTask(taskId)
+            .map(AnalysisTaskResponse::from)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/analysis/{taskId}/report")
     public ResponseEntity<MatchReportView> report(@PathVariable Long taskId) {
         return analysisService.findReport(taskId)

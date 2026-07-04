@@ -154,6 +154,34 @@ class ResumeMatchControllerTest {
     }
 
     @Test
+    void returnsAnalysisTaskStatus() throws Exception {
+        AnalysisTask task = new AnalysisTask(10L, 20L);
+        ReflectionTestUtils.setField(task, "id", 30L);
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 4, 10, 15);
+        LocalDateTime updatedAt = LocalDateTime.of(2026, 7, 4, 10, 20);
+        ReflectionTestUtils.setField(task, "createdAt", createdAt);
+        ReflectionTestUtils.setField(task, "updatedAt", updatedAt);
+        when(analysisService.findTask(30L)).thenReturn(Optional.of(task));
+
+        mockMvc.perform(get("/api/analysis/30").header("X-API-Token", "test-token"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.taskId").value(30))
+            .andExpect(jsonPath("$.resumeId").value(10))
+            .andExpect(jsonPath("$.jobDescriptionId").value(20))
+            .andExpect(jsonPath("$.status").value("PENDING"))
+            .andExpect(jsonPath("$.createdAt").value("2026-07-04T10:15:00"))
+            .andExpect(jsonPath("$.updatedAt").value("2026-07-04T10:20:00"));
+    }
+
+    @Test
+    void returnsNotFoundWhenAnalysisTaskDoesNotExist() throws Exception {
+        when(analysisService.findTask(404L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/analysis/404").header("X-API-Token", "test-token"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
     void returnsReportBodyWhenReportExists() throws Exception {
         MatchReportView report = new MatchReportView(
             30L,
