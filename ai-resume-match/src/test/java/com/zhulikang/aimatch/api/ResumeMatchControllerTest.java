@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -96,6 +97,25 @@ class ResumeMatchControllerTest {
             .andExpect(jsonPath("$.resumeId").value(10));
 
         verify(resumeFileValidator).validate(file);
+    }
+
+    @Test
+    void returnsBadRequestWhenUploadValidatorRejectsFile() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "resume.txt",
+            "text/plain",
+            new byte[] {1, 2, 3}
+        );
+        doThrow(new IllegalArgumentException("Only PDF and DOCX are supported"))
+            .when(resumeFileValidator).validate(file);
+
+        mockMvc.perform(multipart("/api/resumes")
+                .file(file)
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Only PDF and DOCX are supported"));
     }
 
     @Test
