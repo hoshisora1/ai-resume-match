@@ -211,6 +211,17 @@ class ResumeMatchControllerTest {
     }
 
     @Test
+    void returnsInvalidRequestWhenJobJsonIsMalformed() throws Exception {
+        mockMvc.perform(post("/api/jobs")
+                .header("X-API-Token", "test-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
     void returnsBadRequestWhenAnalysisIdsAreMissing() throws Exception {
         mockMvc.perform(post("/api/analysis")
                 .header("X-API-Token", "test-token")
@@ -227,6 +238,22 @@ class ResumeMatchControllerTest {
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"resumeId\":0,\"jobDescriptionId\":-1}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
+    void returnsInvalidRequestWhenAnalysisTaskIdIsNotNumeric() throws Exception {
+        mockMvc.perform(get("/api/analysis/not-a-number").header("X-API-Token", "test-token"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
+    void returnsInvalidRequestWhenResumeUploadFileIsMissing() throws Exception {
+        mockMvc.perform(multipart("/api/resumes").header("X-API-Token", "test-token"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
             .andExpect(jsonPath("$.message").value("Invalid request"));

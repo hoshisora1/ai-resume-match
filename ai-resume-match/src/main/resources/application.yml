@@ -1,6 +1,10 @@
 spring:
   application:
     name: ai-resume-match
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
   datasource:
     url: jdbc:mysql://localhost:3306/ai_resume_match?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
