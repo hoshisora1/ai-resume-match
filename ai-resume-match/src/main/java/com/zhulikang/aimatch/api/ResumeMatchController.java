@@ -4,6 +4,7 @@ import com.zhulikang.aimatch.analysis.AnalysisService;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
 import com.zhulikang.aimatch.document.DocumentTextExtractor;
+import com.zhulikang.aimatch.document.ResumeFileValidator;
 import com.zhulikang.aimatch.job.JdTagExtractor;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
@@ -20,12 +21,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/api")
 public class ResumeMatchController {
     private final DocumentTextExtractor extractor;
+    private final ResumeFileValidator resumeFileValidator;
     private final ResumeRepository resumeRepository;
     private final JobDescriptionRepository jobRepository;
     private final JdTagExtractor jdTagExtractor;
@@ -33,12 +33,14 @@ public class ResumeMatchController {
 
     public ResumeMatchController(
         DocumentTextExtractor extractor,
+        ResumeFileValidator resumeFileValidator,
         ResumeRepository resumeRepository,
         JobDescriptionRepository jobRepository,
         JdTagExtractor jdTagExtractor,
         AnalysisService analysisService
     ) {
         this.extractor = extractor;
+        this.resumeFileValidator = resumeFileValidator;
         this.resumeRepository = resumeRepository;
         this.jobRepository = jobRepository;
         this.jdTagExtractor = jdTagExtractor;
@@ -46,27 +48,25 @@ public class ResumeMatchController {
     }
 
     @PostMapping("/resumes")
-    public Map<String, Long> uploadResume(@RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            throw new IllegalArgumentException("Resume file must not be empty");
-        }
+    public ResumeUploadResponse uploadResume(@RequestParam("file") MultipartFile file) {
+        resumeFileValidator.validate(file);
         String rawText = extractor.extract(file);
         if (rawText.isBlank()) {
             throw new IllegalArgumentException("Resume text must not be blank");
         }
         Resume resume = resumeRepository.save(new Resume(file.getOriginalFilename(), rawText, rawText));
-        return Map.of("resumeId", resume.getId());
+        return new ResumeUploadResponse(resume.getId());
     }
 
     @PostMapping("/jobs")
-    public Map<String, Long> createJob(@Valid @RequestBody CreateJobRequest request) {
+    public JobDescriptionResponse createJob(@Valid @RequestBody CreateJobRequest request) {
         String tags = jdTagExtractor.toStorageValue(jdTagExtractor.extractTags(request.content()));
         JobDescription job = jobRepository.save(new JobDescription(request.content(), tags));
-        return Map.of("jobDescriptionId", job.getId());
+        return new JobDescriptionResponse(job.getId());
     }
 
     @PostMapping("/analysis")
-    public Map<String, Long> createAnalysis(@Valid @RequestBody CreateAnalysisRequest request) {
+    public AnalysisTaskResponse createAnalysis(@Valid @RequestBody CreateAnalysisRequest request) {
         if (!resumeRepository.existsById(request.resumeId())) {
             throw new ResourceNotFoundException("Resume not found");
         }
@@ -74,7 +74,7 @@ public class ResumeMatchController {
             throw new ResourceNotFoundException("Job description not found");
         }
         AnalysisTask task = analysisService.createTask(request.resumeId(), request.jobDescriptionId());
-        return Map.of("taskId", task.getId());
+        return AnalysisTaskResponse.from(task);
     }
 
     @GetMapping("/analysis/{taskId}/report")
