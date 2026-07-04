@@ -55,7 +55,17 @@ class ResumeMatchControllerTest {
     @Test
     void rejectsRequestWithoutApiToken() throws Exception {
         mockMvc.perform(get("/api/analysis/1/report"))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+            .andExpect(jsonPath("$.message").value("Unauthorized"));
+    }
+
+    @Test
+    void rejectsRequestWithInvalidApiToken() throws Exception {
+        mockMvc.perform(get("/api/analysis/1/report").header("X-API-Token", "wrong-token"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+            .andExpect(jsonPath("$.message").value("Unauthorized"));
     }
 
     @Test
@@ -147,7 +157,9 @@ class ResumeMatchControllerTest {
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"content\":\"  \"}"))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
     }
 
     @Test
@@ -156,7 +168,9 @@ class ResumeMatchControllerTest {
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
     }
 
     @Test
@@ -165,7 +179,9 @@ class ResumeMatchControllerTest {
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"resumeId\":0,\"jobDescriptionId\":-1}"))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
     }
 
     @Test
@@ -181,7 +197,9 @@ class ResumeMatchControllerTest {
         mockMvc.perform(multipart("/api/resumes")
                 .file(file)
                 .header("X-API-Token", "test-token"))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Resume text must not be blank"));
     }
 
     @Test
@@ -192,6 +210,8 @@ class ResumeMatchControllerTest {
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"resumeId\":1,\"jobDescriptionId\":2}"))
-            .andExpect(status().isNotFound());
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+            .andExpect(jsonPath("$.message").value("Resume not found"));
     }
 }
