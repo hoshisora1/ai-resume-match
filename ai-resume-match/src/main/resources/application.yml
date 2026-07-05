@@ -6,13 +6,15 @@ spring:
       max-file-size: 5MB
       max-request-size: 5MB
   datasource:
-    url: jdbc:mysql://localhost:3306/ai_resume_match?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/ai_resume_match?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai
     username: root
     password: root
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
+  flyway:
+    enabled: true
   data:
     redis:
       host: localhost
@@ -36,3 +38,11 @@ report:
 
 analysis:
   running-timeout: 15m
+  outbox:
+    fixed-delay: 5s
+    batch-size: 20
+    retry-delay: 30s
+  retry:
+    delay: 1m
+    scheduler-fixed-delay: 30s
+    batch-size: 20

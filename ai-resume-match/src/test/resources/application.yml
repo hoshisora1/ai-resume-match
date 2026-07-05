@@ -8,6 +8,11 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+  flyway:
+    enabled: false
+  task:
+    scheduling:
+      enabled: false
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
