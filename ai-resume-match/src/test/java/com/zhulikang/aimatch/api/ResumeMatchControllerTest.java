@@ -169,6 +169,10 @@ class ResumeMatchControllerTest {
             .andExpect(jsonPath("$.resumeId").value(10))
             .andExpect(jsonPath("$.jobDescriptionId").value(20))
             .andExpect(jsonPath("$.status").value("PENDING"))
+            .andExpect(jsonPath("$.attemptCount").value(0))
+            .andExpect(jsonPath("$.maxAttempts").value(3))
+            .andExpect(jsonPath("$.failureCode").doesNotExist())
+            .andExpect(jsonPath("$.failureMessage").doesNotExist())
             .andExpect(jsonPath("$.createdAt").value("2026-07-04T10:15:00"))
             .andExpect(jsonPath("$.updatedAt").value("2026-07-04T10:20:00"));
     }

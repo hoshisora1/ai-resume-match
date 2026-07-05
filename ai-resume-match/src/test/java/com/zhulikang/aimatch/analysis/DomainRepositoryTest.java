@@ -54,8 +54,9 @@ class DomainRepositoryTest {
         task.markSuccess();
         assertThat(task.getStatus()).isEqualTo(AnalysisTask.Status.SUCCESS);
 
-        task.markFailed();
-        assertThat(task.getStatus()).isEqualTo(AnalysisTask.Status.FAILED);
+        task.markFinalFailure(AnalysisFailureCode.UNEXPECTED_ERROR, "Analysis failed");
+        assertThat(task.getStatus()).isEqualTo(AnalysisTask.Status.FAILED_FINAL);
+        assertThat(task.getFailureCode()).isEqualTo(AnalysisFailureCode.UNEXPECTED_ERROR);
     }
 
     @Test
@@ -75,6 +76,9 @@ class DomainRepositoryTest {
         );
 
         assertThat(updated).isEqualTo(1);
+        AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updatedTask.getAttemptCount()).isEqualTo(2);
+        assertThat(updatedTask.getStartedAt()).isNotNull();
     }
 
     @Test

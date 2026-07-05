@@ -9,6 +9,13 @@ public record AnalysisTaskResponse(
     Long resumeId,
     Long jobDescriptionId,
     String status,
+    int attemptCount,
+    int maxAttempts,
+    String failureCode,
+    String failureMessage,
+    LocalDateTime nextRetryAt,
+    LocalDateTime startedAt,
+    LocalDateTime completedAt,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -18,6 +25,13 @@ public record AnalysisTaskResponse(
             task.getResumeId(),
             task.getJobDescriptionId(),
             task.getStatus().name(),
+            task.getAttemptCount(),
+            task.getMaxAttempts(),
+            task.getFailureCode() == null ? null : task.getFailureCode().name(),
+            task.getFailureMessage(),
+            task.getNextRetryAt(),
+            task.getStartedAt(),
+            task.getCompletedAt(),
             task.getCreatedAt(),
             task.getUpdatedAt()
         );

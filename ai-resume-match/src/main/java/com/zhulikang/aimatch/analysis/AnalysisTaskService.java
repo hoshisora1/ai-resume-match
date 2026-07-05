@@ -40,11 +40,33 @@ public class AnalysisTaskService {
     @Transactional
     public void completeSuccess(MatchReport report) {
         reportRepository.save(report);
-        taskRepository.updateStatus(report.getTaskId(), AnalysisTask.Status.SUCCESS, LocalDateTime.now());
+        taskRepository.markSuccess(report.getTaskId(), AnalysisTask.Status.SUCCESS, LocalDateTime.now());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFailed(Long taskId) {
-        taskRepository.updateStatus(taskId, AnalysisTask.Status.FAILED, LocalDateTime.now());
+        markFinalFailure(taskId, AnalysisFailureCode.UNEXPECTED_ERROR, "Analysis failed");
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markRetryableFailure(Long taskId, AnalysisFailureCode failureCode, String failureMessage) {
+        taskRepository.markFailure(
+            taskId,
+            AnalysisTask.Status.FAILED_RETRYABLE,
+            failureCode,
+            failureMessage,
+            LocalDateTime.now()
+        );
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markFinalFailure(Long taskId, AnalysisFailureCode failureCode, String failureMessage) {
+        taskRepository.markFailure(
+            taskId,
+            AnalysisTask.Status.FAILED_FINAL,
+            failureCode,
+            failureMessage,
+            LocalDateTime.now()
+        );
     }
 }

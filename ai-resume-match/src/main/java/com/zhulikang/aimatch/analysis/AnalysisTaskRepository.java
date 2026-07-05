@@ -8,10 +8,17 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 
 public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long> {
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         update AnalysisTask t
-        set t.status = :running, t.updatedAt = :now
+        set t.status = :running,
+            t.attemptCount = t.attemptCount + 1,
+            t.failureCode = null,
+            t.failureMessage = null,
+            t.nextRetryAt = null,
+            t.startedAt = :now,
+            t.completedAt = null,
+            t.updatedAt = :now
         where t.id = :taskId
           and (
             t.status = :pending
@@ -27,11 +34,38 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
         @Param("redelivered") boolean redelivered
     );
 
-    @Modifying
-    @Query("update AnalysisTask t set t.status = :status, t.updatedAt = :now where t.id = :taskId")
-    int updateStatus(
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update AnalysisTask t
+        set t.status = :status,
+            t.failureCode = null,
+            t.failureMessage = null,
+            t.nextRetryAt = null,
+            t.completedAt = :now,
+            t.updatedAt = :now
+        where t.id = :taskId
+        """)
+    int markSuccess(
         @Param("taskId") Long taskId,
         @Param("status") AnalysisTask.Status status,
+        @Param("now") LocalDateTime now
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update AnalysisTask t
+        set t.status = :status,
+            t.failureCode = :failureCode,
+            t.failureMessage = :failureMessage,
+            t.completedAt = :now,
+            t.updatedAt = :now
+        where t.id = :taskId
+        """)
+    int markFailure(
+        @Param("taskId") Long taskId,
+        @Param("status") AnalysisTask.Status status,
+        @Param("failureCode") AnalysisFailureCode failureCode,
+        @Param("failureMessage") String failureMessage,
         @Param("now") LocalDateTime now
     );
 }
