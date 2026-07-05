@@ -38,7 +38,7 @@ public class AnalysisRetryScheduler {
         this.clock = clock;
     }
 
-    @Scheduled(fixedDelayString = "${analysis.retry.scheduler-fixed-delay:30s}")
+    @Scheduled(fixedDelayString = "${analysis.retry.scheduler-fixed-delay-ms:30000}")
     @Transactional
     public void enqueueDueRetries() {
         LocalDateTime now = LocalDateTime.now(clock);

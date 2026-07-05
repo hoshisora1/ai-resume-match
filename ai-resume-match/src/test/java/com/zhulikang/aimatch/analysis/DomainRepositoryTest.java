@@ -7,10 +7,11 @@ import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
-import org.springframework.data.domain.PageRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -97,8 +98,7 @@ class DomainRepositoryTest {
             AnalysisTask.Status.RUNNING,
             AnalysisTask.Status.PENDING,
             LocalDateTime.now().minusMinutes(15),
-            LocalDateTime.now(),
-            false
+            LocalDateTime.now()
         );
 
         assertThat(updated).isEqualTo(1);
@@ -155,21 +155,21 @@ class DomainRepositoryTest {
     }
 
     @Test
-    void canReclaimRedeliveredRunningTaskEvenWhenFresh() {
+    void doesNotStartFreshRunningTaskEvenWhenMessageIsRedelivered() {
         AnalysisTask task = analysisTaskRepository.save(new AnalysisTask(1L, 2L));
         task.markRunning();
         analysisTaskRepository.saveAndFlush(task);
 
-        int updated = analysisTaskRepository.markRunningIfPendingOrStale(
-            task.getId(),
-            AnalysisTask.Status.RUNNING,
-            AnalysisTask.Status.PENDING,
-            LocalDateTime.now().minusMinutes(15),
-            LocalDateTime.now(),
-            true
+        AnalysisTaskService service = new AnalysisTaskService(
+            analysisTaskRepository,
+            matchReportRepository,
+            Duration.ofMinutes(15)
         );
 
-        assertThat(updated).isEqualTo(1);
+        assertThat(service.tryStart(task.getId(), true)).isFalse();
+        AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updatedTask.getStatus()).isEqualTo(AnalysisTask.Status.RUNNING);
+        assertThat(updatedTask.getAttemptCount()).isEqualTo(1);
     }
 
     @Test
@@ -183,8 +183,7 @@ class DomainRepositoryTest {
             AnalysisTask.Status.RUNNING,
             AnalysisTask.Status.PENDING,
             LocalDateTime.now().minusMinutes(15),
-            LocalDateTime.now(),
-            false
+            LocalDateTime.now()
         );
 
         assertThat(updated).isEqualTo(0);

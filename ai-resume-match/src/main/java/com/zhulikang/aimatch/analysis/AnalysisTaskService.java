@@ -43,8 +43,7 @@ public class AnalysisTaskService {
             AnalysisTask.Status.RUNNING,
             AnalysisTask.Status.PENDING,
             now.minus(runningTimeout),
-            now,
-            redelivered
+            now
         ) == 1;
     }
 

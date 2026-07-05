@@ -1,9 +1,14 @@
 package com.zhulikang.aimatch.analysis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.core.ReturnedMessage;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.rabbit.connection.CorrelationData.Confirm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -14,29 +19,35 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class AnalysisOutboxPublisher {
     private static final Logger log = LoggerFactory.getLogger(AnalysisOutboxPublisher.class);
-    private static final List<AnalysisOutboxStatus> PUBLISHABLE_STATUSES = List.of(
+    private static final List<AnalysisOutboxStatus> CLAIMABLE_STATUSES = List.of(
         AnalysisOutboxStatus.PENDING,
-        AnalysisOutboxStatus.FAILED
+        AnalysisOutboxStatus.FAILED,
+        AnalysisOutboxStatus.PROCESSING
     );
 
     private final AnalysisOutboxRepository outboxRepository;
     private final RabbitTemplate rabbitTemplate;
     private final int batchSize;
     private final Duration retryDelay;
+    private final Duration confirmTimeout;
     private final Clock clock;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @Autowired
     public AnalysisOutboxPublisher(
         AnalysisOutboxRepository outboxRepository,
         RabbitTemplate rabbitTemplate,
         @Value("${analysis.outbox.batch-size:20}") int batchSize,
-        @Value("${analysis.outbox.retry-delay:30s}") Duration retryDelay
+        @Value("${analysis.outbox.retry-delay:30s}") Duration retryDelay,
+        @Value("${analysis.outbox.confirm-timeout:5s}") Duration confirmTimeout
     ) {
-        this(outboxRepository, rabbitTemplate, batchSize, retryDelay, Clock.systemDefaultZone());
+        this(outboxRepository, rabbitTemplate, batchSize, retryDelay, confirmTimeout, Clock.systemDefaultZone());
     }
 
     AnalysisOutboxPublisher(
@@ -44,39 +55,77 @@ public class AnalysisOutboxPublisher {
         RabbitTemplate rabbitTemplate,
         int batchSize,
         Duration retryDelay,
+        Duration confirmTimeout,
         Clock clock
     ) {
         this.outboxRepository = outboxRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.batchSize = Math.max(1, batchSize);
         this.retryDelay = retryDelay;
+        this.confirmTimeout = confirmTimeout;
         this.clock = clock;
     }
 
-    @Scheduled(fixedDelayString = "${analysis.outbox.fixed-delay:5s}")
+    @Scheduled(fixedDelayString = "${analysis.outbox.fixed-delay-ms:5000}")
     @Transactional
     public void publishPending() {
         LocalDateTime now = LocalDateTime.now(clock);
-        List<AnalysisOutboxEvent> events = outboxRepository.findDueForPublish(
-            PUBLISHABLE_STATUSES,
+        List<Long> eventIds = outboxRepository.findDueForPublishIds(
+            CLAIMABLE_STATUSES,
             now,
             PageRequest.of(0, batchSize)
         );
-        for (AnalysisOutboxEvent event : events) {
-            publish(event, now);
+        for (Long eventId : eventIds) {
+            int claimed = outboxRepository.markProcessingIfDue(
+                eventId,
+                CLAIMABLE_STATUSES,
+                now,
+                AnalysisOutboxStatus.PROCESSING,
+                now.plus(retryDelay)
+            );
+            if (claimed == 1) {
+                Optional<AnalysisOutboxEvent> event = outboxRepository.findById(eventId);
+                event.ifPresent(outboxEvent -> publish(eventId, outboxEvent, now));
+            }
         }
     }
 
-    private void publish(AnalysisOutboxEvent event, LocalDateTime now) {
+    private void publish(Long eventId, AnalysisOutboxEvent event, LocalDateTime now) {
         try {
             Long taskId = extractTaskId(event);
-            rabbitTemplate.convertAndSend(RabbitConfig.ANALYSIS_EXCHANGE, RabbitConfig.ANALYSIS_ROUTING_KEY, taskId);
+            publishToRabbit(eventId, taskId);
             event.markPublished(now);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            event.markPublishFailed(errorMessage(ex), now.plus(retryDelay));
+            log.warn("Interrupted while publishing analysis outbox event {}", eventId);
         } catch (Exception ex) {
-            event.markPublishFailed(ex.getMessage(), now.plus(retryDelay));
-            log.warn("Failed to publish analysis outbox event {}: {}", event.getId(), ex.getMessage());
+            event.markPublishFailed(errorMessage(ex), now.plus(retryDelay));
+            log.warn("Failed to publish analysis outbox event {}: {}", eventId, errorMessage(ex));
         }
         outboxRepository.save(event);
+    }
+
+    private void publishToRabbit(Long eventId, Long taskId) throws Exception {
+        CorrelationData correlationData = new CorrelationData("analysis-outbox-" + eventId);
+        rabbitTemplate.convertAndSend(
+            RabbitConfig.ANALYSIS_EXCHANGE,
+            RabbitConfig.ANALYSIS_ROUTING_KEY,
+            taskId,
+            correlationData
+        );
+        Confirm confirm = correlationData.getFuture().get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);
+        if (!confirm.isAck()) {
+            throw new AmqpException("RabbitMQ broker did not confirm publish: " + confirm.getReason());
+        }
+        ReturnedMessage returned = correlationData.getReturned();
+        if (returned != null) {
+            throw new AmqpException(
+                "RabbitMQ returned unroutable message: " + returned.getReplyText()
+                    + " exchange=" + returned.getExchange()
+                    + " routingKey=" + returned.getRoutingKey()
+            );
+        }
     }
 
     private Long extractTaskId(AnalysisOutboxEvent event) throws Exception {
@@ -84,5 +133,9 @@ public class AnalysisOutboxPublisher {
             throw new IllegalArgumentException("Unsupported analysis outbox event type: " + event.getEventType());
         }
         return objectMapper.readTree(event.getPayloadJson()).required("taskId").asLong();
+    }
+
+    private String errorMessage(Exception ex) {
+        return ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
     }
 }

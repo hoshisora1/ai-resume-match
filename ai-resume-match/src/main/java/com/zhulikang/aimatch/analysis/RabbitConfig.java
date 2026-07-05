@@ -6,6 +6,7 @@ import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.amqp.RabbitTemplateCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -58,5 +59,11 @@ public class RabbitConfig {
         return BindingBuilder.bind(analysisDeadLetterQueue)
             .to(analysisDeadLetterExchange)
             .with(ANALYSIS_DLQ);
+    }
+
+    @Bean
+    public RabbitTemplateCustomizer analysisRabbitTemplateReturnsCustomizer() {
+        return rabbitTemplate -> rabbitTemplate.setReturnsCallback(returned -> {
+        });
     }
 }

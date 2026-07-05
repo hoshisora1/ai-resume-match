@@ -24,7 +24,7 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
         where t.id = :taskId
           and (
             t.status = :pending
-            or (t.status = :running and (:redelivered = true or t.updatedAt < :staleBefore))
+            or (t.status = :running and t.updatedAt < :staleBefore)
           )
         """)
     int markRunningIfPendingOrStale(
@@ -32,8 +32,7 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
         @Param("running") AnalysisTask.Status running,
         @Param("pending") AnalysisTask.Status pending,
         @Param("staleBefore") LocalDateTime staleBefore,
-        @Param("now") LocalDateTime now,
-        @Param("redelivered") boolean redelivered
+        @Param("now") LocalDateTime now
     );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

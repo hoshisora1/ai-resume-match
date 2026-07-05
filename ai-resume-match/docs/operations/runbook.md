@@ -68,7 +68,7 @@ mvn test
 mvn verify
 ```
 
-当前 `mvn verify` 会通过 Testcontainers 验证 MySQL Flyway migration 和 RabbitMQ outbox 投递。
+当前 `mvn verify` 会通过 Testcontainers 验证 MySQL Flyway migration，以及 MySQL+RabbitMQ outbox 生命周期、publisher confirm/return 行为。
 
 检查 API token 拦截：
 
@@ -195,7 +195,7 @@ curl.exe -i `
 可能原因：
 
 - RabbitMQ 未启动。
-- outbox 事件待发布或发布失败后等待下一次重试。
+- outbox 事件待发布、发布中，或因 RabbitMQ 不可达、不可路由、confirm 失败后等待下一次重试。
 - worker 未正常监听队列。
 
 检查：
@@ -212,7 +212,7 @@ docker compose ps rabbitmq
 docker compose exec mysql mysql -uroot -proot ai_resume_match -e "select id,event_type,aggregate_id,status,attempt_count,next_attempt_at,last_error from analysis_outbox order by id desc limit 20;"
 ```
 
-预期：`PENDING` 和 due 的 `FAILED` outbox 事件会由 `AnalysisOutboxPublisher` 自动发布；`last_error` 可用于定位 RabbitMQ 连接或消息转换问题。
+预期：`PENDING`、due 的 `FAILED`、以及已过期的 `PROCESSING` outbox 事件会由 `AnalysisOutboxPublisher` 自动认领并发布；`PROCESSING` 通常只会短暂出现，`last_error` 可用于定位 RabbitMQ 连接、不可路由或消息转换问题。
 
 ### 5.5 任务失败
 
@@ -232,7 +232,7 @@ docker compose exec mysql mysql -uroot -proot ai_resume_match -e "select id,even
 当前行为：
 
 - Phase 2 已提供 `failureCode`、`failureMessage`、attempt 元数据和手动 retry endpoint。
-- Phase 3 已提供 `nextRetryAt`、自动重试调度和 outbox 重投递。
+- Phase 3 已提供 `nextRetryAt`、自动重试调度和带 publisher confirm/return 的 outbox 重投递。
 - `FAILED_FINAL` 是终态；如需重新分析，应创建新任务。
 
 ### 5.6 查询报告慢或缓存异常

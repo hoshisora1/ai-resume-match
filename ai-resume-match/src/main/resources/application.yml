@@ -24,6 +24,10 @@ spring:
     port: 5672
     username: guest
     password: guest
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
 ai:
   endpoint: https://api.openai.com/v1/chat/completions
@@ -39,10 +43,11 @@ report:
 analysis:
   running-timeout: 15m
   outbox:
-    fixed-delay: 5s
+    fixed-delay-ms: 5000
     batch-size: 20
     retry-delay: 30s
+    confirm-timeout: 5s
   retry:
     delay: 1m
-    scheduler-fixed-delay: 30s
+    scheduler-fixed-delay-ms: 30000
     batch-size: 20

@@ -37,7 +37,7 @@
 - Create `src/main/resources/db/migration/V1__initial_schema.sql`: MySQL schema for `resume`, `job_description`, `analysis_task`, `match_report`, `analysis_outbox`.
 - Create `src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxEvent.java`: JPA entity for outbox rows.
 - Create `src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxEventType.java`: enum with `ANALYSIS_REQUESTED`.
-- Create `src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxStatus.java`: enum with `PENDING`, `PUBLISHED`, `FAILED`.
+- Create `src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxStatus.java`: enum with `PENDING`, `PROCESSING`, `PUBLISHED`, `FAILED`.
 - Create `src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxRepository.java`: due-event query and guarded status updates.
 - Modify `src/main/java/com/zhulikang/aimatch/application/analysis/AnalysisTaskPublisher.java`: persist outbox intent.
 - Create `src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisher.java`: scheduled/batch publisher to RabbitMQ.
@@ -60,7 +60,7 @@
 - Create: `src/main/resources/db/migration/V1__initial_schema.sql`
 - Create: `src/integration-test/java/com/zhulikang/aimatch/FlywayMigrationIT.java`
 
-- [ ] **Step 1: Add failing migration verification test**
+- [x] **Step 1: Add failing migration verification test**
 
 Create `src/integration-test/java/com/zhulikang/aimatch/FlywayMigrationIT.java`:
 
@@ -135,7 +135,7 @@ class FlywayMigrationIT {
 }
 ```
 
-- [ ] **Step 2: Run the integration test and verify it fails**
+- [x] **Step 2: Run the integration test and verify it fails**
 
 Run:
 
@@ -145,7 +145,7 @@ mvn "-Dit.test=FlywayMigrationIT" verify
 
 Expected: FAIL because Failsafe/Testcontainers/Flyway and migration file are not yet configured.
 
-- [ ] **Step 3: Add dependencies and Failsafe configuration**
+- [x] **Step 3: Add dependencies and Failsafe configuration**
 
 Update `pom.xml` with:
 
@@ -204,7 +204,7 @@ Add Maven plugins:
 </plugin>
 ```
 
-- [ ] **Step 4: Add migration and config**
+- [x] **Step 4: Add migration and config**
 
 Set main `application.yml`:
 
@@ -232,7 +232,7 @@ spring:
 
 Create `V1__initial_schema.sql` with tables and indexes listed in the File Map. Use `varchar` for enums and `longtext` for text fields. Do not use MySQL native enum.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run:
 
@@ -243,7 +243,7 @@ mvn test
 
 Expected: `FlywayMigrationIT` passes with MySQL Testcontainers; fast tests remain passing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add pom.xml src/main/resources/application.yml src/test/resources/application.yml src/main/resources/db/migration/V1__initial_schema.sql src/integration-test/java/com/zhulikang/aimatch/FlywayMigrationIT.java
@@ -264,7 +264,7 @@ git commit -m "feat: add flyway schema baseline"
 - Modify: `src/test/java/com/zhulikang/aimatch/application/analysis/RetryAnalysisTaskUseCaseTest.java`
 - Add/modify repository tests in `src/test/java/com/zhulikang/aimatch/analysis/DomainRepositoryTest.java`
 
-- [ ] **Step 1: Write failing outbox tests**
+- [x] **Step 1: Write failing outbox tests**
 
 Add tests that assert:
 
@@ -282,7 +282,7 @@ assertThat(outboxRepository.findAll())
 
 Update use-case unit tests to mock `AnalysisOutboxRepository` instead of `RabbitTemplate` expectations.
 
-- [ ] **Step 2: Run failing tests**
+- [x] **Step 2: Run failing tests**
 
 Run:
 
@@ -292,7 +292,7 @@ mvn "-Dtest=CreateAnalysisTaskUseCaseTest,RetryAnalysisTaskUseCaseTest,DomainRep
 
 Expected: FAIL because outbox classes do not exist and publisher still requires `RabbitTemplate`.
 
-- [ ] **Step 3: Implement outbox entity/repository**
+- [x] **Step 3: Implement outbox entity/repository**
 
 Implement `AnalysisOutboxEvent` with fields:
 
@@ -321,7 +321,7 @@ public void markPublished(LocalDateTime now)
 public void markPublishFailed(String lastError, LocalDateTime nextAttemptAt)
 ```
 
-- [ ] **Step 4: Change `AnalysisTaskPublisher` to persist intent**
+- [x] **Step 4: Change `AnalysisTaskPublisher` to persist intent**
 
 Replace direct RabbitTemplate publishing with:
 
@@ -333,7 +333,7 @@ public void publishAfterCommit(Long taskId) {
 
 Keep the method name for API compatibility, but document in code by naming the dependency clearly; do not register transaction synchronization.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run:
 
@@ -344,7 +344,7 @@ mvn test
 
 Expected: fast tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutbox*.java src/main/java/com/zhulikang/aimatch/application/analysis/AnalysisTaskPublisher.java src/test/java/com/zhulikang/aimatch/application/analysis/CreateAnalysisTaskUseCaseTest.java src/test/java/com/zhulikang/aimatch/application/analysis/RetryAnalysisTaskUseCaseTest.java src/test/java/com/zhulikang/aimatch/analysis/DomainRepositoryTest.java
@@ -361,7 +361,7 @@ git commit -m "feat: persist analysis publish requests in outbox"
 - Create: `src/test/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisherTest.java`
 - Create: `src/integration-test/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisherIT.java`
 
-- [ ] **Step 1: Write failing unit tests**
+- [x] **Step 1: Write failing unit tests**
 
 Test success:
 
@@ -382,7 +382,7 @@ assertThat(event.getLastError()).contains("down");
 assertThat(event.getNextAttemptAt()).isAfter(now);
 ```
 
-- [ ] **Step 2: Run failing tests**
+- [x] **Step 2: Run failing tests**
 
 ```powershell
 mvn "-Dtest=AnalysisOutboxPublisherTest" test
@@ -390,20 +390,21 @@ mvn "-Dtest=AnalysisOutboxPublisherTest" test
 
 Expected: FAIL because publisher does not exist.
 
-- [ ] **Step 3: Implement publisher**
+- [x] **Step 3: Implement publisher**
 
 `AnalysisOutboxPublisher` should:
 
-- Use `@Scheduled(fixedDelayString = "${analysis.outbox.fixed-delay:5s}")`.
+- Use `@Scheduled(fixedDelayString = "${analysis.outbox.fixed-delay-ms:5000}")`.
 - Read `analysis.outbox.batch-size`, default `20`.
-- Fetch due `PENDING` or `FAILED` rows with `nextAttemptAt <= now`.
+- Fetch due `PENDING`, `FAILED`, or expired `PROCESSING` rows with `nextAttemptAt <= now`.
 - Publish `taskId` as a `Long`.
-- Mark rows `PUBLISHED` on success.
-- Mark rows `FAILED`, increment attempts, set `lastError`, set `nextAttemptAt` on failure.
+- Claim rows with a guarded transition to `PROCESSING` before publish.
+- Mark rows `PUBLISHED` only after RabbitMQ publisher confirm succeeds and the message is not returned.
+- Mark rows `FAILED`, increment attempts, set `lastError`, set `nextAttemptAt` on publish exception, broker nack, confirm timeout, or returned/unroutable message.
 
-- [ ] **Step 4: Add integration verification**
+- [x] **Step 4: Add integration verification**
 
-`AnalysisOutboxPublisherIT` should use RabbitMQ Testcontainers and assert one outbox event is published to `analysis.queue`.
+`AnalysisOutboxPublisherIT` should use MySQL and RabbitMQ Testcontainers and assert outbox rows are read from MySQL, published to `analysis.queue`, and persisted as `PUBLISHED`; it should also cover returned/unroutable messages becoming `FAILED`.
 
 Run:
 
@@ -413,7 +414,7 @@ mvn "-Dit.test=AnalysisOutboxPublisherIT" verify
 
 Expected: PASS when RabbitMQ container is available.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 ```powershell
 mvn "-Dtest=AnalysisOutboxPublisherTest" test
@@ -421,7 +422,7 @@ mvn "-Dit.test=AnalysisOutboxPublisherIT" verify
 mvn test
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisher.java src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxRepository.java src/test/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisherTest.java src/integration-test/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisherIT.java
@@ -442,7 +443,7 @@ git commit -m "feat: publish analysis outbox events"
 - Create: `src/test/java/com/zhulikang/aimatch/analysis/AnalysisRetrySchedulerTest.java`
 - Modify: `src/test/java/com/zhulikang/aimatch/analysis/DomainRepositoryTest.java`
 
-- [ ] **Step 1: Write failing tests for retry metadata**
+- [x] **Step 1: Write failing tests for retry metadata**
 
 Assert retryable failure below max attempts sets `FAILED_RETRYABLE` and `nextRetryAt`.
 
@@ -450,7 +451,7 @@ Assert failure at max attempts becomes `FAILED_FINAL` and clears `nextRetryAt`.
 
 Assert due scheduler writes outbox and moves task to `PENDING`.
 
-- [ ] **Step 2: Run failing tests**
+- [x] **Step 2: Run failing tests**
 
 ```powershell
 mvn "-Dtest=AnalysisTaskTest,AnalysisTaskServiceTest,AnalysisRetrySchedulerTest,DomainRepositoryTest" test
@@ -458,7 +459,7 @@ mvn "-Dtest=AnalysisTaskTest,AnalysisTaskServiceTest,AnalysisRetrySchedulerTest,
 
 Expected: FAIL because `nextRetryAt` and scheduler behavior do not exist.
 
-- [ ] **Step 3: Implement retry scheduling**
+- [x] **Step 3: Implement retry scheduling**
 
 Use default properties:
 
@@ -466,7 +467,7 @@ Use default properties:
 analysis:
   retry:
     delay: 1m
-    scheduler-fixed-delay: 30s
+    scheduler-fixed-delay-ms: 30000
     batch-size: 20
 ```
 
@@ -488,14 +489,14 @@ Scheduler behavior:
 - For each due task, guard-transition it to `PENDING`.
 - On successful transition, call `AnalysisTaskPublisher.publishAfterCommit(taskId)` to write outbox in the same transaction.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```powershell
 mvn "-Dtest=AnalysisTaskTest,AnalysisTaskServiceTest,AnalysisRetrySchedulerTest,DomainRepositoryTest" test
 mvn test
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/main/java/com/zhulikang/aimatch/analysis/AnalysisTask.java src/main/java/com/zhulikang/aimatch/analysis/AnalysisTaskRepository.java src/main/java/com/zhulikang/aimatch/analysis/AnalysisTaskService.java src/main/java/com/zhulikang/aimatch/analysis/AnalysisRetryScheduler.java src/test/java/com/zhulikang/aimatch/analysis/AnalysisTaskTest.java src/test/java/com/zhulikang/aimatch/analysis/AnalysisTaskServiceTest.java src/test/java/com/zhulikang/aimatch/analysis/AnalysisRetrySchedulerTest.java src/test/java/com/zhulikang/aimatch/analysis/DomainRepositoryTest.java
@@ -514,15 +515,15 @@ git commit -m "feat: schedule retryable analysis tasks"
 - Modify: `docs/operations/runbook.md`
 - Modify tests around worker idempotency.
 
-- [ ] **Step 1: Write/adjust idempotency tests**
+- [x] **Step 1: Write/adjust idempotency tests**
 
 Cover:
 
 - Duplicate message for `SUCCESS` task is skipped and does not write another report.
-- Fresh `RUNNING` task with `redelivered=false` is skipped.
+- Fresh `RUNNING` task is skipped even when RabbitMQ marks the message `redelivered=true`.
 - Stale `RUNNING` task can be reclaimed.
 
-- [ ] **Step 2: Run failing or focused tests**
+- [x] **Step 2: Run failing or focused tests**
 
 ```powershell
 mvn "-Dtest=RunAnalysisUseCaseTest,AnalysisTaskServiceTest,DomainRepositoryTest" test
@@ -530,11 +531,11 @@ mvn "-Dtest=RunAnalysisUseCaseTest,AnalysisTaskServiceTest,DomainRepositoryTest"
 
 Expected: any missing idempotency behavior fails before implementation.
 
-- [ ] **Step 3: Implement minimal fixes**
+- [x] **Step 3: Implement minimal fixes**
 
 Only adjust worker/task-service semantics needed by the failing tests. Keep message body ID-only and avoid adding frontend/API changes.
 
-- [ ] **Step 4: Update docs**
+- [x] **Step 4: Update docs**
 
 Update docs to say:
 
@@ -542,7 +543,7 @@ Update docs to say:
 - Manual retry still exists, but automatic retry handles due `FAILED_RETRYABLE` tasks.
 - Outbox backlog is inspectable in `analysis_outbox`.
 
-- [ ] **Step 5: Final review and verification**
+- [x] **Step 5: Final review and verification**
 
 Run:
 
@@ -554,7 +555,7 @@ git diff --check
 
 Dispatch a final read-only review agent with the Phase 3 plan and branch diff.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/main/java src/test/java src/integration-test/java docs

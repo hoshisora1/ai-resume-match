@@ -142,7 +142,7 @@ POST /api/analysis
 
 - API 返回 `taskId`、`resumeId`、`jobDescriptionId`、`status`、attempt/failure/timestamp 元数据。
 - 任务初始状态为 `PENDING`，同一事务写入 `analysis_outbox`。
-- `AnalysisOutboxPublisher` 定时发布 due outbox 事件到 RabbitMQ，成功标记 `PUBLISHED`，失败标记 `FAILED` 并按 `nextAttemptAt` 重试。
+- `AnalysisOutboxPublisher` 先用 guarded update 将 due outbox 事件认领为 `PROCESSING`，再通过 RabbitMQ publisher confirm/return 判断投递结果；broker ack 且未 return 时标记 `PUBLISHED`，失败或不可路由时标记 `FAILED` 并按 `nextAttemptAt` 重试。
 
 ### 4.4 Worker 生成报告
 
@@ -167,6 +167,7 @@ RabbitMQ message(taskId)
 - worker 不信任消息中的业务数据，必须从 MySQL 重取。
 - `match_report.task_id` 保持唯一，支撑幂等方向的演进。
 - `AnalysisWorker` 只负责监听并委托 `RunAnalysisUseCase`；RAG、AI 调用、报告解析和失败分类在 use case 中编排。
+- `redelivered=true` 不会绕过 `RUNNING` stale 判断；fresh `RUNNING` 任务会被跳过，只有 `PENDING` 或 stale `RUNNING` 可被认领。
 - 运行失败会落到 `FAILED_RETRYABLE` 或 `FAILED_FINAL`，并记录失败码、失败消息、attempts 和 `nextRetryAt`。
 - 自动重试调度会把 due 的 `FAILED_RETRYABLE` 任务重置为 `PENDING`，并通过 outbox 重新投递。
 
@@ -245,7 +246,7 @@ POST /api/analysis/{taskId}/retry
 - `JobDescription`：JD 内容、技能标签。
 - `AnalysisTask`：简历 ID、JD ID、状态、attempts、失败码、失败消息、预留的下一次重试时间、开始/完成/创建/更新时间。
 - `MatchReport`：任务 ID、匹配分数、报告正文、创建时间。
-- `AnalysisOutboxEvent`：事件类型、聚合类型、聚合 ID、payload、投递状态、attempts、下一次投递时间、最后错误、创建/发布时间。
+- `AnalysisOutboxEvent`：事件类型、聚合类型、聚合 ID、payload、投递状态（`PENDING`/`PROCESSING`/`PUBLISHED`/`FAILED`）、attempts、下一次投递时间、最后错误、创建/发布时间。
 
 目标实体增强：
 
@@ -290,7 +291,7 @@ FAILED_RETRYABLE -> CANCELLED
 - Redis 只是缓存。
 - Phase 1 加入明确 API 契约和上传校验。
 - Phase 2 加入 application use case、原子任务状态流转、retryable/final 失败分类、手动 retry 入口和薄 worker。
-- Phase 3 加入 Flyway 初始 schema、analysis outbox、outbox publisher、自动重试调度，以及 MySQL/RabbitMQ Testcontainers 验证。
+- Phase 3 加入 Flyway 初始 schema、analysis outbox、带 claim 和 publisher confirm/return 的 outbox publisher、自动重试调度，以及 MySQL/RabbitMQ Testcontainers 验证。
 
 待实现：
 

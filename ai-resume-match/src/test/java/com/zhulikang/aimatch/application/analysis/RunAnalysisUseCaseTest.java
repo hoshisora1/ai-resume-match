@@ -124,7 +124,7 @@ class RunAnalysisUseCaseTest {
     }
 
     @Test
-    void reprocessesRedeliveredRunningTask() {
+    void processesRedeliveredMessageWhenTaskServiceAllowsStart() {
         AnalysisTask task = task(99L);
         when(taskService.tryStart(99L, true)).thenReturn(true);
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
