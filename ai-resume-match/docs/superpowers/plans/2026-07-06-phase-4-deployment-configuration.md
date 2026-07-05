@@ -601,7 +601,7 @@ git commit -m "feat: add docker compose app runtime"
 - Modify: `docs/development.md`
 - Modify: `docs/architecture.md`
 
-- [ ] **Step 1: Update README**
+- [x] **Step 1: Update README**
 
 Update README with:
 
@@ -635,7 +635,7 @@ docker compose --env-file .env.example config
 
 - Environment variable table covering app, MySQL, Redis, RabbitMQ, API token, and AI provider variables.
 
-- [ ] **Step 2: Update runbook**
+- [x] **Step 2: Update runbook**
 
 Update `docs/operations/runbook.md` to:
 
@@ -655,21 +655,21 @@ docker compose exec redis redis-cli -a $env:REDIS_PASSWORD ping
 curl.exe -i http://localhost:8080/actuator/health/readiness
 ```
 
-- [ ] **Step 3: Update development and architecture docs**
+- [x] **Step 3: Update development and architecture docs**
 
 Update:
 
 - `docs/development.md`: mark Phase 4 as completed/current and Phase 5 as next.
 - `docs/architecture.md`: note Docker Compose runtime includes app, MySQL, Redis, RabbitMQ; profiles are `dev`, `docker`, `prod`.
 
-- [ ] **Step 4: Verify docs and tests**
+- [x] **Step 4: Verify docs and tests**
 
 Run:
 
 ```powershell
 mvn test
 docker compose --env-file .env.example config
-rg -n "Phase 4.*后续|Dockerfile 和 app service 的 compose 启动方式|尚未实现" README.md docs
+rg -n "Phase 4.*后续|Dockerfile 和 app service 的 compose 启动方式|尚未实现" README.md docs --glob "!docs/superpowers/plans/2026-07-06-phase-4-deployment-configuration.md"
 git diff --check
 ```
 

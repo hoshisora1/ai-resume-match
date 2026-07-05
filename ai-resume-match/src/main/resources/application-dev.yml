@@ -1,18 +1,18 @@
 spring:
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://localhost:3306/ai_resume_match?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai}
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:root}
+    username: ${MYSQL_USER:ai_match}
+    password: ${MYSQL_PASSWORD:dev-mysql-password}
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:dev-redis-password}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+    username: ${RABBITMQ_USERNAME:ai_match}
+    password: ${RABBITMQ_PASSWORD:dev-rabbit-password}
 
 ai:
   api-key: ${AI_API_KEY:dev-ai-key}

@@ -1,6 +1,6 @@
 # AI Resume Match Architecture
 
-本文档描述 `ai-resume-match` 在 Phase 2 后的当前架构，以及工程化重构的目标边界。
+本文档描述 `ai-resume-match` 在 Phase 4 后的当前架构，以及工程化重构的目标边界。
 
 ## 1. 系统概览
 
@@ -14,6 +14,7 @@
 - RabbitMQ：异步分析任务队列。
 - OpenAI-compatible API：生成匹配分析文本。
 - 本地 hashing embedding + cosine similarity：提供轻量 RAG 检索能力。
+- Docker Compose：本地可同时启动 app、MySQL、Redis、RabbitMQ，并使用健康检查和持久化 volume。
 
 当前系统仍是单体应用。重构目标不是拆微服务，而是在单体内形成清晰边界。
 
@@ -200,6 +201,24 @@ POST /api/analysis/{taskId}/retry
 - Redis 缓存失败不能改变业务结果。
 - 查询不存在的任务或报告返回 `404`。
 
+### 4.6 运行配置与部署
+
+```text
+docker compose
+  -> app(SPRING_PROFILES_ACTIVE=docker)
+  -> mysql(service name: mysql)
+  -> redis(service name: redis)
+  -> rabbitmq(service name: rabbitmq)
+```
+
+当前 profile 约定：
+
+- `dev`：默认 profile，用于本机 Maven 开发，连接 `localhost` 依赖，可使用开发占位 token/key。
+- `docker`：用于 Compose app 容器，连接 Compose 服务名，凭据来自 `.env`。
+- `prod`：用于生产或类生产环境，不包含本地默认凭据，所有敏感值由环境变量注入。
+
+Dockerfile 使用多阶段 Maven build、Java 21 runtime、非 root 用户和 Actuator readiness healthcheck。Compose 为 app、MySQL、Redis、RabbitMQ 配置 healthcheck 和 volume；`.env.example` 只记录示例值，真实 `.env` 不提交。
+
 ## 5. HTTP 契约
 
 当前成功响应：
@@ -292,11 +311,12 @@ FAILED_RETRYABLE -> CANCELLED
 - Phase 1 加入明确 API 契约和上传校验。
 - Phase 2 加入 application use case、原子任务状态流转、retryable/final 失败分类、手动 retry 入口和薄 worker。
 - Phase 3 加入 Flyway 初始 schema、analysis outbox、带 claim 和 publisher confirm/return 的 outbox publisher、自动重试调度，以及 MySQL/RabbitMQ Testcontainers 验证。
+- Phase 4 加入 Dockerfile、app compose service、health checks、`dev`/`docker`/`prod` profiles、`.env.example` 和部署配置契约测试。
 
 待实现：
 
 - Redis Testcontainers 和端到端分析流验证。
-- 结构化日志、request ID、任务生命周期 metrics。
+- request ID、correlation ID、结构化任务生命周期日志和 metrics。
 
 ## 9. 架构决策
 

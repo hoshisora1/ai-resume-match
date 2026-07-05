@@ -114,8 +114,9 @@ API 层：
 配置：
 
 - 不提交真实 token、真实 API key、真实简历或 JD。
-- 本地默认值只用于开发环境；生产配置必须来自环境变量。
-- 后续 prod profile 应使用 `ddl-auto=validate` 和 Flyway migration。
+- 本地默认值只用于 `dev` profile；`docker` 和 `prod` profile 通过环境变量注入运行配置。
+- `prod` profile 使用 `ddl-auto=validate` 和 Flyway migration，不包含 `root`、`guest`、`localhost` 或开发 token 默认值。
+- `.env` 不得提交，`.env.example` 只保存示例值。
 
 ## 5. 子代理使用
 
@@ -167,8 +168,8 @@ mvn test
 - Phase 1：已完成。API DTO、结构化错误、上传校验、任务状态接口、报告解析组件、回归测试。
 - Phase 2：已完成。引入 use case、任务状态转换、失败码、attempts、手动 retry 和薄 worker。
 - Phase 3：已完成。Flyway、outbox、publisher confirm/return、自动重试调度、RabbitMQ 集成测试。
-- Phase 4：部署与配置。Dockerfile、app compose service、profiles、`.env.example`、README 启动流。
-- Phase 5：可观测与运维。Actuator、request/correlation ID、结构化任务日志、指标、运行手册补强。
+- Phase 4：已完成。Dockerfile、app compose service、health checks、profiles、`.env.example`、README 启动流。
+- Phase 5：可观测与运维。request/correlation ID、结构化任务日志、指标、运行手册补强。
 - Phase 6：端到端验证。Testcontainers、mock AI HTTP server、PDF/DOCX fixtures、`mvn verify`。
 
 `docs/superpowers/plans/2026-05-12-rag-resume-job-match.md` 保留为历史实现上下文，不作为当前工程化重构的执行计划。

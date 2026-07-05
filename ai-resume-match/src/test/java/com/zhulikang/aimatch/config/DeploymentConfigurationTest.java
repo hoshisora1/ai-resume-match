@@ -31,8 +31,11 @@ class DeploymentConfigurationTest {
         Properties properties = yaml("src/main/resources/application-dev.yml");
 
         assertThat(properties.getProperty("spring.datasource.url")).contains("localhost:3306");
-        assertThat(properties.getProperty("spring.datasource.username")).contains("root");
-        assertThat(properties.getProperty("spring.rabbitmq.username")).contains("guest");
+        assertThat(properties.getProperty("spring.datasource.username")).isEqualTo("${MYSQL_USER:ai_match}");
+        assertThat(properties.getProperty("spring.datasource.password")).isEqualTo("${MYSQL_PASSWORD:dev-mysql-password}");
+        assertThat(properties.getProperty("spring.data.redis.password")).isEqualTo("${REDIS_PASSWORD:dev-redis-password}");
+        assertThat(properties.getProperty("spring.rabbitmq.username")).isEqualTo("${RABBITMQ_USERNAME:ai_match}");
+        assertThat(properties.getProperty("spring.rabbitmq.password")).isEqualTo("${RABBITMQ_PASSWORD:dev-rabbit-password}");
         assertThat(properties.getProperty("api.token")).isEqualTo("${API_TOKEN:dev-token}");
         assertThat(properties.getProperty("ai.api-key")).isEqualTo("${AI_API_KEY:dev-ai-key}");
     }
