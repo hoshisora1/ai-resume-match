@@ -2,6 +2,8 @@ package com.zhulikang.aimatch.analysis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -23,7 +25,13 @@ class RedisReportCacheTest {
     @SuppressWarnings("unchecked")
     private final ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-    private final RedisReportCache cache = new RedisReportCache(redisTemplate, objectMapper, Duration.ofMinutes(10));
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+    private final RedisReportCache cache = new RedisReportCache(
+        redisTemplate,
+        objectMapper,
+        Duration.ofMinutes(10),
+        new AnalysisMetrics(meterRegistry)
+    );
 
     @Test
     void returnsCachedReportFromJson() throws Exception {
@@ -34,6 +42,16 @@ class RedisReportCacheTest {
         Optional<MatchReportView> result = cache.get(99L);
 
         assertThat(result).contains(report);
+        assertThat(meterRegistry.counter("report.cache.requests", "result", "hit").count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void returnsEmptyAndRecordsMissWhenCacheIsEmpty() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("match-report:99")).thenReturn(null);
+
+        assertThat(cache.get(99L)).isEmpty();
+        assertThat(meterRegistry.counter("report.cache.requests", "result", "miss").count()).isEqualTo(1.0);
     }
 
     @Test
@@ -42,6 +60,7 @@ class RedisReportCacheTest {
         when(valueOperations.get("match-report:99")).thenReturn("{bad-json");
 
         assertThat(cache.get(99L)).isEmpty();
+        assertThat(meterRegistry.counter("report.cache.requests", "result", "error").count()).isEqualTo(1.0);
     }
 
     @Test
@@ -49,6 +68,7 @@ class RedisReportCacheTest {
         when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException("down"));
 
         assertThat(cache.get(99L)).isEmpty();
+        assertThat(meterRegistry.counter("report.cache.requests", "result", "error").count()).isEqualTo(1.0);
     }
 
     @Test
@@ -59,6 +79,7 @@ class RedisReportCacheTest {
         cache.put(report);
 
         verify(valueOperations).set(eq("match-report:99"), any(String.class), eq(Duration.ofMinutes(10)));
+        assertThat(meterRegistry.counter("report.cache.writes", "outcome", "success").count()).isEqualTo(1.0);
     }
 
     @Test
@@ -67,5 +88,6 @@ class RedisReportCacheTest {
         when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException("down"));
 
         cache.put(report);
+        assertThat(meterRegistry.counter("report.cache.writes", "outcome", "error").count()).isEqualTo(1.0);
     }
 }

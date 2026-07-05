@@ -1,5 +1,7 @@
 package com.zhulikang.aimatch.analysis;
 
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
@@ -57,14 +59,8 @@ class AnalysisOutboxPublisherTest {
         )).thenReturn(1);
         when(repository.findById(10L)).thenReturn(Optional.of(event));
         completePublishWithAck(rabbitTemplate);
-        AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
-            repository,
-            rabbitTemplate,
-            20,
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(5),
-            clock
-        );
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        AnalysisOutboxPublisher publisher = publisher(repository, rabbitTemplate, meterRegistry);
 
         publisher.publishPending();
 
@@ -79,6 +75,7 @@ class AnalysisOutboxPublisherTest {
         assertThat(event.getStatus()).isEqualTo(AnalysisOutboxStatus.PUBLISHED);
         assertThat(event.getPublishedAt()).isEqualTo(now);
         assertThat(event.getLastError()).isNull();
+        assertThat(meterRegistry.counter("analysis.outbox.events", "outcome", "published").count()).isEqualTo(1.0);
     }
 
     @Test
@@ -94,14 +91,8 @@ class AnalysisOutboxPublisherTest {
             AnalysisOutboxStatus.PROCESSING,
             now.plusSeconds(30)
         )).thenReturn(0);
-        AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
-            repository,
-            rabbitTemplate,
-            20,
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(5),
-            clock
-        );
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        AnalysisOutboxPublisher publisher = publisher(repository, rabbitTemplate, meterRegistry);
 
         publisher.publishPending();
 
@@ -140,14 +131,8 @@ class AnalysisOutboxPublisherTest {
                 any(MessagePostProcessor.class),
                 any(CorrelationData.class)
             );
-        AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
-            repository,
-            rabbitTemplate,
-            20,
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(5),
-            clock
-        );
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        AnalysisOutboxPublisher publisher = publisher(repository, rabbitTemplate, meterRegistry);
 
         publisher.publishPending();
 
@@ -157,6 +142,7 @@ class AnalysisOutboxPublisherTest {
         assertThat(event.getLastError()).contains("down");
         assertThat(event.getNextAttemptAt()).isEqualTo(now.plusSeconds(30));
         assertThat(event.getPublishedAt()).isNull();
+        assertThat(meterRegistry.counter("analysis.outbox.events", "outcome", "failed").count()).isEqualTo(1.0);
     }
 
     @Test
@@ -185,14 +171,7 @@ class AnalysisOutboxPublisherTest {
             any(MessagePostProcessor.class),
             any(CorrelationData.class)
         );
-        AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
-            repository,
-            rabbitTemplate,
-            20,
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(5),
-            clock
-        );
+        AnalysisOutboxPublisher publisher = publisher(repository, rabbitTemplate);
 
         publisher.publishPending();
 
@@ -234,14 +213,7 @@ class AnalysisOutboxPublisherTest {
             any(MessagePostProcessor.class),
             any(CorrelationData.class)
         );
-        AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
-            repository,
-            rabbitTemplate,
-            20,
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(5),
-            clock
-        );
+        AnalysisOutboxPublisher publisher = publisher(repository, rabbitTemplate);
 
         publisher.publishPending();
 
@@ -266,14 +238,8 @@ class AnalysisOutboxPublisherTest {
         )).thenReturn(1);
         when(repository.findById(10L)).thenReturn(Optional.of(event));
         completePublishWithAck(rabbitTemplate);
-        AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
-            repository,
-            rabbitTemplate,
-            20,
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(5),
-            clock
-        );
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        AnalysisOutboxPublisher publisher = publisher(repository, rabbitTemplate, meterRegistry);
 
         publisher.publishPending();
 
@@ -304,6 +270,29 @@ class AnalysisOutboxPublisherTest {
             eq(99L),
             any(MessagePostProcessor.class),
             any(CorrelationData.class)
+        );
+    }
+
+    private AnalysisOutboxPublisher publisher(
+        AnalysisOutboxRepository repository,
+        RabbitTemplate rabbitTemplate
+    ) {
+        return publisher(repository, rabbitTemplate, new SimpleMeterRegistry());
+    }
+
+    private AnalysisOutboxPublisher publisher(
+        AnalysisOutboxRepository repository,
+        RabbitTemplate rabbitTemplate,
+        SimpleMeterRegistry meterRegistry
+    ) {
+        return new AnalysisOutboxPublisher(
+            repository,
+            rabbitTemplate,
+            20,
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(5),
+            clock,
+            new AnalysisMetrics(meterRegistry)
         );
     }
 }

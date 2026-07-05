@@ -785,7 +785,7 @@ git commit -m "feat: add analysis lifecycle metrics"
 - Modify: `src/test/java/com/zhulikang/aimatch/ai/OpenAiCompatibleClientTest.java`
 - Create: `src/test/java/com/zhulikang/aimatch/observability/OutboxMetricsTest.java`
 
-- [ ] **Step 1: Write failing metrics tests**
+- [x] **Step 1: Write failing metrics tests**
 
 In `AnalysisOutboxPublisherTest`, use a `SimpleMeterRegistry` and `AnalysisMetrics` when constructing the publisher. Add assertions:
 
@@ -848,7 +848,7 @@ class OutboxMetricsTest {
 }
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 ```powershell
 mvn "-Dtest=AnalysisOutboxPublisherTest,RedisReportCacheTest,OpenAiCompatibleClientTest,OutboxMetricsTest" test
@@ -856,7 +856,7 @@ mvn "-Dtest=AnalysisOutboxPublisherTest,RedisReportCacheTest,OpenAiCompatibleCli
 
 Expected: FAIL because metrics are not recorded and outbox gauge component does not exist.
 
-- [ ] **Step 3: Add outbox counters and gauges**
+- [x] **Step 3: Add outbox counters and gauges**
 
 Modify `AnalysisOutboxRepository`:
 
@@ -910,7 +910,7 @@ metrics.outboxFailed();
 
 inside both failure branches.
 
-- [ ] **Step 4: Add Redis cache metrics**
+- [x] **Step 4: Add Redis cache metrics**
 
 Modify `RedisReportCache` constructor to accept `AnalysisMetrics metrics`.
 
@@ -944,7 +944,7 @@ In `put` catch:
 metrics.cacheWrite("error");
 ```
 
-- [ ] **Step 5: Add AI call metrics**
+- [x] **Step 5: Add AI call metrics**
 
 Modify `OpenAiCompatibleClient` constructors to accept `AnalysisMetrics metrics`.
 
@@ -964,7 +964,7 @@ try {
 
 Update tests to pass `new AnalysisMetrics(new SimpleMeterRegistry())`.
 
-- [ ] **Step 6: Run focused tests**
+- [x] **Step 6: Run focused tests**
 
 ```powershell
 mvn "-Dtest=AnalysisOutboxPublisherTest,RedisReportCacheTest,OpenAiCompatibleClientTest,OutboxMetricsTest" test
@@ -972,7 +972,7 @@ mvn "-Dtest=AnalysisOutboxPublisherTest,RedisReportCacheTest,OpenAiCompatibleCli
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/main/java/com/zhulikang/aimatch/observability/OutboxMetrics.java src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxRepository.java src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisher.java src/main/java/com/zhulikang/aimatch/analysis/RedisReportCache.java src/main/java/com/zhulikang/aimatch/ai/OpenAiCompatibleClient.java src/test/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisherTest.java src/test/java/com/zhulikang/aimatch/analysis/RedisReportCacheTest.java src/test/java/com/zhulikang/aimatch/ai/OpenAiCompatibleClientTest.java src/test/java/com/zhulikang/aimatch/observability/OutboxMetricsTest.java

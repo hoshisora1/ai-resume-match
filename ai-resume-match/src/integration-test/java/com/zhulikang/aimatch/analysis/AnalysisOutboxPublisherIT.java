@@ -1,5 +1,7 @@
 package com.zhulikang.aimatch.analysis;
 
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.BindingBuilder;
@@ -79,7 +81,8 @@ class AnalysisOutboxPublisherIT {
             20,
             Duration.ofSeconds(30),
             Duration.ofSeconds(5),
-            Clock.systemDefaultZone()
+            Clock.systemDefaultZone(),
+            new AnalysisMetrics(new SimpleMeterRegistry())
         );
     }
 

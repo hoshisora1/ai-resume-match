@@ -1,5 +1,7 @@
 package com.zhulikang.aimatch.ai;
 
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -18,12 +20,14 @@ public class OpenAiCompatibleClient implements AiClient {
     private final String endpoint;
     private final String apiKey;
     private final String model;
+    private final AnalysisMetrics metrics;
 
     public OpenAiCompatibleClient(
         RestTemplateBuilder restTemplateBuilder,
         @Value("${ai.endpoint}") String endpoint,
         @Value("${ai.api-key}") String apiKey,
-        @Value("${ai.model}") String model
+        @Value("${ai.model}") String model,
+        AnalysisMetrics metrics
     ) {
         this(
             restTemplateBuilder
@@ -32,11 +36,18 @@ public class OpenAiCompatibleClient implements AiClient {
                 .build(),
             endpoint,
             apiKey,
-            model
+            model,
+            metrics
         );
     }
 
-    OpenAiCompatibleClient(RestTemplate restTemplate, String endpoint, String apiKey, String model) {
+    OpenAiCompatibleClient(
+        RestTemplate restTemplate,
+        String endpoint,
+        String apiKey,
+        String model,
+        AnalysisMetrics metrics
+    ) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalArgumentException("AI API key must not be blank");
         }
@@ -44,10 +55,12 @@ public class OpenAiCompatibleClient implements AiClient {
         this.endpoint = endpoint;
         this.apiKey = apiKey;
         this.model = model;
+        this.metrics = metrics;
     }
 
     @Override
     public String complete(String prompt) {
+        Timer.Sample sample = metrics.startAiCall();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
@@ -57,13 +70,19 @@ public class OpenAiCompatibleClient implements AiClient {
             "temperature", 0.2
         );
 
-        Map<?, ?> response = restTemplate.postForObject(endpoint, new HttpEntity<>(body, headers), Map.class);
-        if (response == null) {
-            throw new IllegalStateException("AI response is empty");
+        try {
+            Map<?, ?> response = restTemplate.postForObject(endpoint, new HttpEntity<>(body, headers), Map.class);
+            if (response == null) {
+                throw new IllegalStateException("AI response is empty");
+            }
+            List<?> choices = (List<?>) response.get("choices");
+            Map<?, ?> first = (Map<?, ?>) choices.getFirst();
+            Map<?, ?> message = (Map<?, ?>) first.get("message");
+            metrics.aiCallFinished(sample, "success");
+            return String.valueOf(message.get("content"));
+        } catch (RuntimeException ex) {
+            metrics.aiCallFinished(sample, "failure");
+            throw ex;
         }
-        List<?> choices = (List<?>) response.get("choices");
-        Map<?, ?> first = (Map<?, ?>) choices.getFirst();
-        Map<?, ?> message = (Map<?, ?>) first.get("message");
-        return String.valueOf(message.get("content"));
     }
 }

@@ -1,6 +1,7 @@
 package com.zhulikang.aimatch.analysis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import com.zhulikang.aimatch.observability.RequestCorrelation;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.MessagePostProcessor;
@@ -39,17 +40,19 @@ public class AnalysisOutboxPublisher {
     private final Duration retryDelay;
     private final Duration confirmTimeout;
     private final Clock clock;
+    private final AnalysisMetrics metrics;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     public AnalysisOutboxPublisher(
         AnalysisOutboxRepository outboxRepository,
         RabbitTemplate rabbitTemplate,
+        AnalysisMetrics metrics,
         @Value("${analysis.outbox.batch-size:20}") int batchSize,
         @Value("${analysis.outbox.retry-delay:30s}") Duration retryDelay,
         @Value("${analysis.outbox.confirm-timeout:5s}") Duration confirmTimeout
     ) {
-        this(outboxRepository, rabbitTemplate, batchSize, retryDelay, confirmTimeout, Clock.systemDefaultZone());
+        this(outboxRepository, rabbitTemplate, batchSize, retryDelay, confirmTimeout, Clock.systemDefaultZone(), metrics);
     }
 
     AnalysisOutboxPublisher(
@@ -58,7 +61,8 @@ public class AnalysisOutboxPublisher {
         int batchSize,
         Duration retryDelay,
         Duration confirmTimeout,
-        Clock clock
+        Clock clock,
+        AnalysisMetrics metrics
     ) {
         this.outboxRepository = outboxRepository;
         this.rabbitTemplate = rabbitTemplate;
@@ -66,6 +70,7 @@ public class AnalysisOutboxPublisher {
         this.retryDelay = retryDelay;
         this.confirmTimeout = confirmTimeout;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     @Scheduled(fixedDelayString = "${analysis.outbox.fixed-delay-ms:5000}")
@@ -98,12 +103,15 @@ public class AnalysisOutboxPublisher {
             String correlationId = extractCorrelationId(event);
             publishToRabbit(eventId, taskId, correlationId);
             event.markPublished(now);
+            metrics.outboxPublished();
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             event.markPublishFailed(errorMessage(ex), now.plus(retryDelay));
+            metrics.outboxFailed();
             log.warn("Interrupted while publishing analysis outbox event {}", eventId);
         } catch (Exception ex) {
             event.markPublishFailed(errorMessage(ex), now.plus(retryDelay));
+            metrics.outboxFailed();
             log.warn("Failed to publish analysis outbox event {}: {}", eventId, errorMessage(ex));
         }
         outboxRepository.save(event);

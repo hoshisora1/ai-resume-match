@@ -2,6 +2,7 @@ package com.zhulikang.aimatch.analysis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,15 +20,18 @@ public class RedisReportCache implements ReportCache {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final Duration ttl;
+    private final AnalysisMetrics metrics;
 
     public RedisReportCache(
         StringRedisTemplate redisTemplate,
         ObjectMapper objectMapper,
-        @Value("${report.cache-ttl:10m}") Duration ttl
+        @Value("${report.cache-ttl:10m}") Duration ttl,
+        AnalysisMetrics metrics
     ) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.ttl = ttl;
+        this.metrics = metrics;
     }
 
     @Override
@@ -35,10 +39,14 @@ public class RedisReportCache implements ReportCache {
         try {
             String value = redisTemplate.opsForValue().get(key(taskId));
             if (value == null || value.isBlank()) {
+                metrics.cacheRequest("miss");
                 return Optional.empty();
             }
-            return Optional.of(objectMapper.readValue(value, MatchReportView.class));
+            MatchReportView report = objectMapper.readValue(value, MatchReportView.class);
+            metrics.cacheRequest("hit");
+            return Optional.of(report);
         } catch (RuntimeException | JsonProcessingException ex) {
+            metrics.cacheRequest("error");
             log.warn("Failed to read match report cache for task {}: {}", taskId, ex.getMessage());
             return Optional.empty();
         }
@@ -48,7 +56,9 @@ public class RedisReportCache implements ReportCache {
     public void put(MatchReportView report) {
         try {
             redisTemplate.opsForValue().set(key(report.taskId()), objectMapper.writeValueAsString(report), ttl);
+            metrics.cacheWrite("success");
         } catch (RuntimeException | JsonProcessingException ex) {
+            metrics.cacheWrite("error");
             log.warn("Failed to write match report cache for task {}: {}", report.taskId(), ex.getMessage());
         }
     }

@@ -11,6 +11,8 @@ import java.util.Collection;
 import java.util.List;
 
 public interface AnalysisOutboxRepository extends JpaRepository<AnalysisOutboxEvent, Long> {
+    long countByStatus(AnalysisOutboxStatus status);
+
     @Query("""
         select e.id from AnalysisOutboxEvent e
         where e.status in :statuses
