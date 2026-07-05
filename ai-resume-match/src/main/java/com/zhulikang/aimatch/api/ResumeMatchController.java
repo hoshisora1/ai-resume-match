@@ -4,6 +4,7 @@ import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.RetryAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.job.CreateJobDescriptionUseCase;
 import com.zhulikang.aimatch.application.report.GetMatchReportUseCase;
 import com.zhulikang.aimatch.application.resume.UploadResumeUseCase;
@@ -28,19 +29,22 @@ public class ResumeMatchController {
     private final CreateAnalysisTaskUseCase createAnalysisTaskUseCase;
     private final GetAnalysisTaskUseCase getAnalysisTaskUseCase;
     private final GetMatchReportUseCase getMatchReportUseCase;
+    private final RetryAnalysisTaskUseCase retryAnalysisTaskUseCase;
 
     public ResumeMatchController(
         UploadResumeUseCase uploadResumeUseCase,
         CreateJobDescriptionUseCase createJobDescriptionUseCase,
         CreateAnalysisTaskUseCase createAnalysisTaskUseCase,
         GetAnalysisTaskUseCase getAnalysisTaskUseCase,
-        GetMatchReportUseCase getMatchReportUseCase
+        GetMatchReportUseCase getMatchReportUseCase,
+        RetryAnalysisTaskUseCase retryAnalysisTaskUseCase
     ) {
         this.uploadResumeUseCase = uploadResumeUseCase;
         this.createJobDescriptionUseCase = createJobDescriptionUseCase;
         this.createAnalysisTaskUseCase = createAnalysisTaskUseCase;
         this.getAnalysisTaskUseCase = getAnalysisTaskUseCase;
         this.getMatchReportUseCase = getMatchReportUseCase;
+        this.retryAnalysisTaskUseCase = retryAnalysisTaskUseCase;
     }
 
     @PostMapping("/resumes")
@@ -67,6 +71,11 @@ public class ResumeMatchController {
             .map(AnalysisTaskResponse::from)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/analysis/{taskId}/retry")
+    public AnalysisTaskResponse retryAnalysis(@PathVariable Long taskId) {
+        return AnalysisTaskResponse.from(retryAnalysisTaskUseCase.retry(taskId));
     }
 
     @GetMapping("/analysis/{taskId}/report")

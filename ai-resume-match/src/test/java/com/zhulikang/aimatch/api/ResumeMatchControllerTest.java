@@ -4,6 +4,7 @@ import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.RetryAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.job.CreateJobDescriptionUseCase;
 import com.zhulikang.aimatch.application.report.GetMatchReportUseCase;
 import com.zhulikang.aimatch.application.resume.UploadResumeUseCase;
@@ -48,6 +49,8 @@ class ResumeMatchControllerTest {
     GetAnalysisTaskUseCase getAnalysisTaskUseCase;
     @MockBean
     GetMatchReportUseCase getMatchReportUseCase;
+    @MockBean
+    RetryAnalysisTaskUseCase retryAnalysisTaskUseCase;
 
     @Test
     void rejectsRequestWithoutApiToken() throws Exception {
@@ -174,6 +177,18 @@ class ResumeMatchControllerTest {
 
         mockMvc.perform(get("/api/analysis/404").header("X-API-Token", "test-token"))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void retriesAnalysisTask() throws Exception {
+        AnalysisTask task = new AnalysisTask(10L, 20L);
+        ReflectionTestUtils.setField(task, "id", 30L);
+        when(retryAnalysisTaskUseCase.retry(30L)).thenReturn(task);
+
+        mockMvc.perform(post("/api/analysis/30/retry").header("X-API-Token", "test-token"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.taskId").value(30))
+            .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     @Test
