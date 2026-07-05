@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,6 +67,31 @@ class ResumeMatchControllerTest {
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
             .andExpect(jsonPath("$.message").value("Unauthorized"));
+    }
+
+    @Test
+    void addsGeneratedRequestIdToUnauthorizedErrorResponse() throws Exception {
+        mockMvc.perform(get("/api/analysis/1/report"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(header().exists("X-Request-Id"))
+            .andExpect(header().exists("X-Correlation-Id"))
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+            .andExpect(jsonPath("$.message").value("Unauthorized"))
+            .andExpect(jsonPath("$.requestId").isNotEmpty());
+    }
+
+    @Test
+    void reusesIncomingRequestAndCorrelationIds() throws Exception {
+        when(getAnalysisTaskUseCase.find(404L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/analysis/404")
+                .header("X-API-Token", "test-token")
+                .header("X-Request-Id", "client-request-1")
+                .header("X-Correlation-Id", "client-correlation-1"))
+            .andExpect(status().isNotFound())
+            .andExpect(header().string("X-Request-Id", "client-request-1"))
+            .andExpect(header().string("X-Correlation-Id", "client-correlation-1"))
+            .andExpect(jsonPath("$.requestId").value("client-request-1"));
     }
 
     @Test

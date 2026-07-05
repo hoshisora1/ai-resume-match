@@ -67,10 +67,10 @@ public class ResumeMatchController {
 
     @GetMapping("/analysis/{taskId}")
     public ResponseEntity<AnalysisTaskResponse> analysisTask(@PathVariable Long taskId) {
-        return getAnalysisTaskUseCase.find(taskId)
+        AnalysisTaskResponse response = getAnalysisTaskUseCase.find(taskId)
             .map(AnalysisTaskResponse::from)
-            .map(ResponseEntity::ok)
-            .orElseGet(() -> ResponseEntity.notFound().build());
+            .orElseThrow(() -> new ResourceNotFoundException("Analysis task not found"));
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/analysis/{taskId}/retry")
@@ -80,8 +80,8 @@ public class ResumeMatchController {
 
     @GetMapping("/analysis/{taskId}/report")
     public ResponseEntity<MatchReportView> report(@PathVariable Long taskId) {
-        return getMatchReportUseCase.find(taskId)
-            .map(ResponseEntity::ok)
-            .orElseGet(() -> ResponseEntity.notFound().build());
+        MatchReportView report = getMatchReportUseCase.find(taskId)
+            .orElseThrow(() -> new ResourceNotFoundException("Match report not found"));
+        return ResponseEntity.ok(report);
     }
 }

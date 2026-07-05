@@ -62,9 +62,10 @@
 - Create: `src/main/java/com/zhulikang/aimatch/observability/RequestCorrelation.java`
 - Create: `src/main/java/com/zhulikang/aimatch/observability/RequestCorrelationFilter.java`
 - Modify: `src/main/java/com/zhulikang/aimatch/api/ApiErrorResponse.java`
+- Modify: `src/main/java/com/zhulikang/aimatch/api/ResumeMatchController.java`
 - Modify: `src/test/java/com/zhulikang/aimatch/api/ResumeMatchControllerTest.java`
 
-- [ ] **Step 1: Write failing API correlation tests**
+- [x] **Step 1: Write failing API correlation tests**
 
 Add imports to `ResumeMatchControllerTest`:
 
@@ -101,7 +102,7 @@ void reusesIncomingRequestAndCorrelationIds() throws Exception {
 }
 ```
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [x] **Step 2: Run the tests and verify RED**
 
 ```powershell
 mvn "-Dtest=ResumeMatchControllerTest#addsGeneratedRequestIdToUnauthorizedErrorResponse+reusesIncomingRequestAndCorrelationIds" test
@@ -109,7 +110,7 @@ mvn "-Dtest=ResumeMatchControllerTest#addsGeneratedRequestIdToUnauthorizedErrorR
 
 Expected: FAIL because response headers and `requestId` are not present.
 
-- [ ] **Step 3: Add request correlation helpers and filter**
+- [x] **Step 3: Add request correlation helpers and filter**
 
 Create `RequestCorrelation.java`:
 
@@ -213,7 +214,7 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
 }
 ```
 
-- [ ] **Step 4: Include request ID in API errors**
+- [x] **Step 4: Include request ID in API errors**
 
 Replace `ApiErrorResponse` with:
 
@@ -229,7 +230,7 @@ public record ApiErrorResponse(String code, String message, String requestId) {
 }
 ```
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 ```powershell
 mvn "-Dtest=ResumeMatchControllerTest#addsGeneratedRequestIdToUnauthorizedErrorResponse+reusesIncomingRequestAndCorrelationIds" test
@@ -237,7 +238,7 @@ mvn "-Dtest=ResumeMatchControllerTest#addsGeneratedRequestIdToUnauthorizedErrorR
 
 Expected: PASS.
 
-- [ ] **Step 6: Run all API tests**
+- [x] **Step 6: Run all API tests**
 
 ```powershell
 mvn "-Dtest=ResumeMatchControllerTest" test
