@@ -84,6 +84,8 @@ mvn spring-boot:run
 curl.exe -i http://localhost:8080/actuator/health/readiness
 ```
 
+readiness 只暴露 Spring 应用自身的接流量状态；MySQL、Redis、RabbitMQ 的容器健康由 Docker Compose healthcheck 管理，Redis 作为 cache-aside 依赖不可用时不应改变业务事实来源。
+
 ## 测试与验证
 
 ```powershell

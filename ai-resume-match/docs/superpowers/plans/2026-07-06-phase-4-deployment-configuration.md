@@ -675,7 +675,7 @@ git diff --check
 
 Expected: tests pass, compose config renders, no stale Phase 4 wording, no whitespace errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add README.md docs/operations/runbook.md docs/development.md docs/architecture.md
@@ -689,7 +689,7 @@ git commit -m "docs: document docker deployment workflow"
 **Files:**
 - No code files unless verification reveals a bug.
 
-- [ ] **Step 1: Build image**
+- [x] **Step 1: Build image**
 
 Run:
 
@@ -699,7 +699,7 @@ docker build -t ai-resume-match:phase4 .
 
 Expected: image builds successfully.
 
-- [ ] **Step 2: Run full verification**
+- [x] **Step 2: Run full verification**
 
 Run:
 
@@ -712,7 +712,9 @@ git diff --check
 
 Expected: all commands pass.
 
-- [ ] **Step 3: Optional local compose smoke**
+- [x] **Step 3: Optional local compose smoke**
+
+Skipped: local port `3306` was already in use, so the real compose smoke was not started. Coverage for this phase is provided by Docker image build, compose config rendering, `mvn test`, and Docker-backed `mvn verify`.
 
 If Docker resources are available and ports `3306`, `6379`, `5672`, `8080`, and `15672` are free, run:
 
@@ -726,7 +728,7 @@ docker compose down
 
 Expected: services become healthy and readiness returns `200`. If a port is already in use, skip this smoke and rely on `docker build`, `docker compose config`, `mvn test`, and `mvn verify`.
 
-- [ ] **Step 4: Final review**
+- [x] **Step 4: Final review**
 
 Request a read-only review focused on:
 
@@ -735,7 +737,7 @@ Request a read-only review focused on:
 - Compose service names, health checks, and persistent volumes.
 - README/runbook accuracy.
 
-- [ ] **Step 5: Commit fixes if needed**
+- [x] **Step 5: Commit fixes if needed**
 
 If review or verification reveals issues, fix them with focused commits.
 

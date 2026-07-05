@@ -3,6 +3,11 @@ package com.zhulikang.aimatch.config;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -23,6 +28,8 @@ class DeploymentConfigurationTest {
         assertThat(properties.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
         assertThat(properties.getProperty("spring.flyway.enabled")).isEqualTo("true");
         assertThat(properties.getProperty("management.endpoint.health.probes.enabled")).isEqualTo("true");
+        assertThat(properties.getProperty("management.endpoint.health.group.liveness.include")).isEqualTo("livenessState");
+        assertThat(properties.getProperty("management.endpoint.health.group.readiness.include")).isEqualTo("readinessState");
         assertThat(properties.getProperty("management.endpoints.web.exposure.include")).contains("health");
     }
 
@@ -38,6 +45,24 @@ class DeploymentConfigurationTest {
         assertThat(properties.getProperty("spring.rabbitmq.password")).isEqualTo("${RABBITMQ_PASSWORD:dev-rabbit-password}");
         assertThat(properties.getProperty("api.token")).isEqualTo("${API_TOKEN:dev-token}");
         assertThat(properties.getProperty("ai.api-key")).isEqualTo("${AI_API_KEY:dev-ai-key}");
+    }
+
+    @Test
+    void bootApplicationLoadsDevDefaultsWhenNoProfileIsActive() {
+        try (ConfigurableApplicationContext context = new SpringApplicationBuilder(EmptyConfiguration.class)
+                .web(WebApplicationType.NONE)
+                .logStartupInfo(false)
+                .properties("spring.config.location=file:src/main/resources/")
+                .run()) {
+            Environment environment = context.getEnvironment();
+
+            assertThat(environment.getProperty("api.token")).isEqualTo("dev-token");
+            assertThat(environment.getProperty("spring.datasource.username")).isEqualTo("ai_match");
+            assertThat(environment.getProperty("spring.data.redis.password")).isEqualTo("dev-redis-password");
+            assertThat(environment.getProperty("spring.rabbitmq.username")).isEqualTo("ai_match");
+            assertThat(environment.getProperty("ai.api-key")).isEqualTo("dev-ai-key");
+            assertThat(environment.getDefaultProfiles()).contains("dev");
+        }
     }
 
     @Test
@@ -98,9 +123,11 @@ class DeploymentConfigurationTest {
         assertThat(compose).contains("rabbitmq-data:");
         assertThat(dockerfile).contains("FROM maven:");
         assertThat(dockerfile).contains("FROM eclipse-temurin:21-jre");
+        assertThat(dockerfile).contains("COPY --from=build /workspace/target/*.jar /app/app.jar");
         assertThat(dockerfile).contains("USER app");
         assertThat(dockerfile).contains("HEALTHCHECK");
         assertThat(dockerfile).contains("/actuator/health/readiness");
+        assertThat(dockerfile).contains("exec java $JAVA_OPTS -jar /app/app.jar");
         assertThat(dockerignore).contains("target/");
         assertThat(dockerignore).contains(".git/");
         assertThat(dockerignore).contains(".worktrees/");
@@ -118,5 +145,9 @@ class DeploymentConfigurationTest {
 
     private static String read(String relativePath) throws IOException {
         return Files.readString(ROOT.resolve(relativePath), StandardCharsets.UTF_8);
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class EmptyConfiguration {
     }
 }

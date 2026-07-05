@@ -217,7 +217,7 @@ docker compose
 - `docker`：用于 Compose app 容器，连接 Compose 服务名，凭据来自 `.env`。
 - `prod`：用于生产或类生产环境，不包含本地默认凭据，所有敏感值由环境变量注入。
 
-Dockerfile 使用多阶段 Maven build、Java 21 runtime、非 root 用户和 Actuator readiness healthcheck。Compose 为 app、MySQL、Redis、RabbitMQ 配置 healthcheck 和 volume；`.env.example` 只记录示例值，真实 `.env` 不提交。
+Dockerfile 使用多阶段 Maven build、Java 21 runtime、非 root 用户和 Actuator readiness healthcheck。Compose 为 app、MySQL、Redis、RabbitMQ 配置 healthcheck 和 volume；`.env.example` 只记录示例值，真实 `.env` 不提交。应用 readiness 明确使用 Spring `readinessState`，依赖服务健康由 Compose healthcheck 和启动期连接/迁移结果覆盖，Redis cache-aside 不参与阻断 readiness。
 
 ## 5. HTTP 契约
 

@@ -32,6 +32,8 @@ docker compose ps
 curl.exe -i http://localhost:8080/actuator/health/readiness
 ```
 
+应用 readiness 使用 Spring `readinessState`，用于判断 app 容器是否可接流量；MySQL、Redis、RabbitMQ 的依赖健康以 Compose healthcheck 和 app 启动期连接/迁移结果为准。Redis 是 cache-aside，不作为 readiness 阻断项。
+
 默认本地端口：
 
 - App：`http://localhost:8080`。
