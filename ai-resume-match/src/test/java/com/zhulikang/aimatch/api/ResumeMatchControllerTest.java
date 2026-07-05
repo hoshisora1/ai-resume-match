@@ -192,6 +192,17 @@ class ResumeMatchControllerTest {
     }
 
     @Test
+    void returnsBadRequestWhenRetryIsRejected() throws Exception {
+        when(retryAnalysisTaskUseCase.retry(30L))
+            .thenThrow(new IllegalArgumentException("Only retryable failed analysis tasks can be retried"));
+
+        mockMvc.perform(post("/api/analysis/30/retry").header("X-API-Token", "test-token"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Only retryable failed analysis tasks can be retried"));
+    }
+
+    @Test
     void returnsReportBodyWhenReportExists() throws Exception {
         MatchReportView report = new MatchReportView(
             30L,

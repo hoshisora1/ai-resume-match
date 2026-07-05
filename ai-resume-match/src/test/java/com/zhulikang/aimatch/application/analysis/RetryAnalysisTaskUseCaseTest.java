@@ -60,7 +60,7 @@ class RetryAnalysisTaskUseCaseTest {
         when(repository.findById(99L)).thenReturn(Optional.of(task));
 
         assertThatThrownBy(() -> useCase.retry(99L))
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Only retryable failed analysis tasks can be retried");
         verifyNoInteractions(publisher);
     }

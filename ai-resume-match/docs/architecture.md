@@ -165,7 +165,7 @@ RabbitMQ message(taskId)
 - worker 不信任消息中的业务数据，必须从 MySQL 重取。
 - `match_report.task_id` 保持唯一，支撑幂等方向的演进。
 - `AnalysisWorker` 只负责监听并委托 `RunAnalysisUseCase`；RAG、AI 调用、报告解析和失败分类在 use case 中编排。
-- 运行失败会落到 `FAILED_RETRYABLE` 或 `FAILED_FINAL`，并记录失败码、失败消息、attempts 和下一次重试时间。
+- 运行失败会落到 `FAILED_RETRYABLE` 或 `FAILED_FINAL`，并记录失败码、失败消息和 attempts；`nextRetryAt` 当前为自动重试调度预留，可为空。
 - 自动重试调度和 outbox 属于 Phase 3 范围。
 
 ### 4.5 查询任务和报告
@@ -241,7 +241,7 @@ POST /api/analysis/{taskId}/retry
 
 - `Resume`：文件名、原始文本、结构化摘要。
 - `JobDescription`：JD 内容、技能标签。
-- `AnalysisTask`：简历 ID、JD ID、状态、attempts、失败码、失败消息、下一次重试时间、开始/完成/创建/更新时间。
+- `AnalysisTask`：简历 ID、JD ID、状态、attempts、失败码、失败消息、预留的下一次重试时间、开始/完成/创建/更新时间。
 - `MatchReport`：任务 ID、匹配分数、报告正文、创建时间。
 
 目标实体增强：

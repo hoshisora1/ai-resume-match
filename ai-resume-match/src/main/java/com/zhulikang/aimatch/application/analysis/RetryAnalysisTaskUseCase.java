@@ -20,7 +20,11 @@ public class RetryAnalysisTaskUseCase {
     public AnalysisTask retry(Long taskId) {
         AnalysisTask task = taskRepository.findById(taskId)
             .orElseThrow(() -> new ResourceNotFoundException("Analysis task not found"));
-        task.retry();
+        try {
+            task.retry();
+        } catch (IllegalStateException ex) {
+            throw new IllegalArgumentException(ex.getMessage(), ex);
+        }
         AnalysisTask saved = taskRepository.save(task);
         publisher.publishAfterCommit(saved.getId());
         return saved;

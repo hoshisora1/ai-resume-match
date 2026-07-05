@@ -1,6 +1,6 @@
 # AI Resume Match Operations Runbook
 
-本文档记录 `ai-resume-match` 当前可执行的本地运行、检查和排障流程。它覆盖 Phase 1 后的状态；Actuator、outbox、重试接口和完整 Docker 化应用服务将在后续阶段补充。
+本文档记录 `ai-resume-match` 当前可执行的本地运行、检查和排障流程。它覆盖 Phase 2 后的状态；Actuator、outbox、自动重试调度和完整 Docker 化应用服务将在后续阶段补充。
 
 ## 1. 本地启动
 
@@ -127,6 +127,17 @@ curl.exe -i `
   http://localhost:8080/api/analysis/1/report
 ```
 
+手动重试可重试失败任务：
+
+```powershell
+curl.exe -i `
+  -X POST `
+  -H "X-API-Token: dev-token" `
+  http://localhost:8080/api/analysis/1/retry
+```
+
+预期：只有 `FAILED_RETRYABLE` 任务可以被重置为 `PENDING` 并重新投递；其他状态返回 `400 BAD_REQUEST`。
+
 注意：示例文件路径和 ID 需要替换为本地实际值，不要使用真实敏感简历做共享演示。
 
 ## 5. 常见问题
@@ -206,8 +217,8 @@ docker compose ps rabbitmq
 
 当前限制：
 
-- Phase 2/3 前失败码和重试次数还不完整。
-- Phase 3 前没有正式 retry endpoint。
+- Phase 2 已提供 `failureCode`、`failureMessage`、attempt 元数据和手动 retry endpoint。
+- 自动重试调度、DLQ 和 outbox 重放仍属于 Phase 3 之后的能力。
 
 ### 5.6 查询报告慢或缓存异常
 
@@ -239,6 +250,6 @@ docker compose ps redis
 - Dockerfile 和 app service 的 compose 启动方式。
 - Flyway migration 检查和回滚策略。
 - outbox backlog 检查和重放流程。
-- failed retryable task 的重试流程。
+- 自动重试调度与 failed retryable task 批量重放流程。
 - RabbitMQ DLQ 检查流程。
 - metrics、结构化日志、request ID 和 correlation ID 查询示例。
