@@ -1,34 +1,18 @@
 package com.zhulikang.aimatch.application.analysis;
 
-import com.zhulikang.aimatch.analysis.RabbitConfig;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.zhulikang.aimatch.analysis.AnalysisOutboxEvent;
+import com.zhulikang.aimatch.analysis.AnalysisOutboxRepository;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Component
 public class AnalysisTaskPublisher {
-    private final RabbitTemplate rabbitTemplate;
+    private final AnalysisOutboxRepository outboxRepository;
 
-    public AnalysisTaskPublisher(RabbitTemplate rabbitTemplate) {
-        this.rabbitTemplate = rabbitTemplate;
+    public AnalysisTaskPublisher(AnalysisOutboxRepository outboxRepository) {
+        this.outboxRepository = outboxRepository;
     }
 
     public void publishAfterCommit(Long taskId) {
-        Runnable publish = () -> rabbitTemplate.convertAndSend(
-            RabbitConfig.ANALYSIS_EXCHANGE,
-            RabbitConfig.ANALYSIS_ROUTING_KEY,
-            taskId
-        );
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            publish.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                publish.run();
-            }
-        });
+        outboxRepository.save(AnalysisOutboxEvent.analysisRequested(taskId));
     }
 }

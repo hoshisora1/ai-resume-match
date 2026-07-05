@@ -23,6 +23,8 @@ class DomainRepositoryTest {
     AnalysisTaskRepository analysisTaskRepository;
     @Autowired
     MatchReportRepository matchReportRepository;
+    @Autowired
+    AnalysisOutboxRepository outboxRepository;
 
     @Test
     void persistsResumeJobTaskAndReport() {
@@ -42,6 +44,22 @@ class DomainRepositoryTest {
         assertThat(report.getTaskId()).isEqualTo(task.getId());
         assertThat(matchReportRepository.findByTaskId(task.getId()))
             .contains(report);
+    }
+
+    @Test
+    void persistsAnalysisOutboxEvent() {
+        AnalysisOutboxEvent event = outboxRepository.save(AnalysisOutboxEvent.analysisRequested(99L));
+
+        assertThat(outboxRepository.findAll())
+            .singleElement()
+            .satisfies(saved -> {
+                assertThat(saved.getId()).isEqualTo(event.getId());
+                assertThat(saved.getEventType()).isEqualTo(AnalysisOutboxEventType.ANALYSIS_REQUESTED);
+                assertThat(saved.getAggregateType()).isEqualTo("analysis_task");
+                assertThat(saved.getAggregateId()).isEqualTo(99L);
+                assertThat(saved.getStatus()).isEqualTo(AnalysisOutboxStatus.PENDING);
+                assertThat(saved.getPayloadJson()).contains("\"taskId\":99");
+            });
     }
 
     @Test
