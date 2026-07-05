@@ -52,7 +52,7 @@
 **Files:**
 - Create: `src/test/java/com/zhulikang/aimatch/config/DeploymentConfigurationTest.java`
 
-- [ ] **Step 1: Write failing profile tests**
+- [x] **Step 1: Write failing profile tests**
 
 Create `src/test/java/com/zhulikang/aimatch/config/DeploymentConfigurationTest.java` with:
 
@@ -175,7 +175,7 @@ class DeploymentConfigurationTest {
 }
 ```
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [x] **Step 2: Run the tests and verify RED**
 
 Run:
 
@@ -196,7 +196,7 @@ Expected: FAIL because `application-dev.yml`, `application-docker.yml`, `applica
 - Create: `src/main/resources/application-docker.yml`
 - Create: `src/main/resources/application-prod.yml`
 
-- [ ] **Step 1: Add Actuator dependency**
+- [x] **Step 1: Add Actuator dependency**
 
 Add to `pom.xml` dependencies:
 
@@ -207,7 +207,7 @@ Add to `pom.xml` dependencies:
 </dependency>
 ```
 
-- [ ] **Step 2: Move common settings into `application.yml`**
+- [x] **Step 2: Move common settings into `application.yml`**
 
 Update `src/main/resources/application.yml` to:
 
@@ -267,7 +267,7 @@ management:
         include: health,info
 ```
 
-- [ ] **Step 3: Create `application-dev.yml`**
+- [x] **Step 3: Create `application-dev.yml`**
 
 Create `src/main/resources/application-dev.yml`:
 
@@ -295,7 +295,7 @@ api:
   token: ${API_TOKEN:dev-token}
 ```
 
-- [ ] **Step 4: Create `application-docker.yml`**
+- [x] **Step 4: Create `application-docker.yml`**
 
 Create `src/main/resources/application-docker.yml`:
 
@@ -323,7 +323,7 @@ ai:
   api-key: ${AI_API_KEY}
 ```
 
-- [ ] **Step 5: Create `application-prod.yml`**
+- [x] **Step 5: Create `application-prod.yml`**
 
 Create `src/main/resources/application-prod.yml`:
 
@@ -351,7 +351,7 @@ ai:
   api-key: ${AI_API_KEY}
 ```
 
-- [ ] **Step 6: Verify profile tests still fail only on Docker assets**
+- [x] **Step 6: Verify profile tests still fail only on Docker assets**
 
 Run:
 
@@ -361,7 +361,7 @@ mvn "-Dtest=DeploymentConfigurationTest" test
 
 Expected: FAIL only because `Dockerfile`, `.dockerignore`, `.env.example`, and compose app service are not implemented.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add pom.xml src/main/resources/application.yml src/main/resources/application-dev.yml src/main/resources/application-docker.yml src/main/resources/application-prod.yml src/test/java/com/zhulikang/aimatch/config/DeploymentConfigurationTest.java
@@ -378,7 +378,7 @@ git commit -m "feat: add deployment profile configuration"
 - Create: `.env.example`
 - Modify: `docker-compose.yml`
 
-- [ ] **Step 1: Create `.dockerignore`**
+- [x] **Step 1: Create `.dockerignore`**
 
 Create `.dockerignore`:
 
@@ -391,7 +391,7 @@ target/
 .env
 ```
 
-- [ ] **Step 2: Create `Dockerfile`**
+- [x] **Step 2: Create `Dockerfile`**
 
 Create `Dockerfile`:
 
@@ -429,7 +429,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
 ```
 
-- [ ] **Step 3: Create `.env.example`**
+- [x] **Step 3: Create `.env.example`**
 
 Create `.env.example`:
 
@@ -462,7 +462,7 @@ ANALYSIS_RETRY_SCHEDULER_FIXED_DELAY_MS=30000
 ANALYSIS_RETRY_BATCH_SIZE=20
 ```
 
-- [ ] **Step 4: Replace compose with full runtime**
+- [x] **Step 4: Replace compose with full runtime**
 
 Update `docker-compose.yml`:
 
@@ -564,7 +564,7 @@ volumes:
   rabbitmq-data:
 ```
 
-- [ ] **Step 5: Verify deployment tests pass**
+- [x] **Step 5: Verify deployment tests pass**
 
 Run:
 
@@ -574,7 +574,7 @@ mvn "-Dtest=DeploymentConfigurationTest" test
 
 Expected: PASS.
 
-- [ ] **Step 6: Validate compose rendering**
+- [x] **Step 6: Validate compose rendering**
 
 Run:
 

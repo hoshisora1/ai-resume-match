@@ -1,53 +1,53 @@
 spring:
   application:
     name: ai-resume-match
+  profiles:
+    default: dev
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
-  datasource:
-    url: jdbc:mysql://localhost:3306/ai_resume_match?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai
-    username: root
-    password: root
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
   flyway:
     enabled: true
-  data:
-    redis:
-      host: localhost
-      port: 6379
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
       mandatory: true
 
 ai:
-  endpoint: https://api.openai.com/v1/chat/completions
+  endpoint: ${AI_ENDPOINT:https://api.openai.com/v1/chat/completions}
   api-key: ${AI_API_KEY}
-  model: gpt-4o-mini
+  model: ${AI_MODEL:gpt-4o-mini}
 
 api:
   token: ${API_TOKEN}
 
 report:
-  cache-ttl: 10m
+  cache-ttl: ${REPORT_CACHE_TTL:10m}
 
 analysis:
-  running-timeout: 15m
+  running-timeout: ${ANALYSIS_RUNNING_TIMEOUT:15m}
   outbox:
-    fixed-delay-ms: 5000
-    batch-size: 20
-    retry-delay: 30s
-    confirm-timeout: 5s
+    fixed-delay-ms: ${ANALYSIS_OUTBOX_FIXED_DELAY_MS:5000}
+    batch-size: ${ANALYSIS_OUTBOX_BATCH_SIZE:20}
+    retry-delay: ${ANALYSIS_OUTBOX_RETRY_DELAY:30s}
+    confirm-timeout: ${ANALYSIS_OUTBOX_CONFIRM_TIMEOUT:5s}
   retry:
-    delay: 1m
-    scheduler-fixed-delay-ms: 30000
-    batch-size: 20
+    delay: ${ANALYSIS_RETRY_DELAY:1m}
+    scheduler-fixed-delay-ms: ${ANALYSIS_RETRY_SCHEDULER_FIXED_DELAY_MS:30000}
+    batch-size: ${ANALYSIS_RETRY_BATCH_SIZE:20}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info
