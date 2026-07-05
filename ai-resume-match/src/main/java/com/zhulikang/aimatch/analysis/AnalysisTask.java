@@ -92,10 +92,19 @@ public class AnalysisTask {
     }
 
     public void markRetryableFailure(AnalysisFailureCode failureCode, String failureMessage) {
+        markRetryableFailure(failureCode, failureMessage, null);
+    }
+
+    public void markRetryableFailure(
+        AnalysisFailureCode failureCode,
+        String failureMessage,
+        LocalDateTime nextRetryAt
+    ) {
         requireRunning("Only running analysis tasks can be marked failed");
         this.status = Status.FAILED_RETRYABLE;
         this.failureCode = failureCode;
         this.failureMessage = failureMessage;
+        this.nextRetryAt = nextRetryAt;
         this.completedAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }

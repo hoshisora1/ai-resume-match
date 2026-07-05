@@ -1,12 +1,17 @@
 package com.zhulikang.aimatch.analysis;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -55,13 +60,61 @@ class AnalysisTaskServiceTest {
     void marksRetryableFailureWithFailureCodeAndMessage() {
         AnalysisTaskRepository taskRepository = mock(AnalysisTaskRepository.class);
         MatchReportRepository reportRepository = mock(MatchReportRepository.class);
-        AnalysisTaskService service = new AnalysisTaskService(taskRepository, reportRepository, Duration.ofMinutes(15));
+        AnalysisTaskService service = new AnalysisTaskService(
+            taskRepository,
+            reportRepository,
+            Duration.ofMinutes(15),
+            Duration.ofMinutes(1)
+        );
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
         when(taskRepository.markFailure(
             eq(99L),
             eq(AnalysisTask.Status.FAILED_RETRYABLE),
             eq(AnalysisTask.Status.RUNNING),
             eq(AnalysisFailureCode.AI_UNAVAILABLE),
             eq("AI unavailable"),
+            any(),
+            any()
+        )).thenReturn(1);
+
+        service.markRetryableFailure(99L, AnalysisFailureCode.AI_UNAVAILABLE, "AI unavailable");
+
+        ArgumentCaptor<LocalDateTime> nextRetryAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(taskRepository).markFailure(
+            eq(99L),
+            eq(AnalysisTask.Status.FAILED_RETRYABLE),
+            eq(AnalysisTask.Status.RUNNING),
+            eq(AnalysisFailureCode.AI_UNAVAILABLE),
+            eq("AI unavailable"),
+            nextRetryAtCaptor.capture(),
+            any()
+        );
+        assertThat(nextRetryAtCaptor.getValue()).isAfter(LocalDateTime.now().plusSeconds(30));
+    }
+
+    @Test
+    void marksFinalFailureWhenRetryAttemptsAreExhausted() {
+        AnalysisTaskRepository taskRepository = mock(AnalysisTaskRepository.class);
+        MatchReportRepository reportRepository = mock(MatchReportRepository.class);
+        AnalysisTaskService service = new AnalysisTaskService(
+            taskRepository,
+            reportRepository,
+            Duration.ofMinutes(15),
+            Duration.ofMinutes(1)
+        );
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        org.springframework.test.util.ReflectionTestUtils.setField(task, "attemptCount", task.getMaxAttempts());
+        when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
+        when(taskRepository.markFailure(
+            eq(99L),
+            eq(AnalysisTask.Status.FAILED_FINAL),
+            eq(AnalysisTask.Status.RUNNING),
+            eq(AnalysisFailureCode.AI_UNAVAILABLE),
+            eq("AI unavailable"),
+            isNull(),
             any()
         )).thenReturn(1);
 
@@ -69,10 +122,11 @@ class AnalysisTaskServiceTest {
 
         verify(taskRepository).markFailure(
             eq(99L),
-            eq(AnalysisTask.Status.FAILED_RETRYABLE),
+            eq(AnalysisTask.Status.FAILED_FINAL),
             eq(AnalysisTask.Status.RUNNING),
             eq(AnalysisFailureCode.AI_UNAVAILABLE),
             eq("AI unavailable"),
+            isNull(),
             any()
         );
     }
@@ -88,6 +142,7 @@ class AnalysisTaskServiceTest {
             eq(AnalysisTask.Status.RUNNING),
             eq(AnalysisFailureCode.SOURCE_DATA_MISSING),
             eq("Analysis source data is missing"),
+            isNull(),
             any()
         )).thenReturn(1);
 
@@ -99,6 +154,7 @@ class AnalysisTaskServiceTest {
             eq(AnalysisTask.Status.RUNNING),
             eq(AnalysisFailureCode.SOURCE_DATA_MISSING),
             eq("Analysis source data is missing"),
+            isNull(),
             any()
         );
     }

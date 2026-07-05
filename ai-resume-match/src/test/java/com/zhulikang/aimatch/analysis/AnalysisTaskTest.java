@@ -46,6 +46,18 @@ class AnalysisTaskTest {
     }
 
     @Test
+    void marksRetryableFailureWithNextRetryAt() {
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        java.time.LocalDateTime nextRetryAt = java.time.LocalDateTime.parse("2026-07-06T00:01:00");
+
+        task.markRetryableFailure(AnalysisFailureCode.AI_UNAVAILABLE, "AI unavailable", nextRetryAt);
+
+        assertThat(task.getStatus()).isEqualTo(AnalysisTask.Status.FAILED_RETRYABLE);
+        assertThat(task.getNextRetryAt()).isEqualTo(nextRetryAt);
+    }
+
+    @Test
     void retriesOnlyRetryableFailures() {
         AnalysisTask task = new AnalysisTask(1L, 2L);
         task.markRunning();

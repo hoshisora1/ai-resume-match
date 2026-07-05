@@ -1,11 +1,13 @@
 package com.zhulikang.aimatch.analysis;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -59,6 +61,7 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
         set t.status = :status,
             t.failureCode = :failureCode,
             t.failureMessage = :failureMessage,
+            t.nextRetryAt = :nextRetryAt,
             t.completedAt = :now,
             t.updatedAt = :now
         where t.id = :taskId
@@ -70,6 +73,38 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
         @Param("running") AnalysisTask.Status running,
         @Param("failureCode") AnalysisFailureCode failureCode,
         @Param("failureMessage") String failureMessage,
+        @Param("nextRetryAt") LocalDateTime nextRetryAt,
+        @Param("now") LocalDateTime now
+    );
+
+    @Query("""
+        select t from AnalysisTask t
+        where t.status = :status
+          and t.nextRetryAt <= :now
+        order by t.nextRetryAt asc, t.id asc
+        """)
+    List<AnalysisTask> findDueRetryableTasks(
+        @Param("status") AnalysisTask.Status status,
+        @Param("now") LocalDateTime now,
+        Pageable pageable
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update AnalysisTask t
+        set t.status = :pending,
+            t.failureCode = null,
+            t.failureMessage = null,
+            t.nextRetryAt = null,
+            t.completedAt = null,
+            t.updatedAt = :now
+        where t.id = :taskId
+          and t.status = :retryable
+        """)
+    int markRetryableAsPending(
+        @Param("taskId") Long taskId,
+        @Param("pending") AnalysisTask.Status pending,
+        @Param("retryable") AnalysisTask.Status retryable,
         @Param("now") LocalDateTime now
     );
 }

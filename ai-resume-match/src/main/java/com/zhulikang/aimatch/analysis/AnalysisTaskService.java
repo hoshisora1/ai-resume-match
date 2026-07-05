@@ -13,15 +13,26 @@ public class AnalysisTaskService {
     private final AnalysisTaskRepository taskRepository;
     private final MatchReportRepository reportRepository;
     private final Duration runningTimeout;
+    private final Duration retryDelay;
 
     public AnalysisTaskService(
         AnalysisTaskRepository taskRepository,
         MatchReportRepository reportRepository,
-        @Value("${analysis.running-timeout:15m}") Duration runningTimeout
+        @Value("${analysis.running-timeout:15m}") Duration runningTimeout,
+        @Value("${analysis.retry.delay:1m}") Duration retryDelay
     ) {
         this.taskRepository = taskRepository;
         this.reportRepository = reportRepository;
         this.runningTimeout = runningTimeout;
+        this.retryDelay = retryDelay;
+    }
+
+    AnalysisTaskService(
+        AnalysisTaskRepository taskRepository,
+        MatchReportRepository reportRepository,
+        Duration runningTimeout
+    ) {
+        this(taskRepository, reportRepository, runningTimeout, Duration.ofMinutes(1));
     }
 
     @Transactional
@@ -58,13 +69,18 @@ public class AnalysisTaskService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markRetryableFailure(Long taskId, AnalysisFailureCode failureCode, String failureMessage) {
+        AnalysisTask task = taskRepository.findById(taskId)
+            .orElseThrow(() -> new IllegalStateException("Analysis task not found"));
+        LocalDateTime now = LocalDateTime.now();
+        boolean attemptsExhausted = task.getAttemptCount() >= task.getMaxAttempts();
         int updated = taskRepository.markFailure(
             taskId,
-            AnalysisTask.Status.FAILED_RETRYABLE,
+            attemptsExhausted ? AnalysisTask.Status.FAILED_FINAL : AnalysisTask.Status.FAILED_RETRYABLE,
             AnalysisTask.Status.RUNNING,
             failureCode,
             failureMessage,
-            LocalDateTime.now()
+            attemptsExhausted ? null : now.plus(retryDelay),
+            now
         );
         if (updated != 1) {
             throw new IllegalStateException("Only running analysis tasks can be marked failed");
@@ -79,6 +95,7 @@ public class AnalysisTaskService {
             AnalysisTask.Status.RUNNING,
             failureCode,
             failureMessage,
+            null,
             LocalDateTime.now()
         );
         if (updated != 1) {

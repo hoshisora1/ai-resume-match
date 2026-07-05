@@ -10,6 +10,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import org.springframework.data.domain.PageRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -143,6 +144,7 @@ class DomainRepositoryTest {
             AnalysisTask.Status.RUNNING,
             AnalysisFailureCode.UNEXPECTED_ERROR,
             "late failure",
+            null,
             LocalDateTime.now()
         );
 
@@ -168,5 +170,35 @@ class DomainRepositoryTest {
         );
 
         assertThat(updated).isEqualTo(1);
+    }
+
+    @Test
+    void canFindAndResetDueRetryableTasks() {
+        LocalDateTime now = LocalDateTime.now();
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        task.markRetryableFailure(AnalysisFailureCode.AI_UNAVAILABLE, "AI unavailable", now.minusMinutes(1));
+        task = analysisTaskRepository.saveAndFlush(task);
+
+        assertThat(analysisTaskRepository.findDueRetryableTasks(
+            AnalysisTask.Status.FAILED_RETRYABLE,
+            now,
+            PageRequest.of(0, 20)
+        )).extracting(AnalysisTask::getId).contains(task.getId());
+
+        int updated = analysisTaskRepository.markRetryableAsPending(
+            task.getId(),
+            AnalysisTask.Status.PENDING,
+            AnalysisTask.Status.FAILED_RETRYABLE,
+            now
+        );
+
+        assertThat(updated).isEqualTo(1);
+        AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updatedTask.getStatus()).isEqualTo(AnalysisTask.Status.PENDING);
+        assertThat(updatedTask.getFailureCode()).isNull();
+        assertThat(updatedTask.getFailureMessage()).isNull();
+        assertThat(updatedTask.getNextRetryAt()).isNull();
+        assertThat(updatedTask.getCompletedAt()).isNull();
     }
 }
