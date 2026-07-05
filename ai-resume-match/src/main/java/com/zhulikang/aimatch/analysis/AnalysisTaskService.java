@@ -39,8 +39,16 @@ public class AnalysisTaskService {
 
     @Transactional
     public void completeSuccess(MatchReport report) {
+        int updated = taskRepository.markSuccess(
+            report.getTaskId(),
+            AnalysisTask.Status.SUCCESS,
+            AnalysisTask.Status.RUNNING,
+            LocalDateTime.now()
+        );
+        if (updated != 1) {
+            throw new IllegalStateException("Only running analysis tasks can be completed");
+        }
         reportRepository.save(report);
-        taskRepository.markSuccess(report.getTaskId(), AnalysisTask.Status.SUCCESS, LocalDateTime.now());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -50,23 +58,31 @@ public class AnalysisTaskService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markRetryableFailure(Long taskId, AnalysisFailureCode failureCode, String failureMessage) {
-        taskRepository.markFailure(
+        int updated = taskRepository.markFailure(
             taskId,
             AnalysisTask.Status.FAILED_RETRYABLE,
+            AnalysisTask.Status.RUNNING,
             failureCode,
             failureMessage,
             LocalDateTime.now()
         );
+        if (updated != 1) {
+            throw new IllegalStateException("Only running analysis tasks can be marked failed");
+        }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFinalFailure(Long taskId, AnalysisFailureCode failureCode, String failureMessage) {
-        taskRepository.markFailure(
+        int updated = taskRepository.markFailure(
             taskId,
             AnalysisTask.Status.FAILED_FINAL,
+            AnalysisTask.Status.RUNNING,
             failureCode,
             failureMessage,
             LocalDateTime.now()
         );
+        if (updated != 1) {
+            throw new IllegalStateException("Only running analysis tasks can be marked failed");
+        }
     }
 }

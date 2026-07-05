@@ -44,10 +44,12 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
             t.completedAt = :now,
             t.updatedAt = :now
         where t.id = :taskId
+          and t.status = :running
         """)
     int markSuccess(
         @Param("taskId") Long taskId,
         @Param("status") AnalysisTask.Status status,
+        @Param("running") AnalysisTask.Status running,
         @Param("now") LocalDateTime now
     );
 
@@ -60,10 +62,12 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
             t.completedAt = :now,
             t.updatedAt = :now
         where t.id = :taskId
+          and t.status = :running
         """)
     int markFailure(
         @Param("taskId") Long taskId,
         @Param("status") AnalysisTask.Status status,
+        @Param("running") AnalysisTask.Status running,
         @Param("failureCode") AnalysisFailureCode failureCode,
         @Param("failureMessage") String failureMessage,
         @Param("now") LocalDateTime now

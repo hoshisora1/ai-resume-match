@@ -19,6 +19,20 @@ class AnalysisTaskTest {
     }
 
     @Test
+    void keepsLegacyFailedStatusReadableForExistingRows() {
+        assertThat(AnalysisTask.Status.valueOf("FAILED")).isEqualTo(AnalysisTask.Status.FAILED);
+    }
+
+    @Test
+    void rejectsSuccessBeforeRunning() {
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+
+        assertThatThrownBy(task::markSuccess)
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Only running analysis tasks can be completed");
+    }
+
+    @Test
     void marksRetryableFailureWithMetadata() {
         AnalysisTask task = new AnalysisTask(1L, 2L);
         task.markRunning();
@@ -54,5 +68,16 @@ class AnalysisTaskTest {
         assertThatThrownBy(task::retry)
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("Only retryable failed analysis tasks can be retried");
+    }
+
+    @Test
+    void rejectsFailureAfterTerminalSuccess() {
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        task.markSuccess();
+
+        assertThatThrownBy(() -> task.markFinalFailure(AnalysisFailureCode.UNEXPECTED_ERROR, "late failure"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Only running analysis tasks can be marked failed");
     }
 }

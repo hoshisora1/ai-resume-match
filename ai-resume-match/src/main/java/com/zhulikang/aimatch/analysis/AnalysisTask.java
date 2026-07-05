@@ -55,7 +55,8 @@ public class AnalysisTask {
         SUCCESS,
         FAILED_RETRYABLE,
         FAILED_FINAL,
-        CANCELLED
+        CANCELLED,
+        FAILED
     }
 
     protected AnalysisTask() {
@@ -81,6 +82,7 @@ public class AnalysisTask {
     }
 
     public void markSuccess() {
+        requireRunning("Only running analysis tasks can be completed");
         this.status = Status.SUCCESS;
         this.failureCode = null;
         this.failureMessage = null;
@@ -90,6 +92,7 @@ public class AnalysisTask {
     }
 
     public void markRetryableFailure(AnalysisFailureCode failureCode, String failureMessage) {
+        requireRunning("Only running analysis tasks can be marked failed");
         this.status = Status.FAILED_RETRYABLE;
         this.failureCode = failureCode;
         this.failureMessage = failureMessage;
@@ -98,6 +101,7 @@ public class AnalysisTask {
     }
 
     public void markFinalFailure(AnalysisFailureCode failureCode, String failureMessage) {
+        requireRunning("Only running analysis tasks can be marked failed");
         this.status = Status.FAILED_FINAL;
         this.failureCode = failureCode;
         this.failureMessage = failureMessage;
@@ -120,6 +124,12 @@ public class AnalysisTask {
         this.nextRetryAt = null;
         this.completedAt = null;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    private void requireRunning(String message) {
+        if (status != Status.RUNNING) {
+            throw new IllegalStateException(message);
+        }
     }
 
     public Long getId() {

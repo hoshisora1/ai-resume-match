@@ -53,8 +53,15 @@ class DomainRepositoryTest {
 
         task.markSuccess();
         assertThat(task.getStatus()).isEqualTo(AnalysisTask.Status.SUCCESS);
+    }
 
+    @Test
+    void taskCanMoveFromRunningToFinalFailure() {
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+
+        task.markRunning();
         task.markFinalFailure(AnalysisFailureCode.UNEXPECTED_ERROR, "Analysis failed");
+
         assertThat(task.getStatus()).isEqualTo(AnalysisTask.Status.FAILED_FINAL);
         assertThat(task.getFailureCode()).isEqualTo(AnalysisFailureCode.UNEXPECTED_ERROR);
     }
@@ -79,6 +86,52 @@ class DomainRepositoryTest {
         AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
         assertThat(updatedTask.getAttemptCount()).isEqualTo(2);
         assertThat(updatedTask.getStartedAt()).isNotNull();
+    }
+
+    @Test
+    void markSuccessOnlyUpdatesRunningTaskAndClearsFailureMetadata() {
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        task.markRetryableFailure(AnalysisFailureCode.AI_UNAVAILABLE, "AI unavailable");
+        task.retry();
+        task.markRunning();
+        task = analysisTaskRepository.saveAndFlush(task);
+
+        int updated = analysisTaskRepository.markSuccess(
+            task.getId(),
+            AnalysisTask.Status.SUCCESS,
+            AnalysisTask.Status.RUNNING,
+            LocalDateTime.now()
+        );
+
+        assertThat(updated).isEqualTo(1);
+        AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updatedTask.getStatus()).isEqualTo(AnalysisTask.Status.SUCCESS);
+        assertThat(updatedTask.getFailureCode()).isNull();
+        assertThat(updatedTask.getFailureMessage()).isNull();
+        assertThat(updatedTask.getCompletedAt()).isNotNull();
+    }
+
+    @Test
+    void markFailureOnlyUpdatesRunningTask() {
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        task.markSuccess();
+        task = analysisTaskRepository.saveAndFlush(task);
+
+        int updated = analysisTaskRepository.markFailure(
+            task.getId(),
+            AnalysisTask.Status.FAILED_FINAL,
+            AnalysisTask.Status.RUNNING,
+            AnalysisFailureCode.UNEXPECTED_ERROR,
+            "late failure",
+            LocalDateTime.now()
+        );
+
+        assertThat(updated).isEqualTo(0);
+        AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updatedTask.getStatus()).isEqualTo(AnalysisTask.Status.SUCCESS);
+        assertThat(updatedTask.getFailureCode()).isNull();
     }
 
     @Test
