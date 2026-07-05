@@ -1,6 +1,6 @@
 # AI Resume Match Operations Runbook
 
-本文档记录 `ai-resume-match` 当前可执行的本地运行、检查和排障流程。它覆盖 Phase 2 后的状态；Actuator、outbox、自动重试调度和完整 Docker 化应用服务将在后续阶段补充。
+本文档记录 `ai-resume-match` 当前可执行的本地运行、检查和排障流程。它覆盖 Phase 3 后的状态；Actuator、完整 Docker 化应用服务、结构化日志和 metrics 将在后续阶段补充。
 
 ## 1. 本地启动
 
@@ -61,6 +61,14 @@ docker compose ps
 ```powershell
 mvn test
 ```
+
+运行集成测试：
+
+```powershell
+mvn verify
+```
+
+当前 `mvn verify` 会通过 Testcontainers 验证 MySQL Flyway migration 和 RabbitMQ outbox 投递。
 
 检查 API token 拦截：
 
@@ -138,6 +146,8 @@ curl.exe -i `
 
 预期：只有 `FAILED_RETRYABLE` 任务可以被重置为 `PENDING` 并重新投递；其他状态返回 `400 BAD_REQUEST`。
 
+自动重试：`FAILED_RETRYABLE` 任务如果带有已到期的 `nextRetryAt`，调度器会自动重置为 `PENDING` 并写入 outbox 重新投递。尝试次数达到 `maxAttempts` 后会转为 `FAILED_FINAL`，不再自动重试。
+
 注意：示例文件路径和 ID 需要替换为本地实际值，不要使用真实敏感简历做共享演示。
 
 ## 5. 常见问题
@@ -185,7 +195,7 @@ curl.exe -i `
 可能原因：
 
 - RabbitMQ 未启动。
-- 应用创建任务后发布消息失败。
+- outbox 事件待发布或发布失败后等待下一次重试。
 - worker 未正常监听队列。
 
 检查：
@@ -196,9 +206,13 @@ docker compose ps rabbitmq
 
 打开 RabbitMQ 管理页检查队列是否存在消息堆积。
 
-当前限制：
+检查 outbox 积压：
 
-- Phase 3 前还没有 outbox，极端情况下可能出现任务已创建但消息未成功投递。此类任务需要人工重新创建分析任务。
+```powershell
+docker compose exec mysql mysql -uroot -proot ai_resume_match -e "select id,event_type,aggregate_id,status,attempt_count,next_attempt_at,last_error from analysis_outbox order by id desc limit 20;"
+```
+
+预期：`PENDING` 和 due 的 `FAILED` outbox 事件会由 `AnalysisOutboxPublisher` 自动发布；`last_error` 可用于定位 RabbitMQ 连接或消息转换问题。
 
 ### 5.5 任务失败
 
@@ -215,10 +229,11 @@ docker compose ps rabbitmq
 - `src/main/resources/application.yml` 中 `ai.endpoint` 和 `ai.model` 是否符合当前供应商。
 - 应用日志中按 `taskId` 搜索失败记录。
 
-当前限制：
+当前行为：
 
 - Phase 2 已提供 `failureCode`、`failureMessage`、attempt 元数据和手动 retry endpoint。
-- 自动重试调度、DLQ 和 outbox 重放仍属于 Phase 3 之后的能力。
+- Phase 3 已提供 `nextRetryAt`、自动重试调度和 outbox 重投递。
+- `FAILED_FINAL` 是终态；如需重新分析，应创建新任务。
 
 ### 5.6 查询报告慢或缓存异常
 
@@ -249,7 +264,6 @@ docker compose ps redis
 - Actuator readiness/liveness/health endpoint。
 - Dockerfile 和 app service 的 compose 启动方式。
 - Flyway migration 检查和回滚策略。
-- outbox backlog 检查和重放流程。
-- 自动重试调度与 failed retryable task 批量重放流程。
 - RabbitMQ DLQ 检查流程。
+- outbox backlog metrics 和 failed retryable task 批量运维脚本。
 - metrics、结构化日志、request ID 和 correlation ID 查询示例。

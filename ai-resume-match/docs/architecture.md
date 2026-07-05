@@ -9,7 +9,7 @@
 当前运行组件：
 
 - Spring Boot 3.3 / Java 21 应用。
-- MySQL：保存简历、JD、分析任务、匹配报告。
+- MySQL：保存简历、JD、分析任务、匹配报告和 outbox 事件。
 - Redis：匹配报告查询的 cache-aside 缓存。
 - RabbitMQ：异步分析任务队列。
 - OpenAI-compatible API：生成匹配分析文本。
@@ -42,7 +42,7 @@ com.zhulikang.aimatch
 - `job`：JD 实体、仓储、技能标签提取。
 - `document`：PDF/DOCX 文本提取和上传文件校验。
 - `application`：上传简历、创建 JD、创建/查询/重试/运行分析任务、查询报告等用例编排。
-- `analysis`：任务和报告实体、任务状态服务、worker 监听器、RabbitMQ 配置、Redis report cache。
+- `analysis`：任务和报告实体、任务状态服务、worker 监听器、outbox publisher、自动重试调度、RabbitMQ 配置、Redis report cache。
 - `rag`：文本切分、embedding、向量检索、上下文构建。
 - `ai`：OpenAI-compatible HTTP 客户端抽象和实现。
 
@@ -132,15 +132,17 @@ POST /api/analysis
   -> check resume exists
   -> check job exists
   -> CreateAnalysisTaskUseCase.create
-  -> after commit publish taskId to RabbitMQ
+  -> save analysis_task(PENDING)
+  -> save analysis_outbox(ANALYSIS_REQUESTED)
+  -> AnalysisOutboxPublisher publishes taskId to RabbitMQ
   -> AnalysisTaskResponse
 ```
 
-当前 Phase 2 状态：
+当前 Phase 3 状态：
 
 - API 返回 `taskId`、`resumeId`、`jobDescriptionId`、`status`、attempt/failure/timestamp 元数据。
-- 任务初始状态为 `PENDING`，并在事务提交后发布 `taskId` 到 RabbitMQ。
-- 可靠消息 outbox 尚未实现，属于 Phase 3 范围。
+- 任务初始状态为 `PENDING`，同一事务写入 `analysis_outbox`。
+- `AnalysisOutboxPublisher` 定时发布 due outbox 事件到 RabbitMQ，成功标记 `PUBLISHED`，失败标记 `FAILED` 并按 `nextAttemptAt` 重试。
 
 ### 4.4 Worker 生成报告
 
@@ -165,8 +167,8 @@ RabbitMQ message(taskId)
 - worker 不信任消息中的业务数据，必须从 MySQL 重取。
 - `match_report.task_id` 保持唯一，支撑幂等方向的演进。
 - `AnalysisWorker` 只负责监听并委托 `RunAnalysisUseCase`；RAG、AI 调用、报告解析和失败分类在 use case 中编排。
-- 运行失败会落到 `FAILED_RETRYABLE` 或 `FAILED_FINAL`，并记录失败码、失败消息和 attempts；`nextRetryAt` 当前为自动重试调度预留，可为空。
-- 自动重试调度和 outbox 属于 Phase 3 范围。
+- 运行失败会落到 `FAILED_RETRYABLE` 或 `FAILED_FINAL`，并记录失败码、失败消息、attempts 和 `nextRetryAt`。
+- 自动重试调度会把 due 的 `FAILED_RETRYABLE` 任务重置为 `PENDING`，并通过 outbox 重新投递。
 
 ### 4.5 查询任务和报告
 
@@ -187,7 +189,7 @@ GET /api/analysis/{taskId}/report
 POST /api/analysis/{taskId}/retry
   -> RetryAnalysisTaskUseCase.retry
   -> FAILED_RETRYABLE -> PENDING
-  -> after commit publish taskId to RabbitMQ
+  -> save analysis_outbox(ANALYSIS_REQUESTED)
   -> AnalysisTaskResponse
 ```
 
@@ -243,11 +245,11 @@ POST /api/analysis/{taskId}/retry
 - `JobDescription`：JD 内容、技能标签。
 - `AnalysisTask`：简历 ID、JD ID、状态、attempts、失败码、失败消息、预留的下一次重试时间、开始/完成/创建/更新时间。
 - `MatchReport`：任务 ID、匹配分数、报告正文、创建时间。
+- `AnalysisOutboxEvent`：事件类型、聚合类型、聚合 ID、payload、投递状态、attempts、下一次投递时间、最后错误、创建/发布时间。
 
 目标实体增强：
 
 - `MatchReport` 增加 `reportJson`，保留 `reportMarkdown`。
-- 增加 `analysis_outbox` 表，支撑可靠投递。
 - 简历和 JD 增加删除标记、内容 hash、文件大小、content type 等审计字段。
 
 ## 7. 任务状态
@@ -288,13 +290,11 @@ FAILED_RETRYABLE -> CANCELLED
 - Redis 只是缓存。
 - Phase 1 加入明确 API 契约和上传校验。
 - Phase 2 加入 application use case、原子任务状态流转、retryable/final 失败分类、手动 retry 入口和薄 worker。
+- Phase 3 加入 Flyway 初始 schema、analysis outbox、outbox publisher、自动重试调度，以及 MySQL/RabbitMQ Testcontainers 验证。
 
 待实现：
 
-- Flyway schema migration。
-- outbox publisher。
-- 自动重试调度。
-- RabbitMQ、Redis、MySQL Testcontainers 验证。
+- Redis Testcontainers 和端到端分析流验证。
 - 结构化日志、request ID、任务生命周期 metrics。
 
 ## 9. 架构决策

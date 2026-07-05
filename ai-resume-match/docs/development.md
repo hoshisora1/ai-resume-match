@@ -76,7 +76,7 @@ mvn "-Dtest=RunAnalysisUseCaseTest,AnalysisWorkerTest" test
 
 PowerShell 中 `-Dtest=A,B` 推荐整体加引号，避免参数解析问题。
 
-当前 fast test suite 使用 JUnit 5、Mockito、AssertJ、MockMvc、H2。后续引入 Testcontainers、Failsafe 后，集成测试入口应使用：
+当前 fast test suite 使用 JUnit 5、Mockito、AssertJ、MockMvc、H2。集成测试使用 Failsafe 和 Testcontainers，当前覆盖 MySQL Flyway 校验和 RabbitMQ outbox 投递：
 
 ```powershell
 mvn verify
@@ -166,7 +166,7 @@ mvn test
 
 - Phase 1：已完成。API DTO、结构化错误、上传校验、任务状态接口、报告解析组件、回归测试。
 - Phase 2：已完成。引入 use case、任务状态转换、失败码、attempts、手动 retry 和薄 worker。
-- Phase 3：持久化与可靠消息。Flyway、outbox、自动重试调度、RabbitMQ 集成测试。
+- Phase 3：已完成。Flyway、outbox、自动重试调度、RabbitMQ 集成测试。
 - Phase 4：部署与配置。Dockerfile、app compose service、profiles、`.env.example`、README 启动流。
 - Phase 5：可观测与运维。Actuator、request/correlation ID、结构化任务日志、指标、运行手册补强。
 - Phase 6：端到端验证。Testcontainers、mock AI HTTP server、PDF/DOCX fixtures、`mvn verify`。

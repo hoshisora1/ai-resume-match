@@ -173,6 +173,27 @@ class DomainRepositoryTest {
     }
 
     @Test
+    void doesNotReclaimFreshRunningTaskWhenMessageIsNotRedelivered() {
+        AnalysisTask task = analysisTaskRepository.save(new AnalysisTask(1L, 2L));
+        task.markRunning();
+        analysisTaskRepository.saveAndFlush(task);
+
+        int updated = analysisTaskRepository.markRunningIfPendingOrStale(
+            task.getId(),
+            AnalysisTask.Status.RUNNING,
+            AnalysisTask.Status.PENDING,
+            LocalDateTime.now().minusMinutes(15),
+            LocalDateTime.now(),
+            false
+        );
+
+        assertThat(updated).isEqualTo(0);
+        AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
+        assertThat(updatedTask.getStatus()).isEqualTo(AnalysisTask.Status.RUNNING);
+        assertThat(updatedTask.getAttemptCount()).isEqualTo(1);
+    }
+
+    @Test
     void canFindAndResetDueRetryableTasks() {
         LocalDateTime now = LocalDateTime.now();
         AnalysisTask task = new AnalysisTask(1L, 2L);
