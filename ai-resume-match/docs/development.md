@@ -71,7 +71,7 @@
 ```powershell
 mvn test
 mvn "-Dtest=ResumeMatchControllerTest" test
-mvn "-Dtest=ReportParserTest,AnalysisWorkerTest" test
+mvn "-Dtest=RunAnalysisUseCaseTest,AnalysisWorkerTest" test
 ```
 
 PowerShell 中 `-Dtest=A,B` 推荐整体加引号，避免参数解析问题。
@@ -102,7 +102,8 @@ API 层：
 - API 只创建任务和查询状态，不在请求线程内执行 AI 分析。
 - RabbitMQ 消息体只传 `taskId`，worker 从 MySQL 重新读取任务、简历和 JD。
 - MySQL 是任务状态和报告结果的事实来源，Redis 只做 report cache-aside。
-- `AnalysisWorker` 负责监听和编排；可测试的业务逻辑应逐步下沉到 application/domain 组件。
+- `AnalysisWorker` 只负责监听 RabbitMQ 并委托 `RunAnalysisUseCase`。
+- 分析任务编排、失败分类、状态转换和手动 retry 入口优先落在 application/domain 组件中。
 
 报告解析：
 
@@ -164,8 +165,8 @@ mvn test
 ## 7. 阶段路线
 
 - Phase 1：已完成。API DTO、结构化错误、上传校验、任务状态接口、报告解析组件、回归测试。
-- Phase 2：domain/application 重构。引入 use case、任务状态转换、失败码和 attempts。
-- Phase 3：持久化与可靠消息。Flyway、outbox、worker 幂等、重试调度、RabbitMQ 集成测试。
+- Phase 2：已完成。引入 use case、任务状态转换、失败码、attempts、手动 retry 和薄 worker。
+- Phase 3：持久化与可靠消息。Flyway、outbox、自动重试调度、RabbitMQ 集成测试。
 - Phase 4：部署与配置。Dockerfile、app compose service、profiles、`.env.example`、README 启动流。
 - Phase 5：可观测与运维。Actuator、request/correlation ID、结构化任务日志、指标、运行手册补强。
 - Phase 6：端到端验证。Testcontainers、mock AI HTTP server、PDF/DOCX fixtures、`mvn verify`。

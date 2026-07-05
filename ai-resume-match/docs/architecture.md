@@ -1,6 +1,6 @@
 # AI Resume Match Architecture
 
-本文档描述 `ai-resume-match` 在 Phase 1 后的当前架构，以及工程化重构的目标边界。
+本文档描述 `ai-resume-match` 在 Phase 2 后的当前架构，以及工程化重构的目标边界。
 
 ## 1. 系统概览
 
@@ -24,6 +24,11 @@ com.zhulikang.aimatch
   ai
   analysis
   api
+  application
+    analysis
+    job
+    report
+    resume
   document
   job
   rag
@@ -36,7 +41,8 @@ com.zhulikang.aimatch
 - `resume`：简历实体与仓储。
 - `job`：JD 实体、仓储、技能标签提取。
 - `document`：PDF/DOCX 文本提取和上传文件校验。
-- `analysis`：任务、报告、worker、RabbitMQ 配置、Redis report cache。
+- `application`：上传简历、创建 JD、创建/查询/重试/运行分析任务、查询报告等用例编排。
+- `analysis`：任务和报告实体、任务状态服务、worker 监听器、RabbitMQ 配置、Redis report cache。
 - `rag`：文本切分、embedding、向量检索、上下文构建。
 - `ai`：OpenAI-compatible HTTP 客户端抽象和实现。
 
@@ -125,15 +131,15 @@ POST /api/jobs
 POST /api/analysis
   -> check resume exists
   -> check job exists
-  -> AnalysisService.createTask
+  -> CreateAnalysisTaskUseCase.create
   -> after commit publish taskId to RabbitMQ
   -> AnalysisTaskResponse
 ```
 
-当前 Phase 1 状态：
+当前 Phase 2 状态：
 
-- API 返回 `taskId`、`resumeId`、`jobDescriptionId`、`status`。
-- 任务初始状态为 `PENDING`。
+- API 返回 `taskId`、`resumeId`、`jobDescriptionId`、`status`、attempt/failure/timestamp 元数据。
+- 任务初始状态为 `PENDING`，并在事务提交后发布 `taskId` 到 RabbitMQ。
 - 可靠消息 outbox 尚未实现，属于 Phase 3 范围。
 
 ### 4.4 Worker 生成报告
@@ -141,6 +147,7 @@ POST /api/analysis
 ```text
 RabbitMQ message(taskId)
   -> AnalysisWorker
+  -> RunAnalysisUseCase
   -> AnalysisTaskService.tryStart
   -> load Resume and JobDescription from MySQL
   -> TextChunker
@@ -157,20 +164,31 @@ RabbitMQ message(taskId)
 - 消息体只包含 `taskId`。
 - worker 不信任消息中的业务数据，必须从 MySQL 重取。
 - `match_report.task_id` 保持唯一，支撑幂等方向的演进。
-- worker 失败当前会标记任务失败；细分失败码、重试调度和 outbox 属于后续阶段。
+- `AnalysisWorker` 只负责监听并委托 `RunAnalysisUseCase`；RAG、AI 调用、报告解析和失败分类在 use case 中编排。
+- 运行失败会落到 `FAILED_RETRYABLE` 或 `FAILED_FINAL`，并记录失败码、失败消息、attempts 和下一次重试时间。
+- 自动重试调度和 outbox 属于 Phase 3 范围。
 
 ### 4.5 查询任务和报告
 
 ```text
 GET /api/analysis/{taskId}
-  -> AnalysisService.findTask
+  -> GetAnalysisTaskUseCase.find
   -> AnalysisTaskResponse
 
 GET /api/analysis/{taskId}/report
+  -> GetMatchReportUseCase.find
   -> ReportCache lookup
   -> MatchReportRepository fallback
   -> cache successful report
   -> MatchReportView
+```
+
+```text
+POST /api/analysis/{taskId}/retry
+  -> RetryAnalysisTaskUseCase.retry
+  -> FAILED_RETRYABLE -> PENDING
+  -> after commit publish taskId to RabbitMQ
+  -> AnalysisTaskResponse
 ```
 
 关键约束：
@@ -215,7 +233,7 @@ GET /api/analysis/{taskId}/report
 
 - 增加 `requestId`。
 - 增加更细的业务错误码。
-- 任务状态响应增加 attempts、failureCode、failureMessage、startedAt、completedAt、nextRetryAt。
+- 报告响应演进为结构化 JSON，同时保留文本 fallback。
 
 ## 6. 数据模型
 
@@ -223,28 +241,18 @@ GET /api/analysis/{taskId}/report
 
 - `Resume`：文件名、原始文本、结构化摘要。
 - `JobDescription`：JD 内容、技能标签。
-- `AnalysisTask`：简历 ID、JD ID、状态、创建和更新时间。
+- `AnalysisTask`：简历 ID、JD ID、状态、attempts、失败码、失败消息、下一次重试时间、开始/完成/创建/更新时间。
 - `MatchReport`：任务 ID、匹配分数、报告正文、创建时间。
 
 目标实体增强：
 
-- `AnalysisTask` 增加 attempts、maxAttempts、failureCode、failureMessage、nextRetryAt、startedAt、completedAt。
 - `MatchReport` 增加 `reportJson`，保留 `reportMarkdown`。
 - 增加 `analysis_outbox` 表，支撑可靠投递。
 - 简历和 JD 增加删除标记、内容 hash、文件大小、content type 等审计字段。
 
 ## 7. 任务状态
 
-当前状态较简单：
-
-```text
-PENDING
-RUNNING
-SUCCESS
-FAILED
-```
-
-目标状态：
+当前状态：
 
 ```text
 PENDING
@@ -254,6 +262,8 @@ FAILED_RETRYABLE
 FAILED_FINAL
 CANCELLED
 ```
+
+`FAILED` 仍作为兼容旧数据的 legacy enum value 保留，不再作为新任务流转目标。
 
 目标状态迁移：
 
@@ -277,13 +287,13 @@ FAILED_RETRYABLE -> CANCELLED
 - 报告按 taskId 唯一。
 - Redis 只是缓存。
 - Phase 1 加入明确 API 契约和上传校验。
+- Phase 2 加入 application use case、原子任务状态流转、retryable/final 失败分类、手动 retry 入口和薄 worker。
 
 待实现：
 
 - Flyway schema migration。
 - outbox publisher。
-- worker 原子 claim 和幂等跳过。
-- retryable/final 失败分类。
+- 自动重试调度。
 - RabbitMQ、Redis、MySQL Testcontainers 验证。
 - 结构化日志、request ID、任务生命周期 metrics。
 
