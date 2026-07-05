@@ -1,6 +1,6 @@
 # AI Resume Match Operations Runbook
 
-本文档记录 `ai-resume-match` 当前可执行的本地运行、检查和排障流程。它覆盖 Phase 4 后的状态：应用已经 Docker 化，Compose 可启动 app、MySQL、Redis、RabbitMQ，并提供 Actuator readiness/liveness health；结构化日志、request ID 和 metrics 将在 Phase 5 补充。
+本文档记录 `ai-resume-match` 当前可执行的本地运行、检查和排障流程。应用已经 Docker 化，Compose 可启动 app、MySQL、Redis、RabbitMQ，并提供 Actuator readiness/liveness health、request/correlation ID、结构化任务日志和 Micrometer metrics。
 
 ## 1. 完整 Docker Compose 启动
 
@@ -263,12 +263,40 @@ RabbitMQ 管理页：`http://localhost:15672`。
 - `.env.example` 只放示例值，不放真实密钥。
 - 生产环境必须使用 `prod` profile，并通过环境变量注入真实配置。
 
-## 8. 后续运维补强点
+## 8. 可观测性检查
 
-Phase 5 需要继续补充：
+请求定位：
 
-- request ID 和 correlation ID。
-- 结构化任务生命周期日志。
-- task、AI、cache、outbox metrics。
-- RabbitMQ DLQ 检查流程。
-- outbox backlog metrics 和 failed retryable task 批量运维脚本。
+```powershell
+curl.exe -i `
+  -H "X-API-Token: dev-token" `
+  -H "X-Request-Id: local-debug-1" `
+  -H "X-Correlation-Id: local-correlation-1" `
+  http://localhost:8080/api/analysis/1
+```
+
+预期：响应 header 保留 `X-Request-Id` 和 `X-Correlation-Id`；错误响应 body 包含 `requestId`。缺失或非法 header 会由服务生成安全 UUID。
+
+日志中可按 `requestId`、`correlationId`、`taskId` 和 `event=analysis_task_*` 搜索任务生命周期。任务日志只记录 ID、状态和失败分类，不记录简历原文、JD 原文、prompt 或 AI 原始响应。
+
+指标检查：
+
+```powershell
+curl.exe -i http://localhost:8080/actuator/metrics
+curl.exe -i http://localhost:8080/actuator/metrics/analysis.tasks.created
+curl.exe -i http://localhost:8080/actuator/metrics/analysis.tasks.succeeded
+curl.exe -i http://localhost:8080/actuator/metrics/analysis.tasks.failed
+curl.exe -i http://localhost:8080/actuator/metrics/analysis.worker.duration
+curl.exe -i http://localhost:8080/actuator/metrics/ai.calls
+curl.exe -i http://localhost:8080/actuator/metrics/ai.call.duration
+curl.exe -i http://localhost:8080/actuator/metrics/report.cache.requests
+curl.exe -i http://localhost:8080/actuator/metrics/report.cache.writes
+curl.exe -i http://localhost:8080/actuator/metrics/analysis.outbox.events
+curl.exe -i http://localhost:8080/actuator/metrics/analysis.outbox.backlog
+```
+
+RabbitMQ 队列深度仍通过 RabbitMQ 管理页或命令检查：
+
+```powershell
+docker compose exec rabbitmq rabbitmqctl list_queues name messages_ready messages_unacknowledged
+```

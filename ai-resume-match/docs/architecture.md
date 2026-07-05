@@ -1,6 +1,6 @@
 # AI Resume Match Architecture
 
-本文档描述 `ai-resume-match` 在 Phase 4 后的当前架构，以及工程化重构的目标边界。
+本文档描述 `ai-resume-match` 在 Phase 5 后的当前架构，以及工程化重构的目标边界。
 
 ## 1. 系统概览
 
@@ -219,6 +219,16 @@ docker compose
 
 Dockerfile 使用多阶段 Maven build、Java 21 runtime、非 root 用户和 Actuator readiness healthcheck。Compose 为 app、MySQL、Redis、RabbitMQ 配置 healthcheck 和 volume；`.env.example` 只记录示例值，真实 `.env` 不提交。应用 readiness 明确使用 Spring `readinessState`，依赖服务健康由 Compose healthcheck 和启动期连接/迁移结果覆盖，Redis cache-aside 不参与阻断 readiness。
 
+### 4.7 可观测性
+
+HTTP 请求经过 `RequestCorrelationFilter`，生成或复用 `X-Request-Id` 和 `X-Correlation-Id`，并写入 SLF4J MDC。API 错误响应包含 `requestId`。
+
+创建分析任务时，当前 `correlationId` 写入 outbox payload；outbox publisher 将它发布为 RabbitMQ header；worker 消费时恢复到 MDC，并在处理结束后清理。
+
+任务生命周期日志使用 key-value 字段：`event`、`requestId`、`correlationId`、`taskId`、`resumeId`、`jobDescriptionId`、`attempt`、`failureCode`。日志只记录 ID、状态和失败分类，不记录简历原文、JD 原文、prompt 或 AI 响应正文。
+
+Micrometer 指标覆盖 `analysis.tasks.created`、`analysis.tasks.succeeded`、`analysis.tasks.failed`、`analysis.worker.duration`、`ai.calls`、`ai.call.duration`、`report.cache.requests`、`report.cache.writes`、`analysis.outbox.events` 和 `analysis.outbox.backlog`。Actuator 暴露 `/actuator/metrics`。
+
 ## 5. HTTP 契约
 
 当前成功响应：
@@ -247,13 +257,13 @@ Dockerfile 使用多阶段 Maven build、Java 21 runtime、非 root 用户和 Ac
 ```json
 {
   "code": "INVALID_REQUEST",
-  "message": "Invalid request"
+  "message": "Invalid request",
+  "requestId": "2f6b6a0d-45c5-4b65-bbc1-3aaf70c79cb4"
 }
 ```
 
 计划中的增强：
 
-- 增加 `requestId`。
 - 增加更细的业务错误码。
 - 报告响应演进为结构化 JSON，同时保留文本 fallback。
 
@@ -312,11 +322,11 @@ FAILED_RETRYABLE -> CANCELLED
 - Phase 2 加入 application use case、原子任务状态流转、retryable/final 失败分类、手动 retry 入口和薄 worker。
 - Phase 3 加入 Flyway 初始 schema、analysis outbox、带 claim 和 publisher confirm/return 的 outbox publisher、自动重试调度，以及 MySQL/RabbitMQ Testcontainers 验证。
 - Phase 4 加入 Dockerfile、app compose service、health checks、`dev`/`docker`/`prod` profiles、`.env.example` 和部署配置契约测试。
+- Phase 5 加入 request ID、correlation ID、结构化任务生命周期日志、Micrometer 指标和运行手册。
 
 待实现：
 
 - Redis Testcontainers 和端到端分析流验证。
-- request ID、correlation ID、结构化任务生命周期日志和 metrics。
 
 ## 9. 架构决策
 

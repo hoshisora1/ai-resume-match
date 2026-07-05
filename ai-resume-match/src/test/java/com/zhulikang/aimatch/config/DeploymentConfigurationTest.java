@@ -31,6 +31,18 @@ class DeploymentConfigurationTest {
         assertThat(properties.getProperty("management.endpoint.health.group.liveness.include")).isEqualTo("livenessState");
         assertThat(properties.getProperty("management.endpoint.health.group.readiness.include")).isEqualTo("readinessState");
         assertThat(properties.getProperty("management.endpoints.web.exposure.include")).contains("health");
+        assertThat(properties.getProperty("management.endpoints.web.exposure.include")).contains("metrics");
+    }
+
+    @Test
+    void docsDescribeObservabilityMetricsAndCorrelationIds() throws IOException {
+        String readme = read("README.md");
+        String runbook = read("docs/operations/runbook.md");
+        String architecture = read("docs/architecture.md");
+
+        assertThat(readme).contains("X-Request-Id").contains("/actuator/metrics");
+        assertThat(runbook).contains("analysis.tasks.created").contains("analysis.outbox.backlog");
+        assertThat(architecture).contains("requestId").contains("correlationId").contains("Micrometer");
     }
 
     @Test

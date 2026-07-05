@@ -991,7 +991,7 @@ git commit -m "feat: add ai cache and outbox metrics"
 - Modify: `docs/development.md`
 - Modify: `docs/architecture.md`
 
-- [ ] **Step 1: Write failing config/docs test**
+- [x] **Step 1: Write failing config/docs test**
 
 In `DeploymentConfigurationTest.commonConfigurationUsesDevAsDefaultProfileAndExposesHealthProbes`, add:
 
@@ -1014,7 +1014,7 @@ void docsDescribeObservabilityMetricsAndCorrelationIds() throws IOException {
 }
 ```
 
-- [ ] **Step 2: Run test and verify RED**
+- [x] **Step 2: Run test and verify RED**
 
 ```powershell
 mvn "-Dtest=DeploymentConfigurationTest" test
@@ -1022,7 +1022,7 @@ mvn "-Dtest=DeploymentConfigurationTest" test
 
 Expected: FAIL because metrics endpoint/docs are not updated.
 
-- [ ] **Step 3: Expose Actuator metrics**
+- [x] **Step 3: Expose Actuator metrics**
 
 Change `application.yml`:
 
@@ -1034,7 +1034,7 @@ management:
         include: health,info,metrics
 ```
 
-- [ ] **Step 4: Update README**
+- [x] **Step 4: Update README**
 
 Add to README after health check:
 
@@ -1050,7 +1050,7 @@ curl.exe -i http://localhost:8080/actuator/metrics/analysis.outbox.backlog
 ```
 ```
 
-- [ ] **Step 5: Update runbook**
+- [x] **Step 5: Update runbook**
 
 Replace Phase 5 placeholder bullets with concrete sections:
 
@@ -1085,7 +1085,7 @@ curl.exe -i http://localhost:8080/actuator/metrics/analysis.outbox.backlog
 RabbitMQ 队列深度仍通过 RabbitMQ 管理页或 `docker compose exec rabbitmq rabbitmqctl list_queues` 检查。
 ```
 
-- [ ] **Step 6: Update development and architecture docs**
+- [x] **Step 6: Update development and architecture docs**
 
 In `docs/development.md`, mark Phase 5 current behavior as completed after implementation and Phase 6 as next.
 
@@ -1101,7 +1101,7 @@ HTTP 请求经过 `RequestCorrelationFilter`，生成或复用 `X-Request-Id` �
 Micrometer 指标覆盖 `analysis.tasks.created`、`analysis.tasks.succeeded`、`analysis.tasks.failed`、`analysis.worker.duration`、`ai.calls`、`ai.call.duration`、`report.cache.requests`、`report.cache.writes`、`analysis.outbox.events` 和 `analysis.outbox.backlog`。
 ```
 
-- [ ] **Step 7: Run focused tests and stale wording scan**
+- [x] **Step 7: Run focused tests and stale wording scan**
 
 ```powershell
 mvn "-Dtest=DeploymentConfigurationTest" test

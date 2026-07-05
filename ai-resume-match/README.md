@@ -86,6 +86,16 @@ curl.exe -i http://localhost:8080/actuator/health/readiness
 
 readiness 只暴露 Spring 应用自身的接流量状态；MySQL、Redis、RabbitMQ 的容器健康由 Docker Compose healthcheck 管理，Redis 作为 cache-aside 依赖不可用时不应改变业务事实来源。
 
+请求链路会返回 `X-Request-Id` 和 `X-Correlation-Id`。客户端可以传入这两个 header；缺失或非法时服务会生成安全 UUID。错误响应包含 `requestId`，便于在日志中定位同一次请求。
+
+常用指标入口：
+
+```powershell
+curl.exe -i http://localhost:8080/actuator/metrics
+curl.exe -i http://localhost:8080/actuator/metrics/analysis.tasks.created
+curl.exe -i http://localhost:8080/actuator/metrics/analysis.outbox.backlog
+```
+
 ## 测试与验证
 
 ```powershell

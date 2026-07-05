@@ -169,7 +169,7 @@ mvn test
 - Phase 2：已完成。引入 use case、任务状态转换、失败码、attempts、手动 retry 和薄 worker。
 - Phase 3：已完成。Flyway、outbox、publisher confirm/return、自动重试调度、RabbitMQ 集成测试。
 - Phase 4：已完成。Dockerfile、app compose service、health checks、profiles、`.env.example`、README 启动流。
-- Phase 5：可观测与运维。request/correlation ID、结构化任务日志、指标、运行手册补强。
-- Phase 6：端到端验证。Testcontainers、mock AI HTTP server、PDF/DOCX fixtures、`mvn verify`。
+- Phase 5：已完成。request/correlation ID、结构化任务日志、Micrometer 指标、运行手册补强。
+- Phase 6：下一步。端到端验证、mock AI HTTP server、PDF/DOCX fixtures、`mvn verify`。
 
 `docs/superpowers/plans/2026-05-12-rag-resume-job-match.md` 保留为历史实现上下文，不作为当前工程化重构的执行计划。
