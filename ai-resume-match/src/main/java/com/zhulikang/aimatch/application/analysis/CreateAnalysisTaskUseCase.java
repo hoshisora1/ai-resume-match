@@ -4,6 +4,7 @@ import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
 import com.zhulikang.aimatch.api.ResourceNotFoundException;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,17 +15,20 @@ public class CreateAnalysisTaskUseCase {
     private final JobDescriptionRepository jobRepository;
     private final AnalysisTaskRepository taskRepository;
     private final AnalysisTaskPublisher publisher;
+    private final AnalysisMetrics metrics;
 
     public CreateAnalysisTaskUseCase(
         ResumeRepository resumeRepository,
         JobDescriptionRepository jobRepository,
         AnalysisTaskRepository taskRepository,
-        AnalysisTaskPublisher publisher
+        AnalysisTaskPublisher publisher,
+        AnalysisMetrics metrics
     ) {
         this.resumeRepository = resumeRepository;
         this.jobRepository = jobRepository;
         this.taskRepository = taskRepository;
         this.publisher = publisher;
+        this.metrics = metrics;
     }
 
     @Transactional
@@ -37,6 +41,7 @@ public class CreateAnalysisTaskUseCase {
         }
         AnalysisTask task = taskRepository.save(new AnalysisTask(resumeId, jobDescriptionId));
         publisher.publishAfterCommit(task.getId());
+        metrics.taskCreated();
         return task;
     }
 }

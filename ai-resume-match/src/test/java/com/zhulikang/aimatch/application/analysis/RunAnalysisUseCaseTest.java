@@ -9,13 +9,18 @@ import com.zhulikang.aimatch.analysis.MatchReport;
 import com.zhulikang.aimatch.analysis.ReportParser;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import com.zhulikang.aimatch.rag.HashingEmbeddingClient;
 import com.zhulikang.aimatch.rag.RagContextBuilder;
 import com.zhulikang.aimatch.rag.TextChunker;
 import com.zhulikang.aimatch.resume.Resume;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
@@ -28,6 +33,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(OutputCaptureExtension.class)
 class RunAnalysisUseCaseTest {
     private final AnalysisTaskService taskService = mock(AnalysisTaskService.class);
     private final AnalysisTaskRepository taskRepository = mock(AnalysisTaskRepository.class);
@@ -35,9 +41,10 @@ class RunAnalysisUseCaseTest {
     private final JobDescriptionRepository jobRepository = mock(JobDescriptionRepository.class);
     private final AiClient aiClient = mock(AiClient.class);
     private final ReportParser reportParser = mock(ReportParser.class);
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @Test
-    void createsReportAndMarksTaskSuccess() {
+    void createsReportAndMarksTaskSuccess(CapturedOutput output) {
         AnalysisTask task = task(99L);
         when(taskService.tryStart(99L, false)).thenReturn(true);
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
@@ -60,6 +67,13 @@ class RunAnalysisUseCaseTest {
         assertThat(reportCaptor.getValue().getTaskId()).isEqualTo(99L);
         assertThat(reportCaptor.getValue().getMatchScore()).isEqualTo(88);
         assertThat(reportCaptor.getValue().getReportContent()).contains("Redis Kafka");
+        assertThat(meterRegistry.counter("analysis.tasks.succeeded").count()).isEqualTo(1.0);
+        assertThat(meterRegistry.find("analysis.worker.duration")
+            .tag("outcome", "success")
+            .tag("failureCode", "none")
+            .timer()).isNotNull();
+        assertThat(output).contains("event=analysis_task_started taskId=99 redelivered=false")
+            .contains("event=analysis_task_succeeded taskId=99");
     }
 
     @Test
@@ -75,6 +89,11 @@ class RunAnalysisUseCaseTest {
 
         verify(taskService).markRetryableFailure(99L, AnalysisFailureCode.AI_UNAVAILABLE, "AI unavailable");
         verify(taskService, never()).completeSuccess(any());
+        assertThat(meterRegistry.counter(
+            "analysis.tasks.failed",
+            "failureCode",
+            AnalysisFailureCode.AI_UNAVAILABLE.name()
+        ).count()).isEqualTo(1.0);
     }
 
     @Test
@@ -90,6 +109,11 @@ class RunAnalysisUseCaseTest {
             "Analysis source data is missing"
         );
         verify(aiClient, never()).complete(anyString());
+        assertThat(meterRegistry.counter(
+            "analysis.tasks.failed",
+            "failureCode",
+            AnalysisFailureCode.SOURCE_DATA_MISSING.name()
+        ).count()).isEqualTo(1.0);
     }
 
     @Test
@@ -110,10 +134,15 @@ class RunAnalysisUseCaseTest {
             AnalysisFailureCode.REPORT_PARSE_FAILED,
             "AI report does not contain score"
         );
+        assertThat(meterRegistry.counter(
+            "analysis.tasks.failed",
+            "failureCode",
+            AnalysisFailureCode.REPORT_PARSE_FAILED.name()
+        ).count()).isEqualTo(1.0);
     }
 
     @Test
-    void skipsTaskWhenItCannotStart() {
+    void skipsTaskWhenItCannotStart(CapturedOutput output) {
         when(taskService.tryStart(99L, false)).thenReturn(false);
 
         useCase().run(99L, false);
@@ -121,6 +150,7 @@ class RunAnalysisUseCaseTest {
         verify(taskRepository, never()).findById(99L);
         verify(aiClient, never()).complete(anyString());
         verify(taskService, never()).completeSuccess(any());
+        assertThat(output).contains("event=analysis_task_skipped taskId=99 redelivered=false reason=not_claimable");
     }
 
     @Test
@@ -149,7 +179,8 @@ class RunAnalysisUseCaseTest {
             new HashingEmbeddingClient(),
             new RagContextBuilder(),
             aiClient,
-            reportParser
+            reportParser,
+            new AnalysisMetrics(meterRegistry)
         );
     }
 

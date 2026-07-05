@@ -9,6 +9,7 @@ import com.zhulikang.aimatch.analysis.MatchReport;
 import com.zhulikang.aimatch.analysis.ReportParser;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import com.zhulikang.aimatch.rag.EmbeddingClient;
 import com.zhulikang.aimatch.rag.InMemoryVectorStore;
 import com.zhulikang.aimatch.rag.RagContextBuilder;
@@ -18,6 +19,7 @@ import com.zhulikang.aimatch.resume.Resume;
 import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
@@ -37,6 +39,7 @@ public class RunAnalysisUseCase {
     private final RagContextBuilder ragContextBuilder;
     private final AiClient aiClient;
     private final ReportParser reportParser;
+    private final AnalysisMetrics metrics;
 
     public RunAnalysisUseCase(
         AnalysisTaskService taskService,
@@ -47,7 +50,8 @@ public class RunAnalysisUseCase {
         EmbeddingClient embeddingClient,
         RagContextBuilder ragContextBuilder,
         AiClient aiClient,
-        ReportParser reportParser
+        ReportParser reportParser,
+        AnalysisMetrics metrics
     ) {
         this.taskService = taskService;
         this.taskRepository = taskRepository;
@@ -58,13 +62,16 @@ public class RunAnalysisUseCase {
         this.ragContextBuilder = ragContextBuilder;
         this.aiClient = aiClient;
         this.reportParser = reportParser;
+        this.metrics = metrics;
     }
 
     public void run(Long taskId, boolean redelivered) {
         if (!taskService.tryStart(taskId, redelivered)) {
-            log.info("Skip analysis task {} because it is not pending", taskId);
+            log.info("event=analysis_task_skipped taskId={} redelivered={} reason=not_claimable", taskId, redelivered);
             return;
         }
+        Timer.Sample sample = metrics.startTimer();
+        log.info("event=analysis_task_started taskId={} redelivered={}", taskId, redelivered);
         try {
             AnalysisTask task = taskRepository.findById(taskId).orElseThrow();
             Resume resume = resumeRepository.findById(task.getResumeId()).orElseThrow();
@@ -83,16 +90,42 @@ public class RunAnalysisUseCase {
             );
             String report = aiClient.complete(prompt);
             taskService.completeSuccess(new MatchReport(task.getId(), reportParser.extractScore(report), report));
+            metrics.taskSucceeded(sample);
+            log.info(
+                "event=analysis_task_succeeded taskId={} resumeId={} jobDescriptionId={} attempt={}",
+                task.getId(),
+                task.getResumeId(),
+                task.getJobDescriptionId(),
+                task.getAttemptCount()
+            );
         } catch (NoSuchElementException ex) {
             taskService.markFinalFailure(
                 taskId,
                 AnalysisFailureCode.SOURCE_DATA_MISSING,
                 "Analysis source data is missing"
             );
+            metrics.taskFailed(AnalysisFailureCode.SOURCE_DATA_MISSING, sample);
+            log.warn(
+                "event=analysis_task_failed taskId={} failureCode={} retryable=false",
+                taskId,
+                AnalysisFailureCode.SOURCE_DATA_MISSING
+            );
         } catch (IllegalArgumentException ex) {
             taskService.markFinalFailure(taskId, AnalysisFailureCode.REPORT_PARSE_FAILED, ex.getMessage());
+            metrics.taskFailed(AnalysisFailureCode.REPORT_PARSE_FAILED, sample);
+            log.warn(
+                "event=analysis_task_failed taskId={} failureCode={} retryable=false",
+                taskId,
+                AnalysisFailureCode.REPORT_PARSE_FAILED
+            );
         } catch (RuntimeException ex) {
             taskService.markRetryableFailure(taskId, AnalysisFailureCode.AI_UNAVAILABLE, ex.getMessage());
+            metrics.taskFailed(AnalysisFailureCode.AI_UNAVAILABLE, sample);
+            log.warn(
+                "event=analysis_task_failed taskId={} failureCode={} retryable=true",
+                taskId,
+                AnalysisFailureCode.AI_UNAVAILABLE
+            );
         }
     }
 }

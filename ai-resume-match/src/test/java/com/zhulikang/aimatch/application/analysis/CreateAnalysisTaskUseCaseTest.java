@@ -4,7 +4,9 @@ import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
 import com.zhulikang.aimatch.api.ResourceNotFoundException;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
+import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -27,7 +29,8 @@ class CreateAnalysisTaskUseCaseTest {
             resumeRepository,
             jobRepository,
             taskRepository,
-            publisher
+            publisher,
+            new AnalysisMetrics(new SimpleMeterRegistry())
         );
         when(resumeRepository.existsById(1L)).thenReturn(false);
 
@@ -47,7 +50,8 @@ class CreateAnalysisTaskUseCaseTest {
             resumeRepository,
             jobRepository,
             taskRepository,
-            publisher
+            publisher,
+            new AnalysisMetrics(new SimpleMeterRegistry())
         );
         when(resumeRepository.existsById(1L)).thenReturn(true);
         when(jobRepository.existsById(2L)).thenReturn(false);
@@ -64,11 +68,13 @@ class CreateAnalysisTaskUseCaseTest {
         JobDescriptionRepository jobRepository = mock(JobDescriptionRepository.class);
         AnalysisTaskRepository taskRepository = mock(AnalysisTaskRepository.class);
         AnalysisTaskPublisher publisher = mock(AnalysisTaskPublisher.class);
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         CreateAnalysisTaskUseCase useCase = new CreateAnalysisTaskUseCase(
             resumeRepository,
             jobRepository,
             taskRepository,
-            publisher
+            publisher,
+            new AnalysisMetrics(meterRegistry)
         );
         AnalysisTask saved = new AnalysisTask(1L, 2L);
         ReflectionTestUtils.setField(saved, "id", 99L);
@@ -82,5 +88,6 @@ class CreateAnalysisTaskUseCaseTest {
         assertThat(task.getJobDescriptionId()).isEqualTo(2L);
         verify(taskRepository).save(any(AnalysisTask.class));
         verify(publisher).publishAfterCommit(99L);
+        assertThat(meterRegistry.counter("analysis.tasks.created").count()).isEqualTo(1.0);
     }
 }

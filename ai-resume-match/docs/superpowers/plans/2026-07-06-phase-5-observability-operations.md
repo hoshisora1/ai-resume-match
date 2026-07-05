@@ -522,7 +522,7 @@ git commit -m "feat: propagate analysis correlation ids"
 - Modify: `src/test/java/com/zhulikang/aimatch/application/analysis/CreateAnalysisTaskUseCaseTest.java`
 - Modify: `src/test/java/com/zhulikang/aimatch/application/analysis/RunAnalysisUseCaseTest.java`
 
-- [ ] **Step 1: Write failing metrics and log tests**
+- [x] **Step 1: Write failing metrics and log tests**
 
 In `CreateAnalysisTaskUseCaseTest`, add imports:
 
@@ -603,7 +603,7 @@ void writesStructuredTaskLifecycleLogsWithoutSourceContent(CapturedOutput output
 }
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 ```powershell
 mvn "-Dtest=CreateAnalysisTaskUseCaseTest,RunAnalysisUseCaseTest" test
@@ -611,7 +611,7 @@ mvn "-Dtest=CreateAnalysisTaskUseCaseTest,RunAnalysisUseCaseTest" test
 
 Expected: FAIL because metrics helper and structured logs do not exist.
 
-- [ ] **Step 3: Implement `AnalysisMetrics`**
+- [x] **Step 3: Implement `AnalysisMetrics`**
 
 Create `AnalysisMetrics.java`:
 
@@ -690,7 +690,7 @@ public class AnalysisMetrics {
 }
 ```
 
-- [ ] **Step 4: Record task-created metrics**
+- [x] **Step 4: Record task-created metrics**
 
 Modify `CreateAnalysisTaskUseCase` constructor to accept `AnalysisMetrics metrics` and call:
 
@@ -702,7 +702,7 @@ immediately after the task is saved and outbox event is written.
 
 Update all `CreateAnalysisTaskUseCaseTest` constructors to pass `new AnalysisMetrics(new SimpleMeterRegistry())`.
 
-- [ ] **Step 5: Add structured task logs and run metrics**
+- [x] **Step 5: Add structured task logs and run metrics**
 
 Modify `RunAnalysisUseCase` constructor to accept `AnalysisMetrics metrics`.
 
@@ -755,7 +755,7 @@ log.info("event=analysis_task_skipped taskId={} redelivered={} reason=not_claima
 
 Update `RunAnalysisUseCaseTest.useCase()` to pass `metrics`.
 
-- [ ] **Step 6: Run focused tests**
+- [x] **Step 6: Run focused tests**
 
 ```powershell
 mvn "-Dtest=CreateAnalysisTaskUseCaseTest,RunAnalysisUseCaseTest" test
@@ -763,7 +763,7 @@ mvn "-Dtest=CreateAnalysisTaskUseCaseTest,RunAnalysisUseCaseTest" test
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/main/java/com/zhulikang/aimatch/observability/AnalysisMetrics.java src/main/java/com/zhulikang/aimatch/application/analysis/CreateAnalysisTaskUseCase.java src/main/java/com/zhulikang/aimatch/application/analysis/RunAnalysisUseCase.java src/test/java/com/zhulikang/aimatch/application/analysis/CreateAnalysisTaskUseCaseTest.java src/test/java/com/zhulikang/aimatch/application/analysis/RunAnalysisUseCaseTest.java
