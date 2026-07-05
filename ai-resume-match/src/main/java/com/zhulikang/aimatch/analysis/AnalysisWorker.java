@@ -1,6 +1,7 @@
 package com.zhulikang.aimatch.analysis;
 
 import com.zhulikang.aimatch.application.analysis.RunAnalysisUseCase;
+import com.zhulikang.aimatch.observability.RequestCorrelation;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
@@ -15,11 +16,25 @@ public class AnalysisWorker {
     }
 
     public void handle(Long taskId) {
-        handle(taskId, false);
+        handle(taskId, false, null);
     }
 
     @RabbitListener(queues = RabbitConfig.ANALYSIS_QUEUE)
-    public void handle(Long taskId, @Header(name = AmqpHeaders.REDELIVERED, required = false) Boolean redelivered) {
-        runAnalysisUseCase.run(taskId, Boolean.TRUE.equals(redelivered));
+    public void handle(
+        Long taskId,
+        @Header(name = AmqpHeaders.REDELIVERED, required = false) Boolean redelivered,
+        @Header(name = RequestCorrelation.CORRELATION_ID_HEADER, required = false) String correlationId
+    ) {
+        String safeCorrelationId = RequestCorrelation.safeOrNew(correlationId);
+        RequestCorrelation.put(null, safeCorrelationId);
+        try {
+            runAnalysisUseCase.run(taskId, Boolean.TRUE.equals(redelivered));
+        } finally {
+            RequestCorrelation.clear();
+        }
+    }
+
+    public void handle(Long taskId, Boolean redelivered) {
+        handle(taskId, redelivered, null);
     }
 }

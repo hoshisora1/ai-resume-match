@@ -1,7 +1,9 @@
 package com.zhulikang.aimatch.analysis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhulikang.aimatch.observability.RequestCorrelation;
 import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.ReturnedMessage;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.connection.CorrelationData.Confirm;
@@ -93,7 +95,8 @@ public class AnalysisOutboxPublisher {
     private void publish(Long eventId, AnalysisOutboxEvent event, LocalDateTime now) {
         try {
             Long taskId = extractTaskId(event);
-            publishToRabbit(eventId, taskId);
+            String correlationId = extractCorrelationId(event);
+            publishToRabbit(eventId, taskId, correlationId);
             event.markPublished(now);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
@@ -106,12 +109,21 @@ public class AnalysisOutboxPublisher {
         outboxRepository.save(event);
     }
 
-    private void publishToRabbit(Long eventId, Long taskId) throws Exception {
+    private void publishToRabbit(Long eventId, Long taskId, String correlationId) throws Exception {
         CorrelationData correlationData = new CorrelationData("analysis-outbox-" + eventId);
+        MessagePostProcessor headers = message -> {
+            message.getMessageProperties().setHeader("analysisOutboxEventId", eventId);
+            if (correlationId != null && !correlationId.isBlank()) {
+                message.getMessageProperties().setHeader(RequestCorrelation.CORRELATION_ID_HEADER, correlationId);
+                message.getMessageProperties().setCorrelationId(correlationId);
+            }
+            return message;
+        };
         rabbitTemplate.convertAndSend(
             RabbitConfig.ANALYSIS_EXCHANGE,
             RabbitConfig.ANALYSIS_ROUTING_KEY,
             taskId,
+            headers,
             correlationData
         );
         Confirm confirm = correlationData.getFuture().get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -133,6 +145,10 @@ public class AnalysisOutboxPublisher {
             throw new IllegalArgumentException("Unsupported analysis outbox event type: " + event.getEventType());
         }
         return objectMapper.readTree(event.getPayloadJson()).required("taskId").asLong();
+    }
+
+    private String extractCorrelationId(AnalysisOutboxEvent event) throws Exception {
+        return objectMapper.readTree(event.getPayloadJson()).path("correlationId").asText(null);
     }
 
     private String errorMessage(Exception ex) {

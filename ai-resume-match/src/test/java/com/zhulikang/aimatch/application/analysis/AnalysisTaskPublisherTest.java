@@ -4,6 +4,7 @@ import com.zhulikang.aimatch.analysis.AnalysisOutboxEvent;
 import com.zhulikang.aimatch.analysis.AnalysisOutboxEventType;
 import com.zhulikang.aimatch.analysis.AnalysisOutboxRepository;
 import com.zhulikang.aimatch.analysis.AnalysisOutboxStatus;
+import com.zhulikang.aimatch.observability.RequestCorrelation;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -27,5 +28,23 @@ class AnalysisTaskPublisherTest {
         assertThat(event.getAggregateId()).isEqualTo(99L);
         assertThat(event.getStatus()).isEqualTo(AnalysisOutboxStatus.PENDING);
         assertThat(event.getPayloadJson()).contains("\"taskId\":99");
+    }
+
+    @Test
+    void persistsCurrentCorrelationIdInOutboxPayload() {
+        AnalysisOutboxRepository outboxRepository = mock(AnalysisOutboxRepository.class);
+        AnalysisTaskPublisher publisher = new AnalysisTaskPublisher(outboxRepository);
+        RequestCorrelation.put("request-1", "correlation-1");
+        try {
+            publisher.publishAfterCommit(99L);
+        } finally {
+            RequestCorrelation.clear();
+        }
+
+        ArgumentCaptor<AnalysisOutboxEvent> eventCaptor = ArgumentCaptor.forClass(AnalysisOutboxEvent.class);
+        verify(outboxRepository).save(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getPayloadJson())
+            .contains("\"taskId\":99")
+            .contains("\"correlationId\":\"correlation-1\"");
     }
 }

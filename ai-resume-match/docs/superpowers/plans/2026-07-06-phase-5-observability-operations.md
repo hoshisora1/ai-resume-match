@@ -246,7 +246,7 @@ mvn "-Dtest=ResumeMatchControllerTest" test
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/main/java/com/zhulikang/aimatch/observability/RequestCorrelation.java src/main/java/com/zhulikang/aimatch/observability/RequestCorrelationFilter.java src/main/java/com/zhulikang/aimatch/api/ApiErrorResponse.java src/test/java/com/zhulikang/aimatch/api/ResumeMatchControllerTest.java
@@ -266,7 +266,7 @@ git commit -m "feat: add request correlation ids"
 - Modify: `src/test/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisherTest.java`
 - Modify: `src/test/java/com/zhulikang/aimatch/analysis/AnalysisWorkerTest.java`
 
-- [ ] **Step 1: Write failing publisher correlation tests**
+- [x] **Step 1: Write failing publisher correlation tests**
 
 Add to `AnalysisTaskPublisherTest`:
 
@@ -347,7 +347,7 @@ void publishesCorrelationIdAsRabbitHeader() {
 }
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 ```powershell
 mvn "-Dtest=AnalysisTaskPublisherTest,AnalysisOutboxPublisherTest" test
@@ -355,7 +355,7 @@ mvn "-Dtest=AnalysisTaskPublisherTest,AnalysisOutboxPublisherTest" test
 
 Expected: FAIL because payload correlation and Rabbit headers do not exist.
 
-- [ ] **Step 3: Add outbox payload correlation ID**
+- [x] **Step 3: Add outbox payload correlation ID**
 
 In `AnalysisTaskPublisher`, inject current correlation:
 
@@ -394,7 +394,7 @@ private static String payload(Long taskId, String correlationId) {
 }
 ```
 
-- [ ] **Step 4: Publish Rabbit headers and update test helper**
+- [x] **Step 4: Publish Rabbit headers and update test helper**
 
 In `AnalysisOutboxPublisher`, add imports:
 
@@ -456,7 +456,7 @@ publishToRabbit(eventId, taskId, correlationId);
 
 Update `AnalysisOutboxPublisherTest.completePublishWithAck` and failure stubs to use the five-argument `convertAndSend` overload with `any(MessagePostProcessor.class)`.
 
-- [ ] **Step 5: Restore correlation ID in worker**
+- [x] **Step 5: Restore correlation ID in worker**
 
 Add this test to `AnalysisWorkerTest`:
 
@@ -496,7 +496,7 @@ public void handle(Long taskId, Boolean redelivered) {
 }
 ```
 
-- [ ] **Step 6: Run focused tests**
+- [x] **Step 6: Run focused tests**
 
 ```powershell
 mvn "-Dtest=AnalysisTaskPublisherTest,AnalysisOutboxPublisherTest,AnalysisWorkerTest" test
@@ -504,7 +504,7 @@ mvn "-Dtest=AnalysisTaskPublisherTest,AnalysisOutboxPublisherTest,AnalysisWorker
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/main/java/com/zhulikang/aimatch/application/analysis/AnalysisTaskPublisher.java src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxEvent.java src/main/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisher.java src/main/java/com/zhulikang/aimatch/analysis/AnalysisWorker.java src/test/java/com/zhulikang/aimatch/application/analysis/AnalysisTaskPublisherTest.java src/test/java/com/zhulikang/aimatch/analysis/AnalysisOutboxPublisherTest.java src/test/java/com/zhulikang/aimatch/analysis/AnalysisWorkerTest.java

@@ -1,6 +1,7 @@
 package com.zhulikang.aimatch.analysis;
 
 import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.core.ReturnedMessage;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.connection.CorrelationData.Confirm;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Pageable;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -70,6 +72,7 @@ class AnalysisOutboxPublisherTest {
             eq(RabbitConfig.ANALYSIS_EXCHANGE),
             eq(RabbitConfig.ANALYSIS_ROUTING_KEY),
             eq(99L),
+            any(MessagePostProcessor.class),
             any(CorrelationData.class)
         );
         verify(repository).save(event);
@@ -104,7 +107,13 @@ class AnalysisOutboxPublisherTest {
 
         verify(repository, never()).findById(10L);
         verify(rabbitTemplate, never())
-            .convertAndSend(anyString(), anyString(), any(Long.class), any(CorrelationData.class));
+            .convertAndSend(
+                anyString(),
+                anyString(),
+                any(Long.class),
+                any(MessagePostProcessor.class),
+                any(CorrelationData.class)
+            );
     }
 
     @Test
@@ -128,6 +137,7 @@ class AnalysisOutboxPublisherTest {
                 eq(RabbitConfig.ANALYSIS_EXCHANGE),
                 eq(RabbitConfig.ANALYSIS_ROUTING_KEY),
                 eq(99L),
+                any(MessagePostProcessor.class),
                 any(CorrelationData.class)
             );
         AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
@@ -165,13 +175,14 @@ class AnalysisOutboxPublisherTest {
         )).thenReturn(1);
         when(repository.findById(10L)).thenReturn(Optional.of(event));
         doAnswer(invocation -> {
-            CorrelationData correlationData = invocation.getArgument(3);
+            CorrelationData correlationData = invocation.getArgument(4);
             correlationData.getFuture().complete(new Confirm(false, "nacked"));
             return null;
         }).when(rabbitTemplate).convertAndSend(
             eq(RabbitConfig.ANALYSIS_EXCHANGE),
             eq(RabbitConfig.ANALYSIS_ROUTING_KEY),
             eq(99L),
+            any(MessagePostProcessor.class),
             any(CorrelationData.class)
         );
         AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
@@ -206,7 +217,7 @@ class AnalysisOutboxPublisherTest {
         )).thenReturn(1);
         when(repository.findById(10L)).thenReturn(Optional.of(event));
         doAnswer(invocation -> {
-            CorrelationData correlationData = invocation.getArgument(3);
+            CorrelationData correlationData = invocation.getArgument(4);
             correlationData.setReturned(new ReturnedMessage(
                 new Message(new byte[0], new MessageProperties()),
                 312,
@@ -220,6 +231,7 @@ class AnalysisOutboxPublisherTest {
             eq(RabbitConfig.ANALYSIS_EXCHANGE),
             eq(RabbitConfig.ANALYSIS_ROUTING_KEY),
             eq(99L),
+            any(MessagePostProcessor.class),
             any(CorrelationData.class)
         );
         AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
@@ -238,15 +250,59 @@ class AnalysisOutboxPublisherTest {
         assertThat(event.getNextAttemptAt()).isEqualTo(now.plusSeconds(30));
     }
 
+    @Test
+    void publishesCorrelationIdAsRabbitHeader() {
+        AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
+        RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+        AnalysisOutboxEvent event = AnalysisOutboxEvent.analysisRequested(99L, "correlation-1");
+        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), any(Pageable.class)))
+            .thenReturn(List.of(10L));
+        when(repository.markProcessingIfDue(
+            10L,
+            CLAIMABLE_STATUSES,
+            now,
+            AnalysisOutboxStatus.PROCESSING,
+            now.plusSeconds(30)
+        )).thenReturn(1);
+        when(repository.findById(10L)).thenReturn(Optional.of(event));
+        completePublishWithAck(rabbitTemplate);
+        AnalysisOutboxPublisher publisher = new AnalysisOutboxPublisher(
+            repository,
+            rabbitTemplate,
+            20,
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(5),
+            clock
+        );
+
+        publisher.publishPending();
+
+        ArgumentCaptor<MessagePostProcessor> processorCaptor = ArgumentCaptor.forClass(MessagePostProcessor.class);
+        verify(rabbitTemplate).convertAndSend(
+            eq(RabbitConfig.ANALYSIS_EXCHANGE),
+            eq(RabbitConfig.ANALYSIS_ROUTING_KEY),
+            eq(99L),
+            processorCaptor.capture(),
+            any(CorrelationData.class)
+        );
+        Message message = new Message(new byte[0], new MessageProperties());
+        Message processed = processorCaptor.getValue().postProcessMessage(message);
+        String correlationId = processed.getMessageProperties().getHeader("X-Correlation-Id");
+        Long eventId = processed.getMessageProperties().getHeader("analysisOutboxEventId");
+        assertThat(correlationId).isEqualTo("correlation-1");
+        assertThat(eventId).isEqualTo(10L);
+    }
+
     private void completePublishWithAck(RabbitTemplate rabbitTemplate) {
         doAnswer(invocation -> {
-            CorrelationData correlationData = invocation.getArgument(3);
+            CorrelationData correlationData = invocation.getArgument(4);
             correlationData.getFuture().complete(new Confirm(true, null));
             return null;
         }).when(rabbitTemplate).convertAndSend(
             eq(RabbitConfig.ANALYSIS_EXCHANGE),
             eq(RabbitConfig.ANALYSIS_ROUTING_KEY),
             eq(99L),
+            any(MessagePostProcessor.class),
             any(CorrelationData.class)
         );
     }

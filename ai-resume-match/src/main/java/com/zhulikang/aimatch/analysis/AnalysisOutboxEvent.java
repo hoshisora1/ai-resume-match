@@ -66,12 +66,27 @@ public class AnalysisOutboxEvent {
     }
 
     public static AnalysisOutboxEvent analysisRequested(Long taskId) {
+        return analysisRequested(taskId, null);
+    }
+
+    public static AnalysisOutboxEvent analysisRequested(Long taskId, String correlationId) {
         return new AnalysisOutboxEvent(
             AnalysisOutboxEventType.ANALYSIS_REQUESTED,
             "analysis_task",
             taskId,
-            "{\"taskId\":" + taskId + "}"
+            payload(taskId, correlationId)
         );
+    }
+
+    private static String payload(Long taskId, String correlationId) {
+        if (correlationId == null || correlationId.isBlank()) {
+            return "{\"taskId\":" + taskId + "}";
+        }
+        return "{\"taskId\":" + taskId + ",\"correlationId\":\"" + escapeJson(correlationId) + "\"}";
+    }
+
+    private static String escapeJson(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     public void markPublished(LocalDateTime now) {

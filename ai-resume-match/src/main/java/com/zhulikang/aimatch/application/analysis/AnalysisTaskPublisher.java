@@ -2,6 +2,7 @@ package com.zhulikang.aimatch.application.analysis;
 
 import com.zhulikang.aimatch.analysis.AnalysisOutboxEvent;
 import com.zhulikang.aimatch.analysis.AnalysisOutboxRepository;
+import com.zhulikang.aimatch.observability.RequestCorrelation;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -13,6 +14,9 @@ public class AnalysisTaskPublisher {
     }
 
     public void publishAfterCommit(Long taskId) {
-        outboxRepository.save(AnalysisOutboxEvent.analysisRequested(taskId));
+        outboxRepository.save(AnalysisOutboxEvent.analysisRequested(
+            taskId,
+            RequestCorrelation.currentCorrelationIdOrNew()
+        ));
     }
 }
