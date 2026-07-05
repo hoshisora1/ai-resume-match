@@ -1,15 +1,14 @@
 package com.zhulikang.aimatch.api;
 
-import com.zhulikang.aimatch.analysis.AnalysisService;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
-import com.zhulikang.aimatch.document.DocumentTextExtractor;
-import com.zhulikang.aimatch.document.ResumeFileValidator;
-import com.zhulikang.aimatch.job.JdTagExtractor;
+import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.job.CreateJobDescriptionUseCase;
+import com.zhulikang.aimatch.application.report.GetMatchReportUseCase;
+import com.zhulikang.aimatch.application.resume.UploadResumeUseCase;
 import com.zhulikang.aimatch.job.JobDescription;
-import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.resume.Resume;
-import com.zhulikang.aimatch.resume.ResumeRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,62 +23,47 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api")
 public class ResumeMatchController {
-    private final DocumentTextExtractor extractor;
-    private final ResumeFileValidator resumeFileValidator;
-    private final ResumeRepository resumeRepository;
-    private final JobDescriptionRepository jobRepository;
-    private final JdTagExtractor jdTagExtractor;
-    private final AnalysisService analysisService;
+    private final UploadResumeUseCase uploadResumeUseCase;
+    private final CreateJobDescriptionUseCase createJobDescriptionUseCase;
+    private final CreateAnalysisTaskUseCase createAnalysisTaskUseCase;
+    private final GetAnalysisTaskUseCase getAnalysisTaskUseCase;
+    private final GetMatchReportUseCase getMatchReportUseCase;
 
     public ResumeMatchController(
-        DocumentTextExtractor extractor,
-        ResumeFileValidator resumeFileValidator,
-        ResumeRepository resumeRepository,
-        JobDescriptionRepository jobRepository,
-        JdTagExtractor jdTagExtractor,
-        AnalysisService analysisService
+        UploadResumeUseCase uploadResumeUseCase,
+        CreateJobDescriptionUseCase createJobDescriptionUseCase,
+        CreateAnalysisTaskUseCase createAnalysisTaskUseCase,
+        GetAnalysisTaskUseCase getAnalysisTaskUseCase,
+        GetMatchReportUseCase getMatchReportUseCase
     ) {
-        this.extractor = extractor;
-        this.resumeFileValidator = resumeFileValidator;
-        this.resumeRepository = resumeRepository;
-        this.jobRepository = jobRepository;
-        this.jdTagExtractor = jdTagExtractor;
-        this.analysisService = analysisService;
+        this.uploadResumeUseCase = uploadResumeUseCase;
+        this.createJobDescriptionUseCase = createJobDescriptionUseCase;
+        this.createAnalysisTaskUseCase = createAnalysisTaskUseCase;
+        this.getAnalysisTaskUseCase = getAnalysisTaskUseCase;
+        this.getMatchReportUseCase = getMatchReportUseCase;
     }
 
     @PostMapping("/resumes")
     public ResumeUploadResponse uploadResume(@RequestParam("file") MultipartFile file) {
-        resumeFileValidator.validate(file);
-        String rawText = extractor.extract(file);
-        if (rawText.isBlank()) {
-            throw new IllegalArgumentException("Resume text must not be blank");
-        }
-        Resume resume = resumeRepository.save(new Resume(file.getOriginalFilename(), rawText, rawText));
+        Resume resume = uploadResumeUseCase.upload(file);
         return new ResumeUploadResponse(resume.getId());
     }
 
     @PostMapping("/jobs")
     public JobDescriptionResponse createJob(@Valid @RequestBody CreateJobRequest request) {
-        String tags = jdTagExtractor.toStorageValue(jdTagExtractor.extractTags(request.content()));
-        JobDescription job = jobRepository.save(new JobDescription(request.content(), tags));
+        JobDescription job = createJobDescriptionUseCase.create(request.content());
         return new JobDescriptionResponse(job.getId());
     }
 
     @PostMapping("/analysis")
     public AnalysisTaskResponse createAnalysis(@Valid @RequestBody CreateAnalysisRequest request) {
-        if (!resumeRepository.existsById(request.resumeId())) {
-            throw new ResourceNotFoundException("Resume not found");
-        }
-        if (!jobRepository.existsById(request.jobDescriptionId())) {
-            throw new ResourceNotFoundException("Job description not found");
-        }
-        AnalysisTask task = analysisService.createTask(request.resumeId(), request.jobDescriptionId());
+        AnalysisTask task = createAnalysisTaskUseCase.create(request.resumeId(), request.jobDescriptionId());
         return AnalysisTaskResponse.from(task);
     }
 
     @GetMapping("/analysis/{taskId}")
     public ResponseEntity<AnalysisTaskResponse> analysisTask(@PathVariable Long taskId) {
-        return analysisService.findTask(taskId)
+        return getAnalysisTaskUseCase.find(taskId)
             .map(AnalysisTaskResponse::from)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
@@ -87,7 +71,7 @@ public class ResumeMatchController {
 
     @GetMapping("/analysis/{taskId}/report")
     public ResponseEntity<MatchReportView> report(@PathVariable Long taskId) {
-        return analysisService.findReport(taskId)
+        return getMatchReportUseCase.find(taskId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
     }

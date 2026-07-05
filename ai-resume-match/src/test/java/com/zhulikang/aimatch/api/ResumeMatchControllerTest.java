@@ -1,15 +1,14 @@
 package com.zhulikang.aimatch.api;
 
-import com.zhulikang.aimatch.analysis.AnalysisService;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
-import com.zhulikang.aimatch.document.DocumentTextExtractor;
-import com.zhulikang.aimatch.document.ResumeFileValidator;
-import com.zhulikang.aimatch.job.JdTagExtractor;
+import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.job.CreateJobDescriptionUseCase;
+import com.zhulikang.aimatch.application.report.GetMatchReportUseCase;
+import com.zhulikang.aimatch.application.resume.UploadResumeUseCase;
 import com.zhulikang.aimatch.job.JobDescription;
-import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.resume.Resume;
-import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,7 +20,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -41,17 +39,15 @@ class ResumeMatchControllerTest {
     MockMvc mockMvc;
 
     @MockBean
-    DocumentTextExtractor extractor;
+    UploadResumeUseCase uploadResumeUseCase;
     @MockBean
-    ResumeFileValidator resumeFileValidator;
+    CreateJobDescriptionUseCase createJobDescriptionUseCase;
     @MockBean
-    ResumeRepository resumeRepository;
+    CreateAnalysisTaskUseCase createAnalysisTaskUseCase;
     @MockBean
-    JobDescriptionRepository jobRepository;
+    GetAnalysisTaskUseCase getAnalysisTaskUseCase;
     @MockBean
-    JdTagExtractor jdTagExtractor;
-    @MockBean
-    AnalysisService analysisService;
+    GetMatchReportUseCase getMatchReportUseCase;
 
     @Test
     void rejectsRequestWithoutApiToken() throws Exception {
@@ -71,7 +67,7 @@ class ResumeMatchControllerTest {
 
     @Test
     void returnsNotFoundWhenReportMissing() throws Exception {
-        when(analysisService.findReport(1L)).thenReturn(Optional.empty());
+        when(getMatchReportUseCase.find(1L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/analysis/1/report").header("X-API-Token", "test-token"))
             .andExpect(status().isNotFound());
@@ -87,8 +83,7 @@ class ResumeMatchControllerTest {
         );
         Resume savedResume = new Resume("resume.pdf", "Java Redis", "Java Redis");
         ReflectionTestUtils.setField(savedResume, "id", 10L);
-        when(extractor.extract(file)).thenReturn("Java Redis");
-        when(resumeRepository.save(any(Resume.class))).thenReturn(savedResume);
+        when(uploadResumeUseCase.upload(file)).thenReturn(savedResume);
 
         mockMvc.perform(multipart("/api/resumes")
                 .file(file)
@@ -96,7 +91,7 @@ class ResumeMatchControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.resumeId").value(10));
 
-        verify(resumeFileValidator).validate(file);
+        verify(uploadResumeUseCase).upload(file);
     }
 
     @Test
@@ -108,7 +103,7 @@ class ResumeMatchControllerTest {
             new byte[] {1, 2, 3}
         );
         doThrow(new IllegalArgumentException("Only PDF and DOCX are supported"))
-            .when(resumeFileValidator).validate(file);
+            .when(uploadResumeUseCase).upload(file);
 
         mockMvc.perform(multipart("/api/resumes")
                 .file(file)
@@ -122,9 +117,7 @@ class ResumeMatchControllerTest {
     void createsJobAndReturnsJobDescriptionId() throws Exception {
         JobDescription savedJob = new JobDescription("Java Redis", "Java,Redis");
         ReflectionTestUtils.setField(savedJob, "id", 20L);
-        when(jdTagExtractor.extractTags("Java Redis")).thenReturn(List.of("Java", "Redis"));
-        when(jdTagExtractor.toStorageValue(List.of("Java", "Redis"))).thenReturn("Java,Redis");
-        when(jobRepository.save(any(JobDescription.class))).thenReturn(savedJob);
+        when(createJobDescriptionUseCase.create("Java Redis")).thenReturn(savedJob);
 
         mockMvc.perform(post("/api/jobs")
                 .header("X-API-Token", "test-token")
@@ -138,9 +131,7 @@ class ResumeMatchControllerTest {
     void createsAnalysisAndReturnsTaskIdAndStatus() throws Exception {
         AnalysisTask savedTask = new AnalysisTask(10L, 20L);
         ReflectionTestUtils.setField(savedTask, "id", 30L);
-        when(resumeRepository.existsById(10L)).thenReturn(true);
-        when(jobRepository.existsById(20L)).thenReturn(true);
-        when(analysisService.createTask(10L, 20L)).thenReturn(savedTask);
+        when(createAnalysisTaskUseCase.create(10L, 20L)).thenReturn(savedTask);
 
         mockMvc.perform(post("/api/analysis")
                 .header("X-API-Token", "test-token")
@@ -161,7 +152,7 @@ class ResumeMatchControllerTest {
         LocalDateTime updatedAt = LocalDateTime.of(2026, 7, 4, 10, 20);
         ReflectionTestUtils.setField(task, "createdAt", createdAt);
         ReflectionTestUtils.setField(task, "updatedAt", updatedAt);
-        when(analysisService.findTask(30L)).thenReturn(Optional.of(task));
+        when(getAnalysisTaskUseCase.find(30L)).thenReturn(Optional.of(task));
 
         mockMvc.perform(get("/api/analysis/30").header("X-API-Token", "test-token"))
             .andExpect(status().isOk())
@@ -179,7 +170,7 @@ class ResumeMatchControllerTest {
 
     @Test
     void returnsNotFoundWhenAnalysisTaskDoesNotExist() throws Exception {
-        when(analysisService.findTask(404L)).thenReturn(Optional.empty());
+        when(getAnalysisTaskUseCase.find(404L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/analysis/404").header("X-API-Token", "test-token"))
             .andExpect(status().isNotFound());
@@ -193,7 +184,7 @@ class ResumeMatchControllerTest {
             "匹配分数：88",
             LocalDateTime.of(2026, 7, 4, 9, 30)
         );
-        when(analysisService.findReport(30L)).thenReturn(Optional.of(report));
+        when(getMatchReportUseCase.find(30L)).thenReturn(Optional.of(report));
 
         mockMvc.perform(get("/api/analysis/30/report").header("X-API-Token", "test-token"))
             .andExpect(status().isOk())
@@ -271,7 +262,7 @@ class ResumeMatchControllerTest {
             "application/pdf",
             new byte[] {1, 2, 3}
         );
-        when(extractor.extract(file)).thenReturn("   ");
+        when(uploadResumeUseCase.upload(file)).thenThrow(new IllegalArgumentException("Resume text must not be blank"));
 
         mockMvc.perform(multipart("/api/resumes")
                 .file(file)
@@ -283,7 +274,7 @@ class ResumeMatchControllerTest {
 
     @Test
     void returnsNotFoundWhenResumeDoesNotExist() throws Exception {
-        when(resumeRepository.existsById(1L)).thenReturn(false);
+        when(createAnalysisTaskUseCase.create(1L, 2L)).thenThrow(new ResourceNotFoundException("Resume not found"));
 
         mockMvc.perform(post("/api/analysis")
                 .header("X-API-Token", "test-token")
