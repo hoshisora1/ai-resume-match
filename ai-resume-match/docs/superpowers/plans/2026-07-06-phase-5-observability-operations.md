@@ -1125,7 +1125,7 @@ git commit -m "docs: document observability operations"
 **Files:**
 - No code files unless verification or review reveals a bug.
 
-- [ ] **Step 1: Run full fast tests**
+- [x] **Step 1: Run full fast tests**
 
 ```powershell
 mvn test
@@ -1133,7 +1133,7 @@ mvn test
 
 Expected: PASS.
 
-- [ ] **Step 2: Run Docker-backed integration verification**
+- [x] **Step 2: Run Docker-backed integration verification**
 
 ```powershell
 $env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'; mvn verify
@@ -1141,7 +1141,7 @@ $env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'; mvn verify
 
 Expected: PASS.
 
-- [ ] **Step 3: Validate compose config and whitespace**
+- [x] **Step 3: Validate compose config and whitespace**
 
 ```powershell
 docker compose --env-file .env.example config --quiet
@@ -1150,7 +1150,7 @@ git diff --check
 
 Expected: PASS/no output except line-ending warnings.
 
-- [ ] **Step 4: Request read-only review**
+- [x] **Step 4: Request read-only review**
 
 Request a read-only review focused on:
 
@@ -1161,7 +1161,7 @@ Request a read-only review focused on:
 - Structured task logs do not contain resume/JD/prompt/AI response content.
 - Docs match actual metric names and endpoints.
 
-- [ ] **Step 5: Commit fixes if needed**
+- [x] **Step 5: Commit fixes if needed**
 
 If review or verification reveals issues, fix them with focused commits and rerun the relevant focused tests plus `mvn test`.
 

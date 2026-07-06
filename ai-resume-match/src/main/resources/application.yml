@@ -30,6 +30,10 @@ api:
 report:
   cache-ttl: ${REPORT_CACHE_TTL:10m}
 
+logging:
+  pattern:
+    level: "%5p requestId=%X{requestId} correlationId=%X{correlationId}"
+
 analysis:
   running-timeout: ${ANALYSIS_RUNNING_TIMEOUT:15m}
   outbox:

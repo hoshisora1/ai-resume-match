@@ -32,6 +32,9 @@ class DeploymentConfigurationTest {
         assertThat(properties.getProperty("management.endpoint.health.group.readiness.include")).isEqualTo("readinessState");
         assertThat(properties.getProperty("management.endpoints.web.exposure.include")).contains("health");
         assertThat(properties.getProperty("management.endpoints.web.exposure.include")).contains("metrics");
+        assertThat(properties.getProperty("logging.pattern.level"))
+            .contains("requestId")
+            .contains("correlationId");
     }
 
     @Test
