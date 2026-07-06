@@ -58,7 +58,7 @@
 - Create: `src/integration-test/java/com/zhulikang/aimatch/MockAiServer.java`
 - Create: `src/integration-test/java/com/zhulikang/aimatch/IntegrationDocumentFixtures.java`
 
-- [ ] **Step 1: Add explicit Testcontainers core dependency**
+- [x] **Step 1: Add explicit Testcontainers core dependency**
 
 Add this dependency after the existing Testcontainers JUnit dependency:
 
@@ -70,7 +70,7 @@ Add this dependency after the existing Testcontainers JUnit dependency:
 </dependency>
 ```
 
-- [ ] **Step 2: Create `MockAiServer`**
+- [x] **Step 2: Create `MockAiServer`**
 
 Create a package-private integration test helper with:
 
@@ -114,7 +114,7 @@ The implementation must:
 - Set `Content-Type: application/json`.
 - Store request count, latest `Authorization`, and latest body for assertions.
 
-- [ ] **Step 3: Create `IntegrationDocumentFixtures`**
+- [x] **Step 3: Create `IntegrationDocumentFixtures`**
 
 Create a package-private helper with:
 
@@ -134,7 +134,7 @@ final class IntegrationDocumentFixtures {
 
 Both helpers must return non-empty byte arrays and keep all fixture content synthetic.
 
-- [ ] **Step 4: Compile the new support code**
+- [x] **Step 4: Compile the new support code**
 
 Run:
 
@@ -144,7 +144,7 @@ mvn "-DskipTests" test-compile
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add pom.xml src/integration-test/java/com/zhulikang/aimatch/MockAiServer.java src/integration-test/java/com/zhulikang/aimatch/IntegrationDocumentFixtures.java
