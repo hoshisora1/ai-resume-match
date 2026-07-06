@@ -281,7 +281,7 @@ git commit -m "test: add end-to-end analysis flow"
 - Modify: `docs/architecture.md`
 - Modify: `docs/operations/runbook.md`
 
-- [ ] **Step 1: Update README**
+- [x] **Step 1: Update README**
 
 Ensure README says:
 
@@ -289,15 +289,15 @@ Ensure README says:
 - `mvn verify` runs MySQL/RabbitMQ/Redis Testcontainers integration tests and the mock-AI end-to-end flow.
 - Docker must be running for `mvn verify`.
 
-- [ ] **Step 2: Update development guide**
+- [x] **Step 2: Update development guide**
 
 Change Phase 6 from "next" to complete. Add that the B+ engineering-hardening refactor acceptance is now `mvn test`, Docker-backed `mvn verify`, and compose config validation.
 
-- [ ] **Step 3: Update architecture docs**
+- [x] **Step 3: Update architecture docs**
 
 Move "Redis Testcontainers and end-to-end analysis flow verification" from pending to implemented reliability coverage.
 
-- [ ] **Step 4: Update runbook**
+- [x] **Step 4: Update runbook**
 
 Add:
 
@@ -308,7 +308,7 @@ mvn verify
 
 as the local end-to-end verification command before release or merge.
 
-- [ ] **Step 5: Verify docs**
+- [x] **Step 5: Verify docs**
 
 Run:
 
@@ -319,7 +319,7 @@ git diff --check
 
 Expected: wording reflects Phase 6 completion, with no whitespace errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add README.md docs/development.md docs/architecture.md docs/operations/runbook.md

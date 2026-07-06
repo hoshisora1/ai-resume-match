@@ -76,7 +76,7 @@ mvn "-Dtest=RunAnalysisUseCaseTest,AnalysisWorkerTest" test
 
 PowerShell 中 `-Dtest=A,B` 推荐整体加引号，避免参数解析问题。
 
-当前 fast test suite 使用 JUnit 5、Mockito、AssertJ、MockMvc、H2。集成测试使用 Failsafe 和 Testcontainers，当前覆盖 MySQL Flyway 校验，以及 MySQL+RabbitMQ outbox 生命周期、publisher confirm/return 行为：
+当前 fast test suite 使用 JUnit 5、Mockito、AssertJ、MockMvc、H2。集成测试使用 Failsafe 和 Testcontainers，当前覆盖 MySQL Flyway 校验、MySQL+RabbitMQ outbox 生命周期、publisher confirm/return 行为、Redis cache-aside，以及 mock AI HTTP server 驱动的 PDF/DOCX 端到端分析流：
 
 ```powershell
 mvn verify
@@ -170,6 +170,8 @@ mvn test
 - Phase 3：已完成。Flyway、outbox、publisher confirm/return、自动重试调度、RabbitMQ 集成测试。
 - Phase 4：已完成。Dockerfile、app compose service、health checks、profiles、`.env.example`、README 启动流。
 - Phase 5：已完成。request/correlation ID、结构化任务日志、Micrometer 指标、运行手册补强。
-- Phase 6：下一步。端到端验证、mock AI HTTP server、PDF/DOCX fixtures、`mvn verify`。
+- Phase 6：已完成。端到端验证、mock AI HTTP server、PDF/DOCX fixtures、Redis Testcontainers、`mvn verify`。
+
+当前 B+ 工程化重构计划的验收闭环是：`mvn test`、Docker-backed `mvn verify`、`docker compose --env-file .env.example config --quiet` 全部通过。
 
 `docs/superpowers/plans/2026-05-12-rag-resume-job-match.md` 保留为历史实现上下文，不作为当前工程化重构的执行计划。

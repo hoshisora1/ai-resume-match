@@ -80,9 +80,10 @@ docker compose down -v
 mvn test
 ```
 
-运行集成测试：
+运行集成和端到端测试。Docker Desktop 需要处于运行状态；Windows 上如需显式使用 Docker Desktop Linux engine，可先设置 `DOCKER_HOST`：
 
 ```powershell
+$env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'
 mvn verify
 ```
 
@@ -95,10 +96,10 @@ docker compose --env-file .env.example config
 构建应用镜像：
 
 ```powershell
-docker build -t ai-resume-match:phase4 .
+docker build -t ai-resume-match:local .
 ```
 
-当前 `mvn verify` 会通过 Testcontainers 验证 MySQL Flyway migration，以及 MySQL+RabbitMQ outbox 生命周期、publisher confirm/return 行为。
+当前 `mvn verify` 会通过 Testcontainers 验证 MySQL Flyway migration、MySQL+RabbitMQ outbox 生命周期、publisher confirm/return 行为、Redis cache-aside，以及 mock AI HTTP server 驱动的 PDF/DOCX 端到端分析流。
 
 ## 5. 基础业务 smoke flow
 

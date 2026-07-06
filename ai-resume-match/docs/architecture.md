@@ -323,10 +323,11 @@ FAILED_RETRYABLE -> CANCELLED
 - Phase 3 加入 Flyway 初始 schema、analysis outbox、带 claim 和 publisher confirm/return 的 outbox publisher、自动重试调度，以及 MySQL/RabbitMQ Testcontainers 验证。
 - Phase 4 加入 Dockerfile、app compose service、health checks、`dev`/`docker`/`prod` profiles、`.env.example` 和部署配置契约测试。
 - Phase 5 加入 request ID、correlation ID、结构化任务生命周期日志、Micrometer 指标和运行手册。
+- Phase 6 加入 Redis Testcontainers、mock AI HTTP server、PDF/DOCX fixtures，以及覆盖上传、任务创建、outbox、RabbitMQ worker、AI 调用、报告查询和 Redis cache-aside 的端到端分析流验证。
 
 待实现：
 
-- Redis Testcontainers 和端到端分析流验证。
+- 当前 B+ 工程化重构计划内无剩余必做项；后续增强应作为新的阶段或需求单独设计。
 
 ## 9. 架构决策
 

@@ -102,10 +102,10 @@ curl.exe -i http://localhost:8080/actuator/metrics/analysis.outbox.backlog
 mvn test
 mvn verify
 docker compose --env-file .env.example config
-docker build -t ai-resume-match:phase4 .
+docker build -t ai-resume-match:local .
 ```
 
-`mvn test` 跑 fast tests；`mvn verify` 通过 Testcontainers 验证 MySQL Flyway migration 和 MySQL+RabbitMQ outbox 生命周期。
+`mvn test` 跑 fast tests；`mvn verify` 需要 Docker 正在运行，并通过 Testcontainers 验证 MySQL Flyway migration、MySQL+RabbitMQ outbox 生命周期、Redis cache-aside，以及 mock AI HTTP server 驱动的 PDF/DOCX 端到端分析流。
 
 ## 文档
 
