@@ -1,6 +1,7 @@
 package com.zhulikang.aimatch.analysis;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ public class AnalysisTaskService {
     private final Duration runningTimeout;
     private final Duration retryDelay;
 
+    @Autowired
     public AnalysisTaskService(
         AnalysisTaskRepository taskRepository,
         MatchReportRepository reportRepository,

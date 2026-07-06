@@ -2,6 +2,7 @@ package com.zhulikang.aimatch.ai;
 
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import io.micrometer.core.instrument.Timer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -22,6 +23,7 @@ public class OpenAiCompatibleClient implements AiClient {
     private final String model;
     private final AnalysisMetrics metrics;
 
+    @Autowired
     public OpenAiCompatibleClient(
         RestTemplateBuilder restTemplateBuilder,
         @Value("${ai.endpoint}") String endpoint,
