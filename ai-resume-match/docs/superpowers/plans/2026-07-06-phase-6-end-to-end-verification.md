@@ -333,7 +333,7 @@ git commit -m "docs: document end-to-end verification"
 **Files:**
 - No code files unless verification or review reveals a bug.
 
-- [ ] **Step 1: Run fast tests**
+- [x] **Step 1: Run fast tests**
 
 ```powershell
 mvn test
@@ -341,7 +341,7 @@ mvn test
 
 Expected: 107+ tests pass.
 
-- [ ] **Step 2: Run full integration verification**
+- [x] **Step 2: Run full integration verification**
 
 ```powershell
 $env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'; mvn verify
@@ -349,7 +349,7 @@ $env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'; mvn verify
 
 Expected: fast tests plus all `*IT` integration tests pass.
 
-- [ ] **Step 3: Validate compose and whitespace**
+- [x] **Step 3: Validate compose and whitespace**
 
 ```powershell
 docker compose --env-file .env.example config --quiet
@@ -358,7 +358,7 @@ git diff --check
 
 Expected: PASS/no output except acceptable line-ending warnings.
 
-- [ ] **Step 4: Review**
+- [x] **Step 4: Review**
 
 Review locally or with a subagent when available:
 
