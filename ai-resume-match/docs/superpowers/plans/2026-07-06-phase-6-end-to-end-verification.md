@@ -369,7 +369,7 @@ Review locally or with a subagent when available:
 - Redis is tested as cache-aside, not as source of truth.
 - Docs match current commands and phase status.
 
-- [ ] **Step 5: Merge back to master**
+- [x] **Step 5: Merge back to master**
 
 After all checks pass:
 
