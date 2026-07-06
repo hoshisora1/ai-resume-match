@@ -158,7 +158,7 @@ git commit -m "test: add end-to-end integration fixtures"
 **Files:**
 - Create: `src/integration-test/java/com/zhulikang/aimatch/EndToEndAnalysisFlowIT.java`
 
-- [ ] **Step 1: Write the end-to-end integration test**
+- [x] **Step 1: Write the end-to-end integration test**
 
 Create a Spring Boot integration test with:
 
@@ -254,7 +254,7 @@ Implement `runFlow` to:
 5. Assert `GET /api/analysis/{taskId}` eventually reports `SUCCESS`.
 6. Return a record containing `taskId` and `matchScore`.
 
-- [ ] **Step 2: Run the new integration test**
+- [x] **Step 2: Run the new integration test**
 
 Run:
 
@@ -264,7 +264,7 @@ $env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'; mvn "-Dit.test=End
 
 Expected: PASS after support code is complete. If it fails, fix the production or test code according to the observed failure and rerun this focused command.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add src/integration-test/java/com/zhulikang/aimatch/EndToEndAnalysisFlowIT.java
