@@ -2,12 +2,12 @@ package com.zhulikang.aimatch.application.analysis;
 
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
-import com.zhulikang.aimatch.analysis.MatchReport;
 import com.zhulikang.aimatch.analysis.MatchReportRepository;
+import com.zhulikang.aimatch.analysis.MatchScoreView;
 import com.zhulikang.aimatch.api.ResourceNotFoundException;
-import com.zhulikang.aimatch.job.JobDescription;
+import com.zhulikang.aimatch.job.JobDescriptionDisplayView;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
-import com.zhulikang.aimatch.resume.Resume;
+import com.zhulikang.aimatch.resume.ResumeDisplayView;
 import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +31,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 class ListAnalysisTasksUseCaseTest {
@@ -57,17 +58,17 @@ class ListAnalysisTasksUseCaseTest {
     @Test
     void listsNewestTasksWithDisplayMetadataAndScore() {
         AnalysisTask task = successfulTask(30L, 10L, 20L);
-        Resume resume = resume(10L, "resume.pdf");
-        JobDescription job = job(20L, "高级后端工程师");
-        MatchReport report = new MatchReport(30L, 88, "report");
+        ResumeDisplayView resume = resume(10L, "resume.pdf");
+        JobDescriptionDisplayView job = job(20L, "高级后端工程师");
+        MatchScoreView score = new MatchScoreView(30L, 88);
         when(taskRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(
             List.of(task),
             PageRequest.of(0, 20),
             41
         ));
-        when(resumeRepository.findAllById(any())).thenReturn(List.of(resume));
-        when(jobRepository.findAllById(any())).thenReturn(List.of(job));
-        when(reportRepository.findAllByTaskIdIn(anyCollection())).thenReturn(List.of(report));
+        when(resumeRepository.findDisplayViewsByIdIn(anyCollection())).thenReturn(List.of(resume));
+        when(jobRepository.findDisplayViewsByIdIn(anyCollection())).thenReturn(List.of(job));
+        when(reportRepository.findScoreViewsByTaskIdIn(anyCollection())).thenReturn(List.of(score));
 
         AnalysisPage page = useCase.list(null, 0, 20);
 
@@ -92,12 +93,13 @@ class ListAnalysisTasksUseCaseTest {
             Sort.Order.desc("createdAt"),
             Sort.Order.desc("id")
         );
-        verify(resumeRepository).findAllById(any());
-        verify(jobRepository).findAllById(any());
-        verify(reportRepository).findAllByTaskIdIn(anyCollection());
-        verify(resumeRepository, never()).findById(any());
-        verify(jobRepository, never()).findById(any());
+        verify(resumeRepository).findDisplayViewsByIdIn(anyCollection());
+        verify(jobRepository).findDisplayViewsByIdIn(anyCollection());
+        verify(reportRepository).findScoreViewsByTaskIdIn(anyCollection());
+        verify(resumeRepository, never()).findAllById(any());
+        verify(jobRepository, never()).findAllById(any());
         verify(reportRepository, never()).findByTaskId(any());
+        verifyNoMoreInteractions(resumeRepository, jobRepository, reportRepository);
     }
 
     @Test
@@ -118,9 +120,11 @@ class ListAnalysisTasksUseCaseTest {
         AnalysisTask task = new AnalysisTask(10L, 20L);
         ReflectionTestUtils.setField(task, "id", 30L);
         stubSingleTaskPage(task);
-        when(resumeRepository.findAllById(any())).thenReturn(List.of(resume(10L, "resume.pdf")));
-        when(jobRepository.findAllById(any())).thenReturn(List.of(job(20L, "Backend Engineer")));
-        when(reportRepository.findAllByTaskIdIn(anyCollection())).thenReturn(List.of());
+        when(resumeRepository.findDisplayViewsByIdIn(anyCollection()))
+            .thenReturn(List.of(resume(10L, "resume.pdf")));
+        when(jobRepository.findDisplayViewsByIdIn(anyCollection()))
+            .thenReturn(List.of(job(20L, "Backend Engineer")));
+        when(reportRepository.findScoreViewsByTaskIdIn(anyCollection())).thenReturn(List.of());
 
         AnalysisPage page = useCase.list(null, 0, 20);
 
@@ -132,9 +136,10 @@ class ListAnalysisTasksUseCaseTest {
         AnalysisTask task = new AnalysisTask(10L, 20L);
         ReflectionTestUtils.setField(task, "id", 30L);
         stubSingleTaskPage(task);
-        when(resumeRepository.findAllById(any())).thenReturn(List.of());
-        when(jobRepository.findAllById(any())).thenReturn(List.of(job(20L, "Backend Engineer")));
-        when(reportRepository.findAllByTaskIdIn(anyCollection())).thenReturn(List.of());
+        when(resumeRepository.findDisplayViewsByIdIn(anyCollection())).thenReturn(List.of());
+        when(jobRepository.findDisplayViewsByIdIn(anyCollection()))
+            .thenReturn(List.of(job(20L, "Backend Engineer")));
+        when(reportRepository.findScoreViewsByTaskIdIn(anyCollection())).thenReturn(List.of());
 
         assertThatThrownBy(() -> useCase.list(null, 0, 20))
             .isInstanceOf(ResourceNotFoundException.class)
@@ -146,9 +151,10 @@ class ListAnalysisTasksUseCaseTest {
         AnalysisTask task = new AnalysisTask(10L, 20L);
         ReflectionTestUtils.setField(task, "id", 30L);
         stubSingleTaskPage(task);
-        when(resumeRepository.findAllById(any())).thenReturn(List.of(resume(10L, "resume.pdf")));
-        when(jobRepository.findAllById(any())).thenReturn(List.of());
-        when(reportRepository.findAllByTaskIdIn(anyCollection())).thenReturn(List.of());
+        when(resumeRepository.findDisplayViewsByIdIn(anyCollection()))
+            .thenReturn(List.of(resume(10L, "resume.pdf")));
+        when(jobRepository.findDisplayViewsByIdIn(anyCollection())).thenReturn(List.of());
+        when(reportRepository.findScoreViewsByTaskIdIn(anyCollection())).thenReturn(List.of());
 
         assertThatThrownBy(() -> useCase.list(null, 0, 20))
             .isInstanceOf(ResourceNotFoundException.class)
@@ -183,15 +189,11 @@ class ListAnalysisTasksUseCaseTest {
         return task;
     }
 
-    private Resume resume(Long id, String fileName) {
-        Resume resume = new Resume(fileName, "raw", "summary");
-        ReflectionTestUtils.setField(resume, "id", id);
-        return resume;
+    private ResumeDisplayView resume(Long id, String fileName) {
+        return new ResumeDisplayView(id, fileName);
     }
 
-    private JobDescription job(Long id, String title) {
-        JobDescription job = new JobDescription(title, "content", "Java");
-        ReflectionTestUtils.setField(job, "id", id);
-        return job;
+    private JobDescriptionDisplayView job(Long id, String title) {
+        return new JobDescriptionDisplayView(id, title);
     }
 }

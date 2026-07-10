@@ -2,18 +2,19 @@ package com.zhulikang.aimatch.application.analysis;
 
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
-import com.zhulikang.aimatch.analysis.MatchReport;
 import com.zhulikang.aimatch.analysis.MatchReportRepository;
+import com.zhulikang.aimatch.analysis.MatchScoreView;
 import com.zhulikang.aimatch.api.ResourceNotFoundException;
-import com.zhulikang.aimatch.job.JobDescription;
+import com.zhulikang.aimatch.job.JobDescriptionDisplayView;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
-import com.zhulikang.aimatch.resume.Resume;
+import com.zhulikang.aimatch.resume.ResumeDisplayView;
 import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -41,6 +42,7 @@ public class ListAnalysisTasksUseCase {
         this.reportRepository = reportRepository;
     }
 
+    @Transactional(readOnly = true)
     public AnalysisPage list(AnalysisTask.Status status, int page, int size) {
         validatePagination(page, size);
         Pageable pageable = PageRequest.of(page, size, Sort.by(
@@ -65,40 +67,40 @@ public class ListAnalysisTasksUseCase {
             .map(AnalysisTask::getId)
             .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        Map<Long, Resume> resumesById = resumeRepository.findAllById(resumeIds).stream()
-            .collect(Collectors.toMap(Resume::getId, Function.identity()));
-        Map<Long, JobDescription> jobsById = jobRepository.findAllById(jobIds).stream()
-            .collect(Collectors.toMap(JobDescription::getId, Function.identity()));
-        Map<Long, MatchReport> reportsByTaskId = reportRepository.findAllByTaskIdIn(taskIds).stream()
-            .collect(Collectors.toMap(MatchReport::getTaskId, Function.identity()));
+        Map<Long, ResumeDisplayView> resumesById = resumeRepository.findDisplayViewsByIdIn(resumeIds).stream()
+            .collect(Collectors.toMap(ResumeDisplayView::id, Function.identity()));
+        Map<Long, JobDescriptionDisplayView> jobsById = jobRepository.findDisplayViewsByIdIn(jobIds).stream()
+            .collect(Collectors.toMap(JobDescriptionDisplayView::id, Function.identity()));
+        Map<Long, MatchScoreView> scoresByTaskId = reportRepository.findScoreViewsByTaskIdIn(taskIds).stream()
+            .collect(Collectors.toMap(MatchScoreView::taskId, Function.identity()));
 
         var items = taskPage.stream()
-            .map(task -> toListItem(task, resumesById, jobsById, reportsByTaskId))
+            .map(task -> toListItem(task, resumesById, jobsById, scoresByTaskId))
             .toList();
         return toPage(taskPage, items);
     }
 
     private AnalysisListItem toListItem(
         AnalysisTask task,
-        Map<Long, Resume> resumesById,
-        Map<Long, JobDescription> jobsById,
-        Map<Long, MatchReport> reportsByTaskId
+        Map<Long, ResumeDisplayView> resumesById,
+        Map<Long, JobDescriptionDisplayView> jobsById,
+        Map<Long, MatchScoreView> scoresByTaskId
     ) {
-        Resume resume = resumesById.get(task.getResumeId());
+        ResumeDisplayView resume = resumesById.get(task.getResumeId());
         if (resume == null) {
             throw new ResourceNotFoundException("Resume not found");
         }
-        JobDescription job = jobsById.get(task.getJobDescriptionId());
+        JobDescriptionDisplayView job = jobsById.get(task.getJobDescriptionId());
         if (job == null) {
             throw new ResourceNotFoundException("Job description not found");
         }
-        MatchReport report = reportsByTaskId.get(task.getId());
+        MatchScoreView score = scoresByTaskId.get(task.getId());
         return new AnalysisListItem(
             task.getId(),
-            job.getTitle(),
-            resume.getFileName(),
+            job.title(),
+            resume.fileName(),
             task.getStatus(),
-            report == null ? null : report.getMatchScore(),
+            score == null ? null : score.matchScore(),
             task.getAttemptCount(),
             task.getMaxAttempts(),
             task.getFailureCode(),

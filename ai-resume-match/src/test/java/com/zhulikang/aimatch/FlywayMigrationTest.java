@@ -40,6 +40,12 @@ class FlywayMigrationTest {
             assertThat(tableExists(connection, "match_report")).isTrue();
             assertThat(tableExists(connection, "analysis_outbox")).isTrue();
             assertThat(indexExists(connection, "analysis_outbox", "idx_analysis_outbox_due")).isTrue();
+            assertThat(indexExists(connection, "analysis_task", "idx_analysis_task_created_id")).isTrue();
+            assertThat(indexExists(
+                connection,
+                "analysis_task",
+                "idx_analysis_task_status_created_id"
+            )).isTrue();
             assertThat(jobTitle(connection, jobId)).isEqualTo("岗位 " + jobId);
 
             ColumnMetadata titleColumn = columnMetadata(connection, "job_description", "title");

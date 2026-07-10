@@ -1,8 +1,10 @@
 package com.zhulikang.aimatch.analysis;
 
 import com.zhulikang.aimatch.job.JobDescription;
+import com.zhulikang.aimatch.job.JobDescriptionDisplayView;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.resume.Resume;
+import com.zhulikang.aimatch.resume.ResumeDisplayView;
 import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +55,30 @@ class DomainRepositoryTest {
     }
 
     @Test
+    void readsResumeDisplayProjections() {
+        Resume resume = resumeRepository.save(new Resume("resume.pdf", "fixture", "fixture"));
+
+        assertThat(resumeRepository.findDisplayViewsByIdIn(List.of(resume.getId())))
+            .containsExactly(new ResumeDisplayView(resume.getId(), "resume.pdf"));
+        assertThat(resumeRepository.findDisplayViewById(resume.getId()))
+            .contains(new ResumeDisplayView(resume.getId(), "resume.pdf"));
+    }
+
+    @Test
+    void readsJobDescriptionDisplayProjections() {
+        JobDescription job = jobDescriptionRepository.save(new JobDescription(
+            "高级后端工程师",
+            "fixture",
+            "fixture"
+        ));
+
+        assertThat(jobDescriptionRepository.findDisplayViewsByIdIn(List.of(job.getId())))
+            .containsExactly(new JobDescriptionDisplayView(job.getId(), "高级后端工程师"));
+        assertThat(jobDescriptionRepository.findDisplayViewById(job.getId()))
+            .contains(new JobDescriptionDisplayView(job.getId(), "高级后端工程师"));
+    }
+
+    @Test
     void findsTasksByStatusInNewestStableOrder() {
         LocalDateTime older = LocalDateTime.of(2026, 7, 10, 8, 0);
         LocalDateTime newer = LocalDateTime.of(2026, 7, 10, 9, 0);
@@ -88,13 +114,15 @@ class DomainRepositoryTest {
     }
 
     @Test
-    void batchesReportsByTaskIdAndCalculatesAverageScore() {
-        MatchReport first = matchReportRepository.save(new MatchReport(101L, 82, "first"));
-        MatchReport second = matchReportRepository.save(new MatchReport(102L, 83, "second"));
-        matchReportRepository.save(new MatchReport(103L, 95, "other"));
+    void readsMatchScoreProjectionsAndCalculatesAverageScore() {
+        matchReportRepository.save(new MatchReport(101L, 82, "fixture"));
+        matchReportRepository.save(new MatchReport(102L, 83, "fixture"));
+        matchReportRepository.save(new MatchReport(103L, 95, "fixture"));
 
-        assertThat(matchReportRepository.findAllByTaskIdIn(List.of(101L, 102L)))
-            .containsExactlyInAnyOrder(first, second);
+        assertThat(matchReportRepository.findScoreViewsByTaskIdIn(List.of(101L, 102L)))
+            .containsExactlyInAnyOrder(new MatchScoreView(101L, 82), new MatchScoreView(102L, 83));
+        assertThat(matchReportRepository.findScoreViewByTaskId(101L))
+            .contains(new MatchScoreView(101L, 82));
         assertThat(matchReportRepository.averageMatchScore()).isEqualTo(86.66666666666667);
     }
 

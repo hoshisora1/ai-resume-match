@@ -3,12 +3,14 @@ package com.zhulikang.aimatch.application.analysis;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
 import com.zhulikang.aimatch.analysis.MatchReportRepository;
+import com.zhulikang.aimatch.analysis.MatchScoreView;
 import com.zhulikang.aimatch.api.ResourceNotFoundException;
-import com.zhulikang.aimatch.job.JobDescription;
+import com.zhulikang.aimatch.job.JobDescriptionDisplayView;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
-import com.zhulikang.aimatch.resume.Resume;
+import com.zhulikang.aimatch.resume.ResumeDisplayView;
 import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -31,18 +33,19 @@ public class GetAnalysisTaskUseCase {
         this.reportRepository = reportRepository;
     }
 
+    @Transactional(readOnly = true)
     public Optional<AnalysisTaskDetails> find(Long taskId) {
         return taskRepository.findById(taskId).map(this::toDetails);
     }
 
     private AnalysisTaskDetails toDetails(AnalysisTask task) {
-        Resume resume = resumeRepository.findById(task.getResumeId())
+        ResumeDisplayView resume = resumeRepository.findDisplayViewById(task.getResumeId())
             .orElseThrow(() -> new ResourceNotFoundException("Resume not found"));
-        JobDescription job = jobRepository.findById(task.getJobDescriptionId())
+        JobDescriptionDisplayView job = jobRepository.findDisplayViewById(task.getJobDescriptionId())
             .orElseThrow(() -> new ResourceNotFoundException("Job description not found"));
-        Integer matchScore = reportRepository.findByTaskId(task.getId())
-            .map(report -> report.getMatchScore())
+        Integer matchScore = reportRepository.findScoreViewByTaskId(task.getId())
+            .map(MatchScoreView::matchScore)
             .orElse(null);
-        return new AnalysisTaskDetails(task, job.getTitle(), resume.getFileName(), matchScore);
+        return new AnalysisTaskDetails(task, job.title(), resume.fileName(), matchScore);
     }
 }

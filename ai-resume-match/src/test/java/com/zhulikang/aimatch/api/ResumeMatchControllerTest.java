@@ -37,6 +37,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -253,6 +254,35 @@ class ResumeMatchControllerTest {
             .andExpect(jsonPath("$.totalPages").value(1));
 
         verify(listAnalysisTasksUseCase).list(null, 0, 20);
+    }
+
+    @Test
+    void returnsNullMatchScoreWhenAnalysisHasNoReport() throws Exception {
+        AnalysisListItem item = new AnalysisListItem(
+            30L,
+            "高级后端工程师",
+            "resume.pdf",
+            AnalysisTask.Status.RUNNING,
+            null,
+            1,
+            3,
+            null,
+            LocalDateTime.of(2026, 7, 10, 9, 0),
+            LocalDateTime.of(2026, 7, 10, 9, 5),
+            null
+        );
+        when(listAnalysisTasksUseCase.list(null, 0, 20)).thenReturn(new AnalysisPage(
+            List.of(item),
+            0,
+            20,
+            1,
+            1
+        ));
+
+        mockMvc.perform(get("/api/analysis")
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].matchScore").value(nullValue()));
     }
 
     @Test

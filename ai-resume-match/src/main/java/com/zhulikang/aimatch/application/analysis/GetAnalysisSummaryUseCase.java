@@ -4,6 +4,7 @@ import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
 import com.zhulikang.aimatch.analysis.MatchReportRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -23,6 +24,7 @@ public class GetAnalysisSummaryUseCase {
         this.reportRepository = reportRepository;
     }
 
+    @Transactional(readOnly = true)
     public AnalysisSummary get() {
         long total = taskRepository.count();
         long success = taskRepository.countByStatus(AnalysisTask.Status.SUCCESS);
