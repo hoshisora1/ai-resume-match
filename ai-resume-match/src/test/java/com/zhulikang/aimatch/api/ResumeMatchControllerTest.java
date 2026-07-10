@@ -276,11 +276,29 @@ class ResumeMatchControllerTest {
     }
 
     @Test
-    void returnsBadRequestWhenJobTitleExceedsMaximumLength() throws Exception {
+    void acceptsJobTitleWithMaximumCodePointLength() throws Exception {
+        String title = "x".repeat(119) + "\uD83D\uDE80";
+        JobDescription savedJob = new JobDescription(title, "Java Redis", "Java,Redis");
+        ReflectionTestUtils.setField(savedJob, "id", 20L);
+        when(createJobDescriptionUseCase.create(title, "Java Redis")).thenReturn(savedJob);
+
         mockMvc.perform(post("/api/jobs")
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"title\":\"" + "x".repeat(121) + "\",\"content\":\"Java Redis\"}"))
+                .content("{\"title\":\"" + title + "\",\"content\":\"Java Redis\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.jobDescriptionId").value(20))
+            .andExpect(jsonPath("$.title").value(title));
+    }
+
+    @Test
+    void returnsBadRequestWhenJobTitleExceedsMaximumLength() throws Exception {
+        String title = "x".repeat(120) + "\uD83D\uDE80";
+
+        mockMvc.perform(post("/api/jobs")
+                .header("X-API-Token", "test-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"" + title + "\",\"content\":\"Java Redis\"}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
             .andExpect(jsonPath("$.message").value("Invalid request"));

@@ -11,10 +11,10 @@ public class JobTitleNormalizer {
         if (candidate == null) {
             return "未命名岗位";
         }
-        String normalized = candidate.trim();
-        return normalized.length() <= MAX_LENGTH
+        String normalized = candidate.strip();
+        return normalized.codePointCount(0, normalized.length()) <= MAX_LENGTH
             ? normalized
-            : normalized.substring(0, MAX_LENGTH);
+            : normalized.substring(0, normalized.offsetByCodePoints(0, MAX_LENGTH));
     }
 
     private String firstNonBlank(String explicitTitle, String content) {
@@ -25,7 +25,7 @@ public class JobTitleNormalizer {
             return null;
         }
         return content.lines()
-            .map(String::trim)
+            .map(String::strip)
             .filter(line -> !line.isBlank())
             .findFirst()
             .orElse(null);
