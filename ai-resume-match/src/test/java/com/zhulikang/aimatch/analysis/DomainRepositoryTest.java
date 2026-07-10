@@ -36,6 +36,7 @@ class DomainRepositoryTest {
             "skills: Java, Redis"
         ));
         JobDescription job = jobDescriptionRepository.save(new JobDescription(
+            "高级后端工程师",
             "熟悉 Java Redis Kafka",
             "Java,Redis,Kafka"
         ));
@@ -43,6 +44,7 @@ class DomainRepositoryTest {
         MatchReport report = matchReportRepository.save(new MatchReport(task.getId(), 88, "匹配分数：88"));
 
         assertThat(task.getStatus()).isEqualTo(AnalysisTask.Status.PENDING);
+        assertThat(job.getTitle()).isEqualTo("高级后端工程师");
         assertThat(report.getTaskId()).isEqualTo(task.getId());
         assertThat(matchReportRepository.findByTaskId(task.getId()))
             .contains(report);

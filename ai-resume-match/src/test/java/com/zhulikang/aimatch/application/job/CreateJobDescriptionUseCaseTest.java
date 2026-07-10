@@ -18,13 +18,20 @@ class CreateJobDescriptionUseCaseTest {
     void extractsTagsSerializesThemAndSavesJobDescription() {
         JdTagExtractor tagExtractor = mock(JdTagExtractor.class);
         JobDescriptionRepository repository = mock(JobDescriptionRepository.class);
-        CreateJobDescriptionUseCase useCase = new CreateJobDescriptionUseCase(tagExtractor, repository);
-        JobDescription saved = new JobDescription("Java Redis", "Java,Redis");
+        CreateJobDescriptionUseCase useCase = new CreateJobDescriptionUseCase(
+            new JobTitleNormalizer(),
+            tagExtractor,
+            repository
+        );
         when(tagExtractor.extractTags("Java Redis")).thenReturn(List.of("Java", "Redis"));
         when(tagExtractor.toStorageValue(List.of("Java", "Redis"))).thenReturn("Java,Redis");
-        when(repository.save(any(JobDescription.class))).thenReturn(saved);
+        when(repository.save(any(JobDescription.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThat(useCase.create("Java Redis")).isSameAs(saved);
+        JobDescription saved = useCase.create("  Backend Engineer  ", "Java Redis");
+
+        assertThat(saved.getTitle()).isEqualTo("Backend Engineer");
+        assertThat(saved.getContent()).isEqualTo("Java Redis");
+        assertThat(saved.getSkillTags()).isEqualTo("Java,Redis");
         verify(tagExtractor).extractTags("Java Redis");
         verify(tagExtractor).toStorageValue(List.of("Java", "Redis"));
         verify(repository).save(any(JobDescription.class));

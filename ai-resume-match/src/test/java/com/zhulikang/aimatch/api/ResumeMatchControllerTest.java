@@ -143,17 +143,35 @@ class ResumeMatchControllerTest {
     }
 
     @Test
-    void createsJobAndReturnsJobDescriptionId() throws Exception {
-        JobDescription savedJob = new JobDescription("Java Redis", "Java,Redis");
+    void createsJobWithExplicitTitleAndReturnsIt() throws Exception {
+        JobDescription savedJob = new JobDescription("Backend Engineer", "Java Redis", "Java,Redis");
         ReflectionTestUtils.setField(savedJob, "id", 20L);
-        when(createJobDescriptionUseCase.create("Java Redis")).thenReturn(savedJob);
+        when(createJobDescriptionUseCase.create("Backend Engineer", "Java Redis")).thenReturn(savedJob);
 
         mockMvc.perform(post("/api/jobs")
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"content\":\"Java Redis\"}"))
+                .content("{\"title\":\"Backend Engineer\",\"content\":\"Java Redis\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.jobDescriptionId").value(20));
+            .andExpect(jsonPath("$.jobDescriptionId").value(20))
+            .andExpect(jsonPath("$.title").value("Backend Engineer"));
+    }
+
+    @Test
+    void createsJobWithoutTitleAndReturnsTitleDerivedFromFirstJdLine() throws Exception {
+        JobDescription savedJob = new JobDescription("Java Redis", "Java Redis\nBuild platform", "Java,Redis");
+        ReflectionTestUtils.setField(savedJob, "id", 20L);
+        when(createJobDescriptionUseCase.create(null, "Java Redis\nBuild platform")).thenReturn(savedJob);
+
+        mockMvc.perform(post("/api/jobs")
+                .header("X-API-Token", "test-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"Java Redis\\nBuild platform\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.jobDescriptionId").value(20))
+            .andExpect(jsonPath("$.title").value("Java Redis"));
+
+        verify(createJobDescriptionUseCase).create(null, "Java Redis\nBuild platform");
     }
 
     @Test
@@ -252,6 +270,17 @@ class ResumeMatchControllerTest {
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"content\":\"  \"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
+    void returnsBadRequestWhenJobTitleExceedsMaximumLength() throws Exception {
+        mockMvc.perform(post("/api/jobs")
+                .header("X-API-Token", "test-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"" + "x".repeat(121) + "\",\"content\":\"Java Redis\"}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
             .andExpect(jsonPath("$.message").value("Invalid request"));

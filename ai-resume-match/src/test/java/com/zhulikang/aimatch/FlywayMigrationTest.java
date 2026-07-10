@@ -22,12 +22,19 @@ class FlywayMigrationTest {
             assertThat(tableExists(connection, "analysis_task")).isTrue();
             assertThat(tableExists(connection, "match_report")).isTrue();
             assertThat(tableExists(connection, "analysis_outbox")).isTrue();
+            assertThat(columnExists(connection, "job_description", "title")).isTrue();
             assertThat(indexExists(connection, "analysis_outbox", "idx_analysis_outbox_due")).isTrue();
         }
     }
 
     private boolean tableExists(Connection connection, String tableName) throws Exception {
         try (ResultSet rows = connection.getMetaData().getTables(null, null, tableName, null)) {
+            return rows.next();
+        }
+    }
+
+    private boolean columnExists(Connection connection, String tableName, String columnName) throws Exception {
+        try (ResultSet rows = connection.getMetaData().getColumns(null, null, tableName, columnName)) {
             return rows.next();
         }
     }

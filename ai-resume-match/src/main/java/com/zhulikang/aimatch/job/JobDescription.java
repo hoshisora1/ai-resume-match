@@ -15,6 +15,9 @@ public class JobDescription {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, length = 120)
+    private String title;
+
     @Lob
     @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
@@ -28,13 +31,18 @@ public class JobDescription {
     protected JobDescription() {
     }
 
-    public JobDescription(String content, String skillTags) {
+    public JobDescription(String title, String content, String skillTags) {
+        this.title = title;
         this.content = content;
         this.skillTags = skillTags;
     }
 
     public Long getId() {
         return id;
+    }
+
+    public String getTitle() {
+        return title;
     }
 
     public String getContent() {

@@ -54,6 +54,7 @@ class RunAnalysisUseCaseTest {
             "summary"
         )));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription(
+            "Backend Engineer",
             "Java backend, Redis and Kafka",
             "Java,Redis,Kafka"
         )));
@@ -82,7 +83,7 @@ class RunAnalysisUseCaseTest {
         when(taskService.tryStart(99L, false)).thenReturn(true);
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
         when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis", "summary")));
-        when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis", "Redis")));
+        when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis Engineer", "Redis", "Redis")));
         when(aiClient.complete(anyString())).thenThrow(new IllegalStateException("AI unavailable"));
 
         useCase().run(99L, false);
@@ -122,7 +123,7 @@ class RunAnalysisUseCaseTest {
         when(taskService.tryStart(99L, false)).thenReturn(true);
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
         when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis", "summary")));
-        when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis", "Redis")));
+        when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis Engineer", "Redis", "Redis")));
         when(aiClient.complete(anyString())).thenReturn("no score");
         when(reportParser.extractScore("no score"))
             .thenThrow(new IllegalArgumentException("AI report does not contain score"));
@@ -159,7 +160,11 @@ class RunAnalysisUseCaseTest {
         when(taskService.tryStart(99L, true)).thenReturn(true);
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
         when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis Kafka", "summary")));
-        when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis Kafka", "Redis,Kafka")));
+        when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription(
+            "Platform Engineer",
+            "Redis Kafka",
+            "Redis,Kafka"
+        )));
         when(aiClient.complete(anyString())).thenReturn("score 90 report");
         when(reportParser.extractScore("score 90 report")).thenReturn(90);
 

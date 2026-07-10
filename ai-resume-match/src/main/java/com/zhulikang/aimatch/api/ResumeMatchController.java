@@ -55,8 +55,8 @@ public class ResumeMatchController {
 
     @PostMapping("/jobs")
     public JobDescriptionResponse createJob(@Valid @RequestBody CreateJobRequest request) {
-        JobDescription job = createJobDescriptionUseCase.create(request.content());
-        return new JobDescriptionResponse(job.getId());
+        JobDescription job = createJobDescriptionUseCase.create(request.title(), request.content());
+        return JobDescriptionResponse.from(job);
     }
 
     @PostMapping("/analysis")
