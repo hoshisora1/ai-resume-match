@@ -2,8 +2,14 @@ package com.zhulikang.aimatch.api;
 
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
+import com.zhulikang.aimatch.application.analysis.AnalysisListItem;
+import com.zhulikang.aimatch.application.analysis.AnalysisPage;
+import com.zhulikang.aimatch.application.analysis.AnalysisSummary;
+import com.zhulikang.aimatch.application.analysis.AnalysisTaskDetails;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.GetAnalysisSummaryUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.ListAnalysisTasksUseCase;
 import com.zhulikang.aimatch.application.analysis.RetryAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.job.CreateJobDescriptionUseCase;
 import com.zhulikang.aimatch.application.report.GetMatchReportUseCase;
@@ -11,6 +17,8 @@ import com.zhulikang.aimatch.application.resume.UploadResumeUseCase;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.resume.Resume;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -20,7 +28,9 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -48,6 +58,10 @@ class ResumeMatchControllerTest {
     CreateAnalysisTaskUseCase createAnalysisTaskUseCase;
     @MockBean
     GetAnalysisTaskUseCase getAnalysisTaskUseCase;
+    @MockBean
+    ListAnalysisTasksUseCase listAnalysisTasksUseCase;
+    @MockBean
+    GetAnalysisSummaryUseCase getAnalysisSummaryUseCase;
     @MockBean
     GetMatchReportUseCase getMatchReportUseCase;
     @MockBean
@@ -192,6 +206,97 @@ class ResumeMatchControllerTest {
     }
 
     @Test
+    void returnsAnalysisHistoryPage() throws Exception {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 10, 9, 0);
+        LocalDateTime updatedAt = LocalDateTime.of(2026, 7, 10, 9, 5);
+        LocalDateTime completedAt = LocalDateTime.of(2026, 7, 10, 9, 5);
+        AnalysisListItem item = new AnalysisListItem(
+            30L,
+            "高级后端工程师",
+            "resume.pdf",
+            AnalysisTask.Status.SUCCESS,
+            88,
+            1,
+            3,
+            null,
+            createdAt,
+            updatedAt,
+            completedAt
+        );
+        when(listAnalysisTasksUseCase.list(null, 0, 20)).thenReturn(new AnalysisPage(
+            List.of(item),
+            0,
+            20,
+            1,
+            1
+        ));
+
+        mockMvc.perform(get("/api/analysis")
+                .param("page", "0")
+                .param("size", "20")
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].taskId").value(30))
+            .andExpect(jsonPath("$.items[0].jobTitle").value("高级后端工程师"))
+            .andExpect(jsonPath("$.items[0].resumeFileName").value("resume.pdf"))
+            .andExpect(jsonPath("$.items[0].status").value("SUCCESS"))
+            .andExpect(jsonPath("$.items[0].matchScore").value(88))
+            .andExpect(jsonPath("$.items[0].attemptCount").value(1))
+            .andExpect(jsonPath("$.items[0].maxAttempts").value(3))
+            .andExpect(jsonPath("$.items[0].failureCode").doesNotExist())
+            .andExpect(jsonPath("$.items[0].createdAt").value("2026-07-10T09:00:00"))
+            .andExpect(jsonPath("$.items[0].updatedAt").value("2026-07-10T09:05:00"))
+            .andExpect(jsonPath("$.items[0].completedAt").value("2026-07-10T09:05:00"))
+            .andExpect(jsonPath("$.page").value(0))
+            .andExpect(jsonPath("$.size").value(20))
+            .andExpect(jsonPath("$.totalElements").value(1))
+            .andExpect(jsonPath("$.totalPages").value(1));
+
+        verify(listAnalysisTasksUseCase).list(null, 0, 20);
+    }
+
+    @Test
+    void filtersAnalysisHistoryByStatus() throws Exception {
+        when(listAnalysisTasksUseCase.list(AnalysisTask.Status.SUCCESS, 0, 20)).thenReturn(new AnalysisPage(
+            List.of(),
+            0,
+            20,
+            0,
+            0
+        ));
+
+        mockMvc.perform(get("/api/analysis")
+                .param("status", "SUCCESS")
+                .param("page", "0")
+                .param("size", "20")
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items").isEmpty())
+            .andExpect(jsonPath("$.totalElements").value(0));
+
+        verify(listAnalysisTasksUseCase).list(AnalysisTask.Status.SUCCESS, 0, 20);
+    }
+
+    @Test
+    void returnsAnalysisSummary() throws Exception {
+        when(getAnalysisSummaryUseCase.get()).thenReturn(new AnalysisSummary(
+            12,
+            10,
+            1,
+            1,
+            new BigDecimal("82.4")
+        ));
+
+        mockMvc.perform(get("/api/analysis/summary").header("X-API-Token", "test-token"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalCount").value(12))
+            .andExpect(jsonPath("$.successCount").value(10))
+            .andExpect(jsonPath("$.inProgressCount").value(1))
+            .andExpect(jsonPath("$.retryableFailureCount").value(1))
+            .andExpect(jsonPath("$.averageMatchScore").value(82.4));
+    }
+
+    @Test
     void returnsAnalysisTaskStatus() throws Exception {
         AnalysisTask task = new AnalysisTask(10L, 20L);
         ReflectionTestUtils.setField(task, "id", 30L);
@@ -199,13 +304,21 @@ class ResumeMatchControllerTest {
         LocalDateTime updatedAt = LocalDateTime.of(2026, 7, 4, 10, 20);
         ReflectionTestUtils.setField(task, "createdAt", createdAt);
         ReflectionTestUtils.setField(task, "updatedAt", updatedAt);
-        when(getAnalysisTaskUseCase.find(30L)).thenReturn(Optional.of(task));
+        when(getAnalysisTaskUseCase.find(30L)).thenReturn(Optional.of(new AnalysisTaskDetails(
+            task,
+            "高级后端工程师",
+            "resume.pdf",
+            88
+        )));
 
         mockMvc.perform(get("/api/analysis/30").header("X-API-Token", "test-token"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.taskId").value(30))
             .andExpect(jsonPath("$.resumeId").value(10))
             .andExpect(jsonPath("$.jobDescriptionId").value(20))
+            .andExpect(jsonPath("$.jobTitle").value("高级后端工程师"))
+            .andExpect(jsonPath("$.resumeFileName").value("resume.pdf"))
+            .andExpect(jsonPath("$.matchScore").value(88))
             .andExpect(jsonPath("$.status").value("PENDING"))
             .andExpect(jsonPath("$.attemptCount").value(0))
             .andExpect(jsonPath("$.maxAttempts").value(3))
@@ -343,6 +456,43 @@ class ResumeMatchControllerTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
             .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
+    void returnsInvalidRequestWhenAnalysisStatusIsUnknown() throws Exception {
+        mockMvc.perform(get("/api/analysis")
+                .param("status", "UNKNOWN")
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
+    void returnsBadRequestWhenAnalysisPageIsNegative() throws Exception {
+        when(listAnalysisTasksUseCase.list(null, -1, 20))
+            .thenThrow(new IllegalArgumentException("Page must not be negative"));
+
+        mockMvc.perform(get("/api/analysis")
+                .param("page", "-1")
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Page must not be negative"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 101})
+    void returnsBadRequestWhenAnalysisPageSizeIsOutOfRange(int size) throws Exception {
+        when(listAnalysisTasksUseCase.list(null, 0, size))
+            .thenThrow(new IllegalArgumentException("Size must be between 1 and 100"));
+
+        mockMvc.perform(get("/api/analysis")
+                .param("size", Integer.toString(size))
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Size must be between 1 and 100"));
     }
 
     @Test

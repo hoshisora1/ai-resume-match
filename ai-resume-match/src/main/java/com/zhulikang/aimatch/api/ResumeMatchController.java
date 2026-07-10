@@ -3,7 +3,9 @@ package com.zhulikang.aimatch.api;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.GetAnalysisSummaryUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.ListAnalysisTasksUseCase;
 import com.zhulikang.aimatch.application.analysis.RetryAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.job.CreateJobDescriptionUseCase;
 import com.zhulikang.aimatch.application.report.GetMatchReportUseCase;
@@ -28,6 +30,8 @@ public class ResumeMatchController {
     private final CreateJobDescriptionUseCase createJobDescriptionUseCase;
     private final CreateAnalysisTaskUseCase createAnalysisTaskUseCase;
     private final GetAnalysisTaskUseCase getAnalysisTaskUseCase;
+    private final ListAnalysisTasksUseCase listAnalysisTasksUseCase;
+    private final GetAnalysisSummaryUseCase getAnalysisSummaryUseCase;
     private final GetMatchReportUseCase getMatchReportUseCase;
     private final RetryAnalysisTaskUseCase retryAnalysisTaskUseCase;
 
@@ -36,6 +40,8 @@ public class ResumeMatchController {
         CreateJobDescriptionUseCase createJobDescriptionUseCase,
         CreateAnalysisTaskUseCase createAnalysisTaskUseCase,
         GetAnalysisTaskUseCase getAnalysisTaskUseCase,
+        ListAnalysisTasksUseCase listAnalysisTasksUseCase,
+        GetAnalysisSummaryUseCase getAnalysisSummaryUseCase,
         GetMatchReportUseCase getMatchReportUseCase,
         RetryAnalysisTaskUseCase retryAnalysisTaskUseCase
     ) {
@@ -43,6 +49,8 @@ public class ResumeMatchController {
         this.createJobDescriptionUseCase = createJobDescriptionUseCase;
         this.createAnalysisTaskUseCase = createAnalysisTaskUseCase;
         this.getAnalysisTaskUseCase = getAnalysisTaskUseCase;
+        this.listAnalysisTasksUseCase = listAnalysisTasksUseCase;
+        this.getAnalysisSummaryUseCase = getAnalysisSummaryUseCase;
         this.getMatchReportUseCase = getMatchReportUseCase;
         this.retryAnalysisTaskUseCase = retryAnalysisTaskUseCase;
     }
@@ -63,6 +71,20 @@ public class ResumeMatchController {
     public AnalysisTaskResponse createAnalysis(@Valid @RequestBody CreateAnalysisRequest request) {
         AnalysisTask task = createAnalysisTaskUseCase.create(request.resumeId(), request.jobDescriptionId());
         return AnalysisTaskResponse.from(task);
+    }
+
+    @GetMapping("/analysis")
+    public AnalysisPageResponse analyses(
+        @RequestParam(required = false) AnalysisTask.Status status,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        return AnalysisPageResponse.from(listAnalysisTasksUseCase.list(status, page, size));
+    }
+
+    @GetMapping("/analysis/summary")
+    public AnalysisSummaryResponse analysisSummary() {
+        return AnalysisSummaryResponse.from(getAnalysisSummaryUseCase.get());
     }
 
     @GetMapping("/analysis/{taskId}")

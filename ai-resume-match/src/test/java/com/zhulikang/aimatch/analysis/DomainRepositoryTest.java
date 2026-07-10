@@ -8,10 +8,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,6 +50,52 @@ class DomainRepositoryTest {
         assertThat(report.getTaskId()).isEqualTo(task.getId());
         assertThat(matchReportRepository.findByTaskId(task.getId()))
             .contains(report);
+    }
+
+    @Test
+    void findsTasksByStatusInNewestStableOrder() {
+        LocalDateTime older = LocalDateTime.of(2026, 7, 10, 8, 0);
+        LocalDateTime newer = LocalDateTime.of(2026, 7, 10, 9, 0);
+        AnalysisTask olderSuccess = taskWithStatusAndCreatedAt(AnalysisTask.Status.SUCCESS, older);
+        AnalysisTask firstNewerSuccess = taskWithStatusAndCreatedAt(AnalysisTask.Status.SUCCESS, newer);
+        AnalysisTask secondNewerSuccess = taskWithStatusAndCreatedAt(AnalysisTask.Status.SUCCESS, newer);
+        taskWithStatusAndCreatedAt(AnalysisTask.Status.PENDING, newer.plusHours(1));
+
+        assertThat(analysisTaskRepository.findByStatus(
+            AnalysisTask.Status.SUCCESS,
+            PageRequest.of(0, 20, Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            ))
+        )).extracting(AnalysisTask::getId).containsExactly(
+            secondNewerSuccess.getId(),
+            firstNewerSuccess.getId(),
+            olderSuccess.getId()
+        );
+    }
+
+    @Test
+    void countsTasksByOneOrSeveralStatuses() {
+        taskWithStatusAndCreatedAt(AnalysisTask.Status.PENDING, LocalDateTime.now());
+        taskWithStatusAndCreatedAt(AnalysisTask.Status.RUNNING, LocalDateTime.now());
+        taskWithStatusAndCreatedAt(AnalysisTask.Status.SUCCESS, LocalDateTime.now());
+
+        assertThat(analysisTaskRepository.countByStatus(AnalysisTask.Status.SUCCESS)).isEqualTo(1);
+        assertThat(analysisTaskRepository.countByStatusIn(List.of(
+            AnalysisTask.Status.PENDING,
+            AnalysisTask.Status.RUNNING
+        ))).isEqualTo(2);
+    }
+
+    @Test
+    void batchesReportsByTaskIdAndCalculatesAverageScore() {
+        MatchReport first = matchReportRepository.save(new MatchReport(101L, 82, "first"));
+        MatchReport second = matchReportRepository.save(new MatchReport(102L, 83, "second"));
+        matchReportRepository.save(new MatchReport(103L, 95, "other"));
+
+        assertThat(matchReportRepository.findAllByTaskIdIn(List.of(101L, 102L)))
+            .containsExactlyInAnyOrder(first, second);
+        assertThat(matchReportRepository.averageMatchScore()).isEqualTo(86.66666666666667);
     }
 
     @Test
@@ -222,5 +270,13 @@ class DomainRepositoryTest {
         assertThat(updatedTask.getFailureMessage()).isNull();
         assertThat(updatedTask.getNextRetryAt()).isNull();
         assertThat(updatedTask.getCompletedAt()).isNull();
+    }
+
+    private AnalysisTask taskWithStatusAndCreatedAt(AnalysisTask.Status status, LocalDateTime createdAt) {
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        ReflectionTestUtils.setField(task, "status", status);
+        ReflectionTestUtils.setField(task, "createdAt", createdAt);
+        ReflectionTestUtils.setField(task, "updatedAt", createdAt);
+        return analysisTaskRepository.saveAndFlush(task);
     }
 }
