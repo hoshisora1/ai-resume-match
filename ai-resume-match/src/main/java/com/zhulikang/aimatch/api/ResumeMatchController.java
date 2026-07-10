@@ -2,6 +2,8 @@ package com.zhulikang.aimatch.api;
 
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
+import com.zhulikang.aimatch.application.analysis.AnalysisSubmission;
+import com.zhulikang.aimatch.application.analysis.CreateAnalysisSubmissionUseCase;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisSummaryUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
@@ -13,7 +15,11 @@ import com.zhulikang.aimatch.application.resume.UploadResumeUseCase;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.resume.Resume;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import org.hibernate.validator.constraints.CodePointLength;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,10 +31,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api")
+@Validated
 public class ResumeMatchController {
     private final UploadResumeUseCase uploadResumeUseCase;
     private final CreateJobDescriptionUseCase createJobDescriptionUseCase;
     private final CreateAnalysisTaskUseCase createAnalysisTaskUseCase;
+    private final CreateAnalysisSubmissionUseCase createAnalysisSubmissionUseCase;
     private final GetAnalysisTaskUseCase getAnalysisTaskUseCase;
     private final ListAnalysisTasksUseCase listAnalysisTasksUseCase;
     private final GetAnalysisSummaryUseCase getAnalysisSummaryUseCase;
@@ -39,6 +47,7 @@ public class ResumeMatchController {
         UploadResumeUseCase uploadResumeUseCase,
         CreateJobDescriptionUseCase createJobDescriptionUseCase,
         CreateAnalysisTaskUseCase createAnalysisTaskUseCase,
+        CreateAnalysisSubmissionUseCase createAnalysisSubmissionUseCase,
         GetAnalysisTaskUseCase getAnalysisTaskUseCase,
         ListAnalysisTasksUseCase listAnalysisTasksUseCase,
         GetAnalysisSummaryUseCase getAnalysisSummaryUseCase,
@@ -48,6 +57,7 @@ public class ResumeMatchController {
         this.uploadResumeUseCase = uploadResumeUseCase;
         this.createJobDescriptionUseCase = createJobDescriptionUseCase;
         this.createAnalysisTaskUseCase = createAnalysisTaskUseCase;
+        this.createAnalysisSubmissionUseCase = createAnalysisSubmissionUseCase;
         this.getAnalysisTaskUseCase = getAnalysisTaskUseCase;
         this.listAnalysisTasksUseCase = listAnalysisTasksUseCase;
         this.getAnalysisSummaryUseCase = getAnalysisSummaryUseCase;
@@ -71,6 +81,16 @@ public class ResumeMatchController {
     public AnalysisTaskResponse createAnalysis(@Valid @RequestBody CreateAnalysisRequest request) {
         AnalysisTask task = createAnalysisTaskUseCase.create(request.resumeId(), request.jobDescriptionId());
         return AnalysisTaskResponse.from(task);
+    }
+
+    @PostMapping(value = "/analysis-submissions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public AnalysisTaskResponse createAnalysisSubmission(
+        @RequestParam("file") MultipartFile file,
+        @RequestParam("jobTitle") @NotBlank @CodePointLength(max = 120) String jobTitle,
+        @RequestParam("jobContent") @NotBlank String jobContent
+    ) {
+        AnalysisSubmission submission = createAnalysisSubmissionUseCase.create(file, jobTitle, jobContent);
+        return AnalysisTaskResponse.from(submission);
     }
 
     @GetMapping("/analysis")

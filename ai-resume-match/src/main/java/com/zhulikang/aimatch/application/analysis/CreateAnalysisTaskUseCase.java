@@ -1,10 +1,8 @@
 package com.zhulikang.aimatch.application.analysis;
 
 import com.zhulikang.aimatch.analysis.AnalysisTask;
-import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
 import com.zhulikang.aimatch.api.ResourceNotFoundException;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
-import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import com.zhulikang.aimatch.resume.ResumeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,22 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreateAnalysisTaskUseCase {
     private final ResumeRepository resumeRepository;
     private final JobDescriptionRepository jobRepository;
-    private final AnalysisTaskRepository taskRepository;
-    private final AnalysisTaskPublisher publisher;
-    private final AnalysisMetrics metrics;
+    private final AnalysisTaskCreator taskCreator;
 
     public CreateAnalysisTaskUseCase(
         ResumeRepository resumeRepository,
         JobDescriptionRepository jobRepository,
-        AnalysisTaskRepository taskRepository,
-        AnalysisTaskPublisher publisher,
-        AnalysisMetrics metrics
+        AnalysisTaskCreator taskCreator
     ) {
         this.resumeRepository = resumeRepository;
         this.jobRepository = jobRepository;
-        this.taskRepository = taskRepository;
-        this.publisher = publisher;
-        this.metrics = metrics;
+        this.taskCreator = taskCreator;
     }
 
     @Transactional
@@ -39,9 +31,6 @@ public class CreateAnalysisTaskUseCase {
         if (!jobRepository.existsById(jobDescriptionId)) {
             throw new ResourceNotFoundException("Job description not found");
         }
-        AnalysisTask task = taskRepository.save(new AnalysisTask(resumeId, jobDescriptionId));
-        publisher.publishAfterCommit(task.getId());
-        metrics.taskCreated();
-        return task;
+        return taskCreator.create(resumeId, jobDescriptionId);
     }
 }

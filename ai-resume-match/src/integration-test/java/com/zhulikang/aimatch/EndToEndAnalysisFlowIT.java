@@ -97,16 +97,41 @@ class EndToEndAnalysisFlowIT {
     }
 
     @Test
-    void processesDocxResumeThroughHttpOutboxWorkerAiAndRedisCache() throws Exception {
-        FlowResult result = runFlow(
-            "docx-flow",
+    void processesDocxResumeThroughAtomicSubmissionOutboxWorkerAiAndRedisCache() throws Exception {
+        String flowName = "docx-flow";
+        String jobTitle = "Backend Engineer";
+        long taskId = createAnalysisSubmission(
+            flowName,
             "resume.docx",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            IntegrationDocumentFixtures.docx("Java Spring Boot Redis RabbitMQ integration candidate")
+            IntegrationDocumentFixtures.docx("Java Spring Boot Redis RabbitMQ integration candidate"),
+            jobTitle
         );
+        JsonNode report = awaitReport(flowName, taskId);
+        awaitTaskSuccess(flowName, taskId, jobTitle, "resume.docx");
 
-        assertThat(result.matchScore()).isEqualTo(91);
-        assertThat(redisTemplate.hasKey("match-report:" + result.taskId())).isTrue();
+        assertThat(report.required("matchScore").asInt()).isEqualTo(91);
+        assertThat(redisTemplate.hasKey("match-report:" + taskId)).isTrue();
+
+        ResponseEntity<String> historyResponse = getApi(flowName, "/api/analysis?status=SUCCESS");
+        assertThat(historyResponse.getStatusCode()).as(historyResponse.getBody()).isEqualTo(HttpStatus.OK);
+        JsonNode historyItems = objectMapper.readTree(historyResponse.getBody()).required("items");
+        JsonNode historyTask = null;
+        for (JsonNode item : historyItems) {
+            if (item.required("taskId").asLong() == taskId) {
+                historyTask = item;
+                break;
+            }
+        }
+        assertThat(historyTask).isNotNull();
+        assertThat(historyTask.required("jobTitle").asText()).isEqualTo(jobTitle);
+        assertThat(historyTask.required("resumeFileName").asText()).isEqualTo("resume.docx");
+
+        ResponseEntity<String> summaryResponse = getApi(flowName, "/api/analysis/summary");
+        assertThat(summaryResponse.getStatusCode()).as(summaryResponse.getBody()).isEqualTo(HttpStatus.OK);
+        JsonNode summary = objectMapper.readTree(summaryResponse.getBody());
+        assertThat(summary.required("totalCount").asLong()).isGreaterThanOrEqualTo(1);
+        assertThat(summary.required("averageMatchScore").asDouble()).isEqualTo(91.0);
     }
 
     @Test
@@ -190,6 +215,42 @@ class EndToEndAnalysisFlowIT {
         return json.required("taskId").asLong();
     }
 
+    private long createAnalysisSubmission(
+        String flowName,
+        String filename,
+        String contentType,
+        byte[] content,
+        String jobTitle
+    ) throws Exception {
+        HttpHeaders headers = apiHeaders(flowName);
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        HttpHeaders fileHeaders = new HttpHeaders();
+        fileHeaders.setContentType(MediaType.parseMediaType(contentType));
+        HttpEntity<ByteArrayResource> filePart = new HttpEntity<>(namedResource(content, filename), fileHeaders);
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", filePart);
+        body.add("jobTitle", jobTitle);
+        body.add("jobContent", "We need Java, Spring Boot, Redis, and RabbitMQ experience.");
+
+        ResponseEntity<String> response = restTemplate.exchange(
+            "/api/analysis-submissions",
+            HttpMethod.POST,
+            new HttpEntity<>(body, headers),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).as(response.getBody()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getHeaders().getFirst("X-Request-Id")).isEqualTo(flowName + "-request");
+        assertThat(response.getHeaders().getFirst("X-Correlation-Id")).isEqualTo(flowName + "-correlation");
+        JsonNode json = objectMapper.readTree(response.getBody());
+        assertThat(json.required("status").asText()).isEqualTo("PENDING");
+        assertThat(json.required("jobTitle").asText()).isEqualTo(jobTitle);
+        assertThat(json.required("resumeFileName").asText()).isEqualTo(filename);
+        return json.required("taskId").asLong();
+    }
+
     private JsonNode awaitReport(String flowName, long taskId) {
         AtomicReference<JsonNode> capturedReport = new AtomicReference<>();
         Awaitility.await()
@@ -208,6 +269,15 @@ class EndToEndAnalysisFlowIT {
     }
 
     private void awaitTaskSuccess(String flowName, long taskId) {
+        awaitTaskSuccess(flowName, taskId, null, null);
+    }
+
+    private void awaitTaskSuccess(
+        String flowName,
+        long taskId,
+        String expectedJobTitle,
+        String expectedResumeFileName
+    ) {
         Awaitility.await()
             .atMost(Duration.ofSeconds(10))
             .pollInterval(Duration.ofMillis(250))
@@ -216,6 +286,12 @@ class EndToEndAnalysisFlowIT {
                 assertThat(response.getStatusCode()).as(response.getBody()).isEqualTo(HttpStatus.OK);
                 JsonNode task = objectMapper.readTree(response.getBody());
                 assertThat(task.required("status").asText()).isEqualTo("SUCCESS");
+                if (expectedJobTitle != null) {
+                    assertThat(task.required("jobTitle").asText()).isEqualTo(expectedJobTitle);
+                }
+                if (expectedResumeFileName != null) {
+                    assertThat(task.required("resumeFileName").asText()).isEqualTo(expectedResumeFileName);
+                }
             });
     }
 

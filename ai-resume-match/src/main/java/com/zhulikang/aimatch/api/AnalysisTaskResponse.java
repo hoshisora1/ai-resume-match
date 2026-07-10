@@ -1,6 +1,7 @@
 package com.zhulikang.aimatch.api;
 
 import com.zhulikang.aimatch.analysis.AnalysisTask;
+import com.zhulikang.aimatch.application.analysis.AnalysisSubmission;
 import com.zhulikang.aimatch.application.analysis.AnalysisTaskDetails;
 
 import java.time.LocalDateTime;
@@ -53,6 +54,28 @@ public record AnalysisTaskResponse(
             details.jobTitle(),
             details.resumeFileName(),
             details.matchScore(),
+            task.getStatus().name(),
+            task.getAttemptCount(),
+            task.getMaxAttempts(),
+            task.getFailureCode() == null ? null : task.getFailureCode().name(),
+            task.getFailureMessage(),
+            task.getNextRetryAt(),
+            task.getStartedAt(),
+            task.getCompletedAt(),
+            task.getCreatedAt(),
+            task.getUpdatedAt()
+        );
+    }
+
+    public static AnalysisTaskResponse from(AnalysisSubmission submission) {
+        AnalysisTask task = submission.task();
+        return new AnalysisTaskResponse(
+            task.getId(),
+            task.getResumeId(),
+            task.getJobDescriptionId(),
+            submission.jobTitle(),
+            submission.resumeFileName(),
+            null,
             task.getStatus().name(),
             task.getAttemptCount(),
             task.getMaxAttempts(),

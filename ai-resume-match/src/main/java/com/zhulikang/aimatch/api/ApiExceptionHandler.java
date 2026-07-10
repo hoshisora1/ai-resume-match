@@ -1,7 +1,9 @@
 package com.zhulikang.aimatch.api;
 
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -20,6 +22,8 @@ public class ApiExceptionHandler {
         HttpMessageNotReadableException.class,
         MethodArgumentTypeMismatchException.class,
         MissingServletRequestPartException.class,
+        MissingServletRequestParameterException.class,
+        ConstraintViolationException.class,
         MaxUploadSizeExceededException.class
     })
     public ResponseEntity<ApiErrorResponse> handleFrameworkBadRequest(Exception ex) {

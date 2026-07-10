@@ -5,7 +5,9 @@ import com.zhulikang.aimatch.analysis.MatchReportView;
 import com.zhulikang.aimatch.application.analysis.AnalysisListItem;
 import com.zhulikang.aimatch.application.analysis.AnalysisPage;
 import com.zhulikang.aimatch.application.analysis.AnalysisSummary;
+import com.zhulikang.aimatch.application.analysis.AnalysisSubmission;
 import com.zhulikang.aimatch.application.analysis.AnalysisTaskDetails;
+import com.zhulikang.aimatch.application.analysis.CreateAnalysisSubmissionUseCase;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisSummaryUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
@@ -24,6 +26,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -57,6 +60,8 @@ class ResumeMatchControllerTest {
     CreateJobDescriptionUseCase createJobDescriptionUseCase;
     @MockBean
     CreateAnalysisTaskUseCase createAnalysisTaskUseCase;
+    @MockBean
+    CreateAnalysisSubmissionUseCase createAnalysisSubmissionUseCase;
     @MockBean
     GetAnalysisTaskUseCase getAnalysisTaskUseCase;
     @MockBean
@@ -204,6 +209,97 @@ class ResumeMatchControllerTest {
             .andExpect(jsonPath("$.status").value("PENDING"))
             .andExpect(jsonPath("$.resumeId").value(10))
             .andExpect(jsonPath("$.jobDescriptionId").value(20));
+    }
+
+    @Test
+    void createsAtomicAnalysisSubmissionFromMultipartRequest() throws Exception {
+        MockMultipartFile file = resumeFile("resume.docx");
+        AnalysisSubmission submission = submission("Backend Engineer", "resume.docx");
+        when(createAnalysisSubmissionUseCase.create(file, "Backend Engineer", "Java Redis"))
+            .thenReturn(submission);
+
+        mockMvc.perform(analysisSubmissionRequest(file, "Backend Engineer", "Java Redis"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.taskId").value(30))
+            .andExpect(jsonPath("$.resumeId").value(10))
+            .andExpect(jsonPath("$.jobDescriptionId").value(20))
+            .andExpect(jsonPath("$.jobTitle").value("Backend Engineer"))
+            .andExpect(jsonPath("$.resumeFileName").value("resume.docx"))
+            .andExpect(jsonPath("$.matchScore").value(nullValue()))
+            .andExpect(jsonPath("$.status").value("PENDING"))
+            .andExpect(jsonPath("$.attemptCount").value(0))
+            .andExpect(jsonPath("$.maxAttempts").value(3))
+            .andExpect(jsonPath("$.createdAt").exists())
+            .andExpect(jsonPath("$.updatedAt").exists());
+
+        verify(createAnalysisSubmissionUseCase).create(file, "Backend Engineer", "Java Redis");
+    }
+
+    @Test
+    void returnsBadRequestWhenAnalysisSubmissionFileIsInvalid() throws Exception {
+        MockMultipartFile file = resumeFile("resume.txt");
+        when(createAnalysisSubmissionUseCase.create(file, "Backend Engineer", "Java Redis"))
+            .thenThrow(new IllegalArgumentException("Only PDF and DOCX are supported"));
+
+        mockMvc.perform(analysisSubmissionRequest(file, "Backend Engineer", "Java Redis"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Only PDF and DOCX are supported"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"file", "jobTitle", "jobContent"})
+    void returnsInvalidRequestWhenRequiredAnalysisSubmissionPartIsMissing(String missingPart) throws Exception {
+        MockMultipartHttpServletRequestBuilder request = multipart("/api/analysis-submissions");
+        request.header("X-API-Token", "test-token");
+        if (!missingPart.equals("file")) {
+            request.file(resumeFile("resume.pdf"));
+        }
+        if (!missingPart.equals("jobTitle")) {
+            request.param("jobTitle", "Backend Engineer");
+        }
+        if (!missingPart.equals("jobContent")) {
+            request.param("jobContent", "Java Redis");
+        }
+
+        mockMvc.perform(request)
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"jobTitle", "jobContent"})
+    void returnsInvalidRequestWhenAnalysisSubmissionTextPartIsBlank(String blankPart) throws Exception {
+        String jobTitle = blankPart.equals("jobTitle") ? "  " : "Backend Engineer";
+        String jobContent = blankPart.equals("jobContent") ? "  " : "Java Redis";
+
+        mockMvc.perform(analysisSubmissionRequest(resumeFile("resume.pdf"), jobTitle, jobContent))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
+    void acceptsAnalysisSubmissionTitleWithMaximumCodePointLength() throws Exception {
+        String title = "x".repeat(119) + "\uD83D\uDE80";
+        MockMultipartFile file = resumeFile("resume.pdf");
+        when(createAnalysisSubmissionUseCase.create(file, title, "Java Redis"))
+            .thenReturn(submission(title, "resume.pdf"));
+
+        mockMvc.perform(analysisSubmissionRequest(file, title, "Java Redis"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.jobTitle").value(title));
+    }
+
+    @Test
+    void returnsInvalidRequestWhenAnalysisSubmissionTitleExceedsCodePointLimit() throws Exception {
+        String title = "x".repeat(120) + "\uD83D\uDE80";
+
+        mockMvc.perform(analysisSubmissionRequest(resumeFile("resume.pdf"), title, "Java Redis"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
     }
 
     @Test
@@ -562,5 +658,28 @@ class ResumeMatchControllerTest {
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOT_FOUND"))
             .andExpect(jsonPath("$.message").value("Resume not found"));
+    }
+
+    private MockMultipartHttpServletRequestBuilder analysisSubmissionRequest(
+        MockMultipartFile file,
+        String jobTitle,
+        String jobContent
+    ) {
+        MockMultipartHttpServletRequestBuilder request = multipart("/api/analysis-submissions");
+        request.file(file);
+        request.param("jobTitle", jobTitle);
+        request.param("jobContent", jobContent);
+        request.header("X-API-Token", "test-token");
+        return request;
+    }
+
+    private MockMultipartFile resumeFile(String fileName) {
+        return new MockMultipartFile("file", fileName, MediaType.APPLICATION_OCTET_STREAM_VALUE, new byte[] {1});
+    }
+
+    private AnalysisSubmission submission(String jobTitle, String resumeFileName) {
+        AnalysisTask task = new AnalysisTask(10L, 20L);
+        ReflectionTestUtils.setField(task, "id", 30L);
+        return new AnalysisSubmission(task, jobTitle, resumeFileName);
     }
 }
