@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,6 +61,18 @@ class DeploymentConfigurationTest {
         assertThat(properties.getProperty("spring.rabbitmq.password")).isEqualTo("${RABBITMQ_PASSWORD:dev-rabbit-password}");
         assertThat(properties.getProperty("api.token")).isEqualTo("${API_TOKEN:dev-token}");
         assertThat(properties.getProperty("ai.api-key")).isEqualTo("${AI_API_KEY:dev-ai-key}");
+    }
+
+    @Test
+    void datasourceUrlsUseConnectorSupportedUtf8Configuration() {
+        for (String profile : List.of("dev", "docker")) {
+            String url = yaml("src/main/resources/application-" + profile + ".yml")
+                .getProperty("spring.datasource.url");
+
+            assertThat(url)
+                .doesNotContain("characterEncoding=utf8mb4")
+                .contains("connectionCollation=utf8mb4_unicode_ci");
+        }
     }
 
     @Test
