@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { cwd } from 'node:process'
 import { HttpResponse, http } from 'msw'
+import { StrictMode } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { createMemoryRouter } from 'react-router'
 
@@ -24,6 +25,10 @@ interface RenderedApp {
   queryClient: QueryClient
   router: AppRouter
   dispose: () => void
+}
+
+interface RenderNewAnalysisOptions {
+  strictMode?: boolean
 }
 
 const renderedApps: RenderedApp[] = []
@@ -52,7 +57,10 @@ function createSubmissionResponse(
   }
 }
 
-function renderNewAnalysis(initialEntries = ['/analyses/new']) {
+function renderNewAnalysis(
+  initialEntries = ['/analyses/new'],
+  { strictMode = false }: RenderNewAnalysisOptions = {},
+) {
   server.use(
     http.get('/backend-health', () => HttpResponse.json({ status: 'UP' })),
   )
@@ -68,7 +76,10 @@ function renderNewAnalysis(initialEntries = ['/analyses/new']) {
     },
   })
   const router: AppRouter = createMemoryRouter(appRoutes, { initialEntries })
-  const rendered = render(<App queryClient={queryClient} router={router} />)
+  const appElement = <App queryClient={queryClient} router={router} />
+  const rendered = render(
+    strictMode ? <StrictMode>{appElement}</StrictMode> : appElement,
+  )
   let disposed = false
 
   const app = {
@@ -221,11 +232,23 @@ test('tracks drag state without replacing the keyboard input and rejects an unsu
   fireEvent.dragEnter(zone, { dataTransfer: { files: [unsupportedFile] } })
   fireEvent.drop(zone, { dataTransfer: { files: [unsupportedFile] } })
   expect(zone).toHaveAttribute('data-dragging', 'false')
-  expect(
-    within(screen.getByRole('status', { name: '已选择简历' })).getByText(
-      unsupportedFile.name,
-    ),
-  ).toBeVisible()
+  const selection = screen.getByRole('status', { name: '已选择简历' })
+  const selectedName = within(selection).getByText(unsupportedFile.name)
+  const selectedSize = within(selection).getByText('6 B')
+  expect(selectedName).toBeVisible()
+  expect(selectedSize).toBeVisible()
+
+  fileInput.focus()
+  expect(fileInput).toHaveFocus()
+  expect(selectedName).toHaveAttribute('id')
+  expect(selectedSize).toHaveAttribute('id')
+  const describedBy = fileInput
+    .getAttribute('aria-describedby')
+    ?.split(/\s+/)
+  expect(describedBy).toEqual(
+    expect.arrayContaining([selectedName.id, selectedSize.id]),
+  )
+  expect(fileInput).toHaveAccessibleDescription(/candidate\.txt.*6 B/)
 
   await user.click(screen.getByRole('button', { name: '提交分析' }))
 
@@ -265,6 +288,61 @@ test('accepts exactly 5 MiB with a case-insensitive extension regardless of MIME
       jobContent: VALID_JOB_CONTENT,
     }).success,
   ).toBe(true)
+})
+
+test('submits the latest same-name file after consecutive reselection', async () => {
+  const submission: { file: FormDataEntryValue | null } = { file: null }
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    if (input === '/backend-health') {
+      return Response.json({ status: 'UP' })
+    }
+
+    if (input === '/api/analysis-submissions') {
+      submission.file =
+        init?.body instanceof FormData ? init.body.get('file') : null
+      return Response.json(createSubmissionResponse())
+    }
+
+    throw new Error(`Unexpected fetch input: ${String(input)}`)
+  })
+  const user = userEvent.setup()
+  const { router } = renderNewAnalysis()
+  const fileInput = screen.getByLabelText('选择简历文件')
+  const firstFile = new File(['old'], 'candidate.pdf', {
+    lastModified: 1_000,
+    type: 'application/pdf',
+  })
+  const secondFile = new File(['new-resume'], 'candidate.pdf', {
+    lastModified: 2_000,
+    type: 'application/pdf',
+  })
+
+  await user.upload(fileInput, firstFile)
+  expect(fileInput).toHaveValue('')
+  expect((fileInput as HTMLInputElement).files).toHaveLength(0)
+
+  await user.upload(fileInput, secondFile)
+  expect(fileInput).toHaveValue('')
+  expect((fileInput as HTMLInputElement).files).toHaveLength(0)
+  expect(
+    within(screen.getByRole('status', { name: '已选择简历' })).getByText(
+      '10 B',
+    ),
+  ).toBeVisible()
+  setTextValues()
+
+  await user.click(screen.getByRole('button', { name: '提交分析' }))
+
+  await waitFor(() => {
+    expect(router.state.location.pathname).toBe('/analyses/42')
+  })
+  expect(submission.file).toBeInstanceOf(File)
+  if (!(submission.file instanceof File)) {
+    throw new Error('Expected a submitted resume file')
+  }
+  expect(submission.file.name).toBe(secondFile.name)
+  expect(submission.file.size).toBe(secondFile.size)
+  expect(submission.file.lastModified).toBe(secondFile.lastModified)
 })
 
 test.each([
@@ -502,7 +580,8 @@ test('preserves all values after a structured server error, shows only a safe me
   const mutationBaseline = queryClient.getMutationCache().getAll()
   expect(mutationBaseline).toHaveLength(0)
   const file = new File(['resume'], 'retry-me.pdf')
-  await user.upload(screen.getByLabelText('选择简历文件'), file)
+  const fileInput = screen.getByLabelText('选择简历文件')
+  await user.upload(fileInput, file)
   setTextValues()
 
   await user.click(screen.getByRole('button', { name: '提交分析' }))
@@ -515,9 +594,8 @@ test('preserves all values after a structured server error, shows only a safe me
   expect(alert).toHaveTextContent('关联 ID：req-safe-123')
   expect(document.body).not.toHaveTextContent(rawServerMessage)
   expect(document.body).not.toHaveTextContent('RAW_SERVER_CODE')
-  expect(screen.getByLabelText('选择简历文件')).toHaveValue(
-    'C:\\fakepath\\retry-me.pdf',
-  )
+  expect(fileInput).toHaveValue('')
+  expect((fileInput as HTMLInputElement).files).toHaveLength(0)
   expect(screen.getByRole('textbox', { name: '岗位名称' })).toHaveValue(
     VALID_TITLE,
   )
@@ -538,6 +616,100 @@ test('preserves all values after a structured server error, shows only a safe me
   })
   expect(requestCount).toBe(2)
   expect(queryClient.getMutationCache().getAll()).toEqual(mutationBaseline)
+})
+
+test('clears a stale request error when an edited title makes the retry invalid', async () => {
+  let requestCount = 0
+  server.use(
+    http.post('/api/analysis-submissions', () => {
+      requestCount += 1
+      return HttpResponse.json(
+        {
+          code: 'SUBMISSION_REJECTED',
+          message: 'unsafe server detail',
+          requestId: 'req-stale-title',
+        },
+        { status: 422 },
+      )
+    }),
+  )
+  const user = userEvent.setup()
+  renderNewAnalysis()
+  const file = new File(['resume'], 'keep-me.pdf')
+  await user.upload(screen.getByLabelText('选择简历文件'), file)
+  setTextValues()
+
+  await user.click(screen.getByRole('button', { name: '提交分析' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    '关联 ID：req-stale-title',
+  )
+
+  const titleInput = screen.getByRole('textbox', { name: '岗位名称' })
+  await user.clear(titleInput)
+  await user.click(screen.getByRole('button', { name: '提交分析' }))
+
+  expect(screen.queryByText('关联 ID：req-stale-title')).not.toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expectFieldError(titleInput, '请输入岗位名称')
+  expect(requestCount).toBe(1)
+  expect(screen.getByRole('textbox', { name: '岗位 JD' })).toHaveValue(
+    VALID_JOB_CONTENT,
+  )
+  expect(
+    within(screen.getByRole('status', { name: '已选择简历' })).getByText(
+      file.name,
+    ),
+  ).toBeVisible()
+})
+
+test('clears a stale request error when the RHF file selection changes', async () => {
+  server.use(
+    http.post('/api/analysis-submissions', () =>
+      HttpResponse.json(
+        {
+          code: 'SUBMISSION_REJECTED',
+          message: 'unsafe server detail',
+          requestId: 'req-stale-file',
+        },
+        { status: 422 },
+      ),
+    ),
+  )
+  const user = userEvent.setup()
+  renderNewAnalysis()
+  const fileInput = screen.getByLabelText('选择简历文件')
+  const originalFile = new File(['resume'], 'original.pdf')
+  const replacementFile = new File(['replacement'], 'replacement.pdf')
+  await user.upload(fileInput, originalFile)
+  setTextValues()
+
+  await user.click(screen.getByRole('button', { name: '提交分析' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    '关联 ID：req-stale-file',
+  )
+  expect(
+    within(screen.getByRole('status', { name: '已选择简历' })).getByText(
+      originalFile.name,
+    ),
+  ).toBeVisible()
+
+  await user.upload(fileInput, replacementFile)
+
+  expect(screen.queryByText('关联 ID：req-stale-file')).not.toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(fileInput).toHaveValue('')
+  expect((fileInput as HTMLInputElement).files).toHaveLength(0)
+  expect(screen.getByRole('textbox', { name: '岗位名称' })).toHaveValue(
+    VALID_TITLE,
+  )
+  expect(screen.getByRole('textbox', { name: '岗位 JD' })).toHaveValue(
+    VALID_JOB_CONTENT,
+  )
+  expect(
+    within(screen.getByRole('status', { name: '已选择简历' })).getByText(
+      replacementFile.name,
+    ),
+  ).toBeVisible()
 })
 
 test('reduces an error and its sensitive cause chain to a plain allowlisted summary', () => {
@@ -681,6 +853,68 @@ test('disables the stable submit button while one request is pending and blocks 
     expect(router.state.location.pathname).toBe('/analyses/42')
   })
   expect(requestCount).toBe(1)
+})
+
+test('does not start a POST when an async resolver completes after StrictMode unmount', async () => {
+  let requestCount = 0
+  let markResolverStarted: () => void = () => undefined
+  let markResolverFinished: () => void = () => undefined
+  let releaseResolver: () => void = () => undefined
+  const resolverStarted = new Promise<void>((resolve) => {
+    markResolverStarted = resolve
+  })
+  const resolverFinished = new Promise<void>((resolve) => {
+    markResolverFinished = resolve
+  })
+  const resolverGate = new Promise<void>((resolve) => {
+    releaseResolver = resolve
+  })
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    if (input === '/backend-health') {
+      return Response.json({ status: 'UP' })
+    }
+
+    if (input === '/api/analysis-submissions') {
+      requestCount += 1
+      return Response.json(createSubmissionResponse())
+    }
+
+    throw new Error(`Unexpected fetch input: ${String(input)}`)
+  })
+  const user = userEvent.setup()
+  const app = renderNewAnalysis(['/analyses/new'], { strictMode: true })
+  const invalidateSpy = vi.spyOn(app.queryClient, 'invalidateQueries')
+  const navigateSpy = vi.spyOn(app.router, 'navigate')
+  await user.upload(
+    screen.getByLabelText('选择简历文件'),
+    new File(['resume'], 'resolver-race.pdf'),
+  )
+  setTextValues()
+  const originalResolverRun = analysisFormSchema._zod.run
+  vi.spyOn(analysisFormSchema._zod, 'run').mockImplementation(
+    async (payload, context) => {
+      markResolverStarted()
+      await resolverGate
+      try {
+        const result = await originalResolverRun(payload, context)
+        return result
+      } finally {
+        markResolverFinished()
+      }
+    },
+  )
+
+  fireEvent.submit(screen.getByRole('form', { name: '新建分析表单' }))
+  await resolverStarted
+  app.dispose()
+  releaseResolver()
+  await resolverFinished
+  await new Promise((resolve) => setTimeout(resolve, 0))
+
+  expect(requestCount).toBe(0)
+  expect(invalidateSpy).not.toHaveBeenCalled()
+  expect(navigateSpy).not.toHaveBeenCalled()
+  expect(app.router.state.location.pathname).toBe('/analyses/new')
 })
 
 test('aborts a slow submission on unmount without cache, invalidation or navigation side effects', async () => {

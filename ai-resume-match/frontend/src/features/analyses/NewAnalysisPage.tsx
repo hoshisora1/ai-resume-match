@@ -28,6 +28,8 @@ import './analysis-form.css'
 
 const FILE_INPUT_ID = 'analysis-resume-file'
 const FILE_HELP_ID = 'analysis-resume-help'
+const FILE_NAME_ID = 'analysis-resume-name'
+const FILE_SIZE_ID = 'analysis-resume-size'
 const FILE_ERROR_ID = 'analysis-resume-error'
 const TITLE_INPUT_ID = 'analysis-job-title'
 const TITLE_HELP_ID = 'analysis-job-title-help'
@@ -38,6 +40,14 @@ const CONTENT_ERROR_ID = 'analysis-job-content-error'
 
 function fieldDescription(helpId: string, errorId: string, hasError: boolean) {
   return hasError ? `${helpId} ${errorId}` : helpId
+}
+
+function fileDescription(hasFile: boolean, hasError: boolean) {
+  return [
+    FILE_HELP_ID,
+    ...(hasFile ? [FILE_NAME_ID, FILE_SIZE_ID] : []),
+    ...(hasError ? [FILE_ERROR_ID] : []),
+  ].join(' ')
 }
 
 function formatFileSize(bytes: number) {
@@ -64,7 +74,7 @@ export function NewAnalysisPage() {
   const dragDepthRef = useRef(0)
   const submissionInFlightRef = useRef(false)
   const submissionAbortControllerRef = useRef<AbortController | null>(null)
-  const isMountedRef = useRef(true)
+  const isMountedRef = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submissionError, setSubmissionError] =
@@ -86,8 +96,15 @@ export function NewAnalysisPage() {
   })
   const selectedFile = useWatch({ control, name: 'file' })
   const jobTitle = useWatch({ control, name: 'jobTitle' }) ?? ''
-  const jobTitleRegistration = register('jobTitle')
-  const jobContentRegistration = register('jobContent')
+  const clearSubmissionError = () => {
+    setSubmissionError(null)
+  }
+  const jobTitleRegistration = register('jobTitle', {
+    onChange: clearSubmissionError,
+  })
+  const jobContentRegistration = register('jobContent', {
+    onChange: clearSubmissionError,
+  })
 
   useEffect(() => {
     isMountedRef.current = true
@@ -99,25 +116,33 @@ export function NewAnalysisPage() {
     }
   }, [])
 
-  const chooseFile = (file: File | undefined) => {
+  const selectFile = (
+    file: File | undefined,
+    nativeInput = fileInputRef.current,
+  ) => {
     if (isSubmitting) {
       return
     }
 
+    clearSubmissionError()
     if (file === undefined) {
       resetField('file')
-      return
+    } else {
+      setValue('file', file, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      })
     }
 
-    setValue('file', file, {
-      shouldDirty: true,
-      shouldTouch: true,
-      shouldValidate: true,
-    })
+    if (nativeInput !== null) {
+      nativeInput.value = ''
+    }
   }
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    chooseFile(event.currentTarget.files?.[0])
+    const nativeInput = event.currentTarget
+    selectFile(nativeInput.files?.[0], nativeInput)
   }
 
   const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
@@ -152,14 +177,11 @@ export function NewAnalysisPage() {
     }
     dragDepthRef.current = 0
     setIsDragging(false)
-    if (fileInputRef.current !== null) {
-      fileInputRef.current.value = ''
-    }
-    chooseFile(event.dataTransfer.files[0])
+    selectFile(event.dataTransfer.files[0])
   }
 
   const submitForm = (values: AnalysisFormValues) => {
-    if (submissionInFlightRef.current) {
+    if (!isMountedRef.current || submissionInFlightRef.current) {
       return
     }
 
@@ -231,6 +253,7 @@ export function NewAnalysisPage() {
         className="analysis-form"
         noValidate
         onSubmit={handleFormSubmit}
+        onSubmitCapture={clearSubmissionError}
       >
         <section
           aria-labelledby="analysis-resume-heading"
@@ -273,9 +296,8 @@ export function NewAnalysisPage() {
               render={({ field }) => (
                 <input
                   accept=".pdf,.docx"
-                  aria-describedby={fieldDescription(
-                    FILE_HELP_ID,
-                    FILE_ERROR_ID,
+                  aria-describedby={fileDescription(
+                    selectedFile !== undefined,
                     errors.file !== undefined,
                   )}
                   aria-invalid={errors.file ? true : undefined}
@@ -312,8 +334,10 @@ export function NewAnalysisPage() {
             {selectedFile ? (
               <>
                 <FileText aria-hidden="true" size={18} />
-                <span className="analysis-file-name">{selectedFile.name}</span>
-                <span className="analysis-file-size">
+                <span className="analysis-file-name" id={FILE_NAME_ID}>
+                  {selectedFile.name}
+                </span>
+                <span className="analysis-file-size" id={FILE_SIZE_ID}>
                   {formatFileSize(selectedFile.size)}
                 </span>
               </>
