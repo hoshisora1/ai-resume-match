@@ -5,7 +5,10 @@ import { Link, useParams } from 'react-router'
 
 import { getMatchReport, retryAnalysisTask } from '../../shared/api/analyses'
 import { ApiError } from '../../shared/api/client'
-import type { AnalysisTask } from '../../shared/api/schemas'
+import type {
+  AnalysisStatus,
+  AnalysisTask,
+} from '../../shared/api/schemas'
 import { AsyncState } from '../../shared/components/AsyncState'
 import { Button } from '../../shared/components/Button'
 import { CopyReference } from '../../shared/components/CopyReference'
@@ -35,6 +38,23 @@ function requestIdFrom(error: unknown) {
 
   const requestId = error.requestId?.trim()
   return requestId ? requestId : undefined
+}
+
+function mergeRetryTask(
+  currentTask: AnalysisTask | undefined,
+  retryTask: AnalysisTask,
+) {
+  if (currentTask === undefined) {
+    return retryTask
+  }
+
+  return {
+    ...retryTask,
+    jobTitle: retryTask.jobTitle ?? currentTask.jobTitle,
+    resumeFileName:
+      retryTask.resumeFileName ?? currentTask.resumeFileName,
+    matchScore: retryTask.matchScore ?? currentTask.matchScore,
+  }
 }
 
 function failureSummary(task: AnalysisTask) {
@@ -144,6 +164,34 @@ interface TaskStatusSectionProps {
   retryError: unknown
   retryPending: boolean
   task: AnalysisTask
+}
+
+const TASK_STATUS_ANNOUNCEMENTS: Record<AnalysisStatus, string> = {
+  PENDING: '任务状态：待处理。',
+  RUNNING: '任务状态：分析中。',
+  SUCCESS: '任务状态：已完成。',
+  FAILED_RETRYABLE: '任务状态：可重试失败。',
+  FAILED_FINAL: '任务状态：最终失败。',
+  CANCELLED: '任务状态：已取消。',
+  FAILED: '任务状态：分析失败。',
+}
+
+function TaskStatusAnnouncer({
+  status,
+}: {
+  status: AnalysisStatus | undefined
+}) {
+  return (
+    <p
+      aria-atomic="true"
+      aria-label="任务状态更新"
+      aria-live="polite"
+      className="analysis-detail__status-announcement"
+      role="status"
+    >
+      {status === undefined ? null : TASK_STATUS_ANNOUNCEMENTS[status]}
+    </p>
+  )
 }
 
 function TaskStatusSection({
@@ -322,22 +370,31 @@ function ValidAnalysisDetail({ taskId }: { taskId: number }) {
       retryControllerRef.current = controller
       return retryAnalysisTask(taskId, controller.signal)
     },
-    onSuccess: async (task) => {
-      queryClient.setQueryData(analysisTaskQueryKey(taskId), task)
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: analysisTaskQueryKey(taskId),
-        }),
-        queryClient.invalidateQueries({ queryKey: ['analyses'] }),
-        queryClient.invalidateQueries({ queryKey: analysisSummaryQueryKey }),
-        queryClient.invalidateQueries({
-          queryKey: analysisReportQueryKey(taskId),
-        }),
-      ])
+    onSuccess: (task) => {
+      queryClient.setQueryData<AnalysisTask>(
+        analysisTaskQueryKey(taskId),
+        (currentTask) => mergeRetryTask(currentTask, task),
+      )
     },
-    onSettled: () => {
-      retryControllerRef.current = null
-      retryInFlightRef.current = false
+    onSettled: async () => {
+      try {
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: analysisTaskQueryKey(taskId),
+            exact: true,
+          }),
+          queryClient.invalidateQueries({ queryKey: ['analyses'] }),
+          queryClient.invalidateQueries({
+            queryKey: analysisSummaryQueryKey,
+          }),
+          queryClient.invalidateQueries({
+            queryKey: analysisReportQueryKey(taskId),
+          }),
+        ])
+      } finally {
+        retryControllerRef.current = null
+        retryInFlightRef.current = false
+      }
     },
   })
 
@@ -348,6 +405,10 @@ function ValidAnalysisDetail({ taskId }: { taskId: number }) {
       retryInFlightRef.current = false
     }
   }, [])
+
+  const taskStatusAnnouncer = (
+    <TaskStatusAnnouncer status={taskQuery.data?.status} />
+  )
 
   const retryTask = () => {
     if (retryInFlightRef.current) {
@@ -360,34 +421,41 @@ function ValidAnalysisDetail({ taskId }: { taskId: number }) {
 
   if (taskQuery.isPending) {
     return (
-      <AsyncState
-        className="analysis-detail__page-state"
-        label="正在加载分析详情"
-        state="loading"
-      />
+      <>
+        {taskStatusAnnouncer}
+        <AsyncState
+          className="analysis-detail__page-state"
+          label="正在加载分析详情"
+          state="loading"
+        />
+      </>
     )
   }
 
   if (taskQuery.data === undefined) {
     const requestId = requestIdFrom(taskQuery.error)
     return (
-      <div className="analysis-detail__page-state analysis-detail__load-error">
-        <AsyncState
-          description="请检查服务连接后重试。"
-          onRetry={() => void taskQuery.refetch()}
-          state="error"
-          title="分析详情加载失败"
-        />
-        {requestId !== undefined ? (
-          <CopyReference label="请求 ID" value={requestId} />
-        ) : null}
-      </div>
+      <>
+        {taskStatusAnnouncer}
+        <div className="analysis-detail__page-state analysis-detail__load-error">
+          <AsyncState
+            description="请检查服务连接后重试。"
+            onRetry={() => void taskQuery.refetch()}
+            state="error"
+            title="分析详情加载失败"
+          />
+          {requestId !== undefined ? (
+            <CopyReference label="请求 ID" value={requestId} />
+          ) : null}
+        </div>
+      </>
     )
   }
 
   const task = taskQuery.data
   return (
     <>
+      {taskStatusAnnouncer}
       {taskQuery.isError ? (
         <TaskConnectionBanner
           error={taskQuery.error}

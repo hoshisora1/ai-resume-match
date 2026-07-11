@@ -89,3 +89,21 @@ test('renders dangerous-scheme link labels as non-clickable text', () => {
     screen.queryByRole('link', { name: '数据链接' }),
   ).not.toBeInTheDocument()
 })
+
+test('omits every Markdown image without exposing a source URL', () => {
+  const imageReport = {
+    ...report,
+    reportContent: `![external tracker](https://images.example/private.png)
+![embedded bitmap](data:image/png;base64,cHJpdmF0ZQ==)
+![external svg](https://images.example/private.svg?candidate=42)
+![embedded svg](data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%3E%3C/svg%3E)`,
+  }
+
+  const { container } = render(<MatchReport report={imageReport} />)
+
+  expect(container.querySelector('img')).toBeNull()
+  expect(container.querySelector('[src]')).toBeNull()
+  expect(screen.getAllByText('图片已省略')).toHaveLength(4)
+  expect(container).not.toHaveTextContent('https://images.example')
+  expect(container).not.toHaveTextContent('data:image')
+})

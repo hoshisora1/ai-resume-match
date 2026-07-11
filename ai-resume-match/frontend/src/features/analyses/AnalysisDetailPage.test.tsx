@@ -210,6 +210,75 @@ test('shows compact task metadata with stable nullable and local date formatting
   expect(metadataValue('下次重试')).toHaveTextContent('2026-07-10 09:10')
 })
 
+test('announces business status changes in one stable live region and keeps transport errors in an alert', async () => {
+  let requestCount = 0
+  let releaseInitialTask: () => void = () => undefined
+  const initialTaskGate = new Promise<void>((resolve) => {
+    releaseInitialTask = resolve
+  })
+  server.use(
+    http.get(`/api/analysis/${TASK_ID}`, async () => {
+      requestCount += 1
+      if (requestCount === 1) {
+        await initialTaskGate
+        return HttpResponse.json(createTask('PENDING'))
+      }
+      if (requestCount === 2) {
+        return HttpResponse.json(createTask('RUNNING'))
+      }
+      return HttpResponse.error()
+    }),
+  )
+  const { queryClient } = renderDetail()
+
+  try {
+    const statusRegion = screen.getByRole('status', {
+      name: '任务状态更新',
+    })
+    expect(statusRegion).toHaveAttribute('aria-live', 'polite')
+    expect(statusRegion).toHaveAttribute('aria-atomic', 'true')
+    expect(statusRegion).toBeEmptyDOMElement()
+
+    releaseInitialTask()
+    await waitFor(() => {
+      expect(statusRegion).toHaveTextContent('任务状态：待处理。')
+    })
+
+    await act(async () => {
+      await queryClient.refetchQueries({
+        queryKey: analysisTaskQueryKey(TASK_ID),
+        exact: true,
+      })
+    })
+
+    expect(
+      screen.getByRole('status', { name: '任务状态更新' }),
+    ).toBe(statusRegion)
+    await waitFor(() => {
+      expect(statusRegion).toHaveTextContent('任务状态：分析中。')
+    })
+
+    await act(async () => {
+      await queryClient.refetchQueries({
+        queryKey: analysisTaskQueryKey(TASK_ID),
+        exact: true,
+      })
+    })
+
+    const transportAlert = await screen.findByRole('alert')
+    expect(transportAlert).toHaveTextContent(
+      '连接中断，当前显示上次获取的任务状态。',
+    )
+    expect(
+      screen.getByRole('status', { name: '任务状态更新' }),
+    ).toBe(statusRegion)
+    expect(statusRegion).toHaveTextContent('任务状态：分析中。')
+    expect(statusRegion).not.toHaveTextContent('连接中断')
+  } finally {
+    releaseInitialTask()
+  }
+})
+
 test('keeps the last-known business status after a network failure and manually refreshes it', async () => {
   let requestCount = 0
   server.use(
@@ -371,6 +440,7 @@ test('retries only once, updates the task cache immediately and invalidates rela
   await waitFor(() => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: analysisTaskQueryKey(TASK_ID),
+      exact: true,
     })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['analyses'] })
     expect(invalidateSpy).toHaveBeenCalledWith({
@@ -380,7 +450,112 @@ test('retries only once, updates the task cache immediately and invalidates rela
       queryKey: analysisReportQueryKey(TASK_ID),
     })
   })
+  expect(invalidateSpy).toHaveBeenCalledTimes(4)
   expect(retryRequestCount).toBe(1)
+})
+
+test('preserves enhanced metadata from a null retry DTO when the task refresh fails', async () => {
+  const initialTask = createTask('FAILED_RETRYABLE', {
+    jobTitle: '增强岗位元数据',
+    resumeFileName: 'enhanced-resume.pdf',
+    matchScore: 73,
+  })
+  const retryResponse = createTask('PENDING', {
+    jobTitle: null,
+    resumeFileName: null,
+    matchScore: null,
+    attemptCount: 3,
+    maxAttempts: 4,
+    updatedAt: '2026-07-10T09:06:00',
+  })
+  let taskRequestCount = 0
+  server.use(
+    http.get(`/api/analysis/${TASK_ID}`, () => {
+      taskRequestCount += 1
+      return taskRequestCount === 1
+        ? HttpResponse.json(initialTask)
+        : HttpResponse.error()
+    }),
+    http.post(`/api/analysis/${TASK_ID}/retry`, () =>
+      HttpResponse.json(retryResponse),
+    ),
+  )
+  const { queryClient } = renderDetail()
+  const user = userEvent.setup()
+
+  await user.click(
+    await screen.findByRole('button', { name: '重新分析' }),
+  )
+
+  expect(await screen.findByText('待处理')).toBeVisible()
+  expect(
+    await screen.findByText('连接中断，当前显示上次获取的任务状态。'),
+  ).toBeVisible()
+  expect(metadataValue('岗位')).toHaveTextContent('增强岗位元数据')
+  expect(metadataValue('简历文件')).toHaveTextContent('enhanced-resume.pdf')
+
+  const cachedTask = queryClient.getQueryData<AnalysisTask>(
+    analysisTaskQueryKey(TASK_ID),
+  )
+  expect(cachedTask).toMatchObject({
+    status: 'PENDING',
+    attemptCount: 3,
+    maxAttempts: 4,
+    failureCode: null,
+    failureMessage: null,
+    nextRetryAt: null,
+    startedAt: null,
+    completedAt: null,
+    updatedAt: '2026-07-10T09:06:00',
+    jobTitle: '增强岗位元数据',
+    resumeFileName: 'enhanced-resume.pdf',
+    matchScore: 73,
+  })
+  expect(taskRequestCount).toBe(2)
+})
+
+test('resyncs the exact task when the retry response is lost after the server accepts it', async () => {
+  let serverStatus: AnalysisStatus = 'FAILED_RETRYABLE'
+  let taskRequestCount = 0
+  server.use(
+    http.get(`/api/analysis/${TASK_ID}`, () => {
+      taskRequestCount += 1
+      return HttpResponse.json(createTask(serverStatus))
+    }),
+    http.post(`/api/analysis/${TASK_ID}/retry`, () => {
+      serverStatus = 'PENDING'
+      return HttpResponse.error()
+    }),
+  )
+  const queryClient = createDetailQueryClient()
+  const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+  renderDetail(`/analyses/${TASK_ID}`, queryClient)
+  const user = userEvent.setup()
+
+  await user.click(
+    await screen.findByRole('button', { name: '重新分析' }),
+  )
+
+  expect(await screen.findByText('待处理')).toBeVisible()
+  expect(
+    screen.queryByRole('button', { name: '重新分析' }),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByText('重新分析失败，请稍后重试。'),
+  ).not.toBeInTheDocument()
+  expect(taskRequestCount).toBe(2)
+  expect(invalidateSpy).toHaveBeenCalledWith({
+    queryKey: analysisTaskQueryKey(TASK_ID),
+    exact: true,
+  })
+  expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['analyses'] })
+  expect(invalidateSpy).toHaveBeenCalledWith({
+    queryKey: analysisSummaryQueryKey,
+  })
+  expect(invalidateSpy).toHaveBeenCalledWith({
+    queryKey: analysisReportQueryKey(TASK_ID),
+  })
+  expect(invalidateSpy).toHaveBeenCalledTimes(4)
 })
 
 test('shows only a safe retry error and copies its transport request id', async () => {

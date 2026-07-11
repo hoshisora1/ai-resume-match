@@ -81,6 +81,7 @@ export function MatchReport({ report }: MatchReportProps) {
             a: ({ children, href }) => (
               <SafeMarkdownLink href={href}>{children}</SafeMarkdownLink>
             ),
+            img: () => <span className="match-report__image-omitted">图片已省略</span>,
             table: ({ children }) => (
               <div className="match-report__table-scroll">
                 <table>{children}</table>
