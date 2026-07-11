@@ -1,0 +1,31 @@
+services:
+  app:
+    environment:
+      AI_API_KEY: e2e-mock-key
+      AI_ENDPOINT: http://mock-ai:18089/v1/chat/completions
+      ANALYSIS_OUTBOX_FIXED_DELAY_MS: 500
+      ANALYSIS_OUTBOX_RETRY_DELAY: 1s
+      ANALYSIS_RETRY_DELAY: 1s
+      ANALYSIS_RETRY_SCHEDULER_FIXED_DELAY_MS: 1000
+    depends_on:
+      mock-ai:
+        condition: service_healthy
+
+  mock-ai:
+    image: node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
+    command: ["node", "/mock-ai/server.mjs"]
+    environment:
+      PORT: 18089
+    volumes:
+      - ./e2e/mock-ai/server.mjs:/mock-ai/server.mjs:ro
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:18089/health').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))"
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 2s
+    restart: "no"
