@@ -466,6 +466,36 @@ describe('apiRequest', () => {
     expect(error).not.toBeInstanceOf(ApiError)
     expect(error).toMatchObject({ name: 'AbortError' })
   })
+
+  test('forwards an explicit signal through the backend health request', async () => {
+    const controller = new AbortController()
+    let observedSignal: AbortSignal | null | undefined
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        observedSignal = init?.signal
+        return new Promise<Response>((_resolve, reject) => {
+          observedSignal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('Aborted', 'AbortError')),
+            { once: true },
+          )
+        })
+      },
+    )
+
+    try {
+      const request = getBackendHealth(controller.signal)
+      await Promise.resolve()
+
+      expect(observedSignal).toBe(controller.signal)
+
+      controller.abort()
+
+      await expect(request).rejects.toMatchObject({ name: 'AbortError' })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })
 
 describe('analysis endpoints', () => {

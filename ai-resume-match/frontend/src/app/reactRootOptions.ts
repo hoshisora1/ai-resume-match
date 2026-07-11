@@ -1,9 +1,11 @@
 import type { RootOptions } from 'react-dom/client'
 
-export const suppressCaughtErrorDetails: NonNullable<
-  RootOptions['onCaughtError']
-> = () => undefined
+type ReactRootErrorHandler = (error: unknown, errorInfo: unknown) => void
+
+export const suppressReactErrorDetails: ReactRootErrorHandler = () => undefined
 
 export const reactRootOptions = {
-  onCaughtError: suppressCaughtErrorDetails,
+  onCaughtError: suppressReactErrorDetails,
+  onUncaughtError: suppressReactErrorDetails,
+  onRecoverableError: suppressReactErrorDetails,
 } satisfies RootOptions

@@ -49,9 +49,12 @@ vi.mock('./app/router', () => ({
   createAppBrowserRouter: () => ({}),
 }))
 
-test('production root suppresses boundary-caught details and still renders the fallback', async () => {
+test('production root safely handles every React error category and still renders the fallback', async () => {
   const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
   const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+  const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+  const reportError = vi.fn()
+  vi.stubGlobal('reportError', reportError)
   const rootElement = document.createElement('div')
   rootElement.id = 'root'
   document.body.append(rootElement)
@@ -63,10 +66,34 @@ test('production root suppresses boundary-caught details and still renders the f
 
     expect(screen.getByRole('alert')).toHaveTextContent('页面暂时无法显示')
     expect(screen.queryByText('synthetic-private-render-error')).not.toBeInTheDocument()
+
+    const options = rootCapture.options
+    expect(options?.onCaughtError).toEqual(expect.any(Function))
+    expect(options?.onUncaughtError).toEqual(expect.any(Function))
+    expect(options?.onRecoverableError).toEqual(expect.any(Function))
+    expect(options?.onCaughtError).toBe(options?.onUncaughtError)
+    expect(options?.onCaughtError).toBe(options?.onRecoverableError)
+
+    const privateError = Object.assign(new Error('private-error-message'), {
+      props: { resume: 'private-resume-content' },
+    })
+    options?.onCaughtError?.(privateError, {
+      componentStack: 'private-component-stack',
+    })
+    options?.onUncaughtError?.(privateError, {
+      componentStack: 'private-component-stack',
+    })
+    options?.onRecoverableError?.(privateError, {
+      componentStack: 'private-component-stack',
+    })
+
     expect(consoleError.mock.calls).toHaveLength(0)
     expect(consoleLog.mock.calls).toHaveLength(0)
-    expect(rootCapture.options?.onCaughtError).toEqual(expect.any(Function))
-    expect(rootCapture.options).not.toHaveProperty('onUncaughtError')
+    expect(consoleWarn.mock.calls).toHaveLength(0)
+    expect(reportError).not.toHaveBeenCalled()
+    expect(document.body).not.toHaveTextContent('private-error-message')
+    expect(document.body).not.toHaveTextContent('private-component-stack')
+    expect(document.body).not.toHaveTextContent('private-resume-content')
   } finally {
     await act(async () => {
       rootCapture.root?.unmount()
@@ -74,5 +101,7 @@ test('production root suppresses boundary-caught details and still renders the f
     rootElement.remove()
     consoleError.mockRestore()
     consoleLog.mockRestore()
+    consoleWarn.mockRestore()
+    vi.unstubAllGlobals()
   }
 })

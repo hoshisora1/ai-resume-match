@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createRef } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
 import { Button } from './Button'
@@ -49,5 +50,13 @@ describe('Button', () => {
     await user.click(button)
 
     expect(onClick).not.toHaveBeenCalled()
+  })
+
+  test('forwards a ref to the underlying button element', () => {
+    const buttonRef = createRef<HTMLButtonElement>()
+
+    render(<Button ref={buttonRef}>保存</Button>)
+
+    expect(buttonRef.current).toBe(screen.getByRole('button', { name: '保存' }))
   })
 })

@@ -61,3 +61,39 @@ test('keeps both actions disabled when there are no pages', async () => {
 
   expect(onPageChange).not.toHaveBeenCalled()
 })
+
+test('clamps a negative page to the first page without locking navigation', async () => {
+  const onPageChange = vi.fn()
+  const user = userEvent.setup()
+
+  render(<Pagination page={-4} totalPages={3} onPageChange={onPageChange} />)
+
+  expect(screen.getByText('第 1 / 3 页')).toBeVisible()
+  expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled()
+
+  await user.click(screen.getByRole('button', { name: '下一页' }))
+
+  expect(onPageChange).toHaveBeenCalledWith(1)
+})
+
+test('clamps a page past the end and only emits an in-range previous page', async () => {
+  const onPageChange = vi.fn()
+  const user = userEvent.setup()
+
+  render(<Pagination page={99} totalPages={3} onPageChange={onPageChange} />)
+
+  expect(screen.getByText('第 3 / 3 页')).toBeVisible()
+  expect(screen.getByRole('button', { name: '下一页' })).toBeDisabled()
+
+  await user.click(screen.getByRole('button', { name: '上一页' }))
+
+  expect(onPageChange).toHaveBeenCalledWith(1)
+})
+
+test('shows a stable single page with both actions disabled', () => {
+  render(<Pagination page={8} totalPages={1} onPageChange={vi.fn()} />)
+
+  expect(screen.getByText('第 1 / 1 页')).toBeVisible()
+  expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '下一页' })).toBeDisabled()
+})

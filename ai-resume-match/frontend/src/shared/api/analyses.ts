@@ -65,6 +65,10 @@ export function getMatchReport(taskId: number) {
   return apiRequest(`/api/analysis/${taskId}/report`, matchReportSchema)
 }
 
-export function getBackendHealth() {
-  return apiRequest('/backend-health', healthSchema)
+export function getBackendHealth(signal?: AbortSignal) {
+  return apiRequest(
+    '/backend-health',
+    healthSchema,
+    signal ? { signal } : undefined,
+  )
 }

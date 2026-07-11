@@ -55,6 +55,23 @@ svg {
   min-height: 100vh;
 }
 
+.skip-link {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 100;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-white);
+  color: var(--color-ink);
+  font-weight: 700;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
@@ -161,11 +178,18 @@ svg {
   min-width: 8.5rem;
   min-height: 2.5rem;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: var(--space-2);
   color: var(--color-ink-soft);
   font-size: 0.875rem;
   white-space: nowrap;
+}
+
+.backend-health__summary {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .backend-health__cue {
@@ -178,6 +202,20 @@ svg {
 .backend-health[data-health="connected"] .backend-health__cue {
   border-color: var(--color-teal);
   background: var(--color-teal);
+}
+
+.backend-health[data-health="checking"] .backend-health__cue {
+  border-color: var(--color-ink-muted);
+}
+
+.backend-health__retry {
+  width: 2rem;
+  height: 2rem;
+  flex-basis: 2rem;
+}
+
+.is-spinning {
+  animation: spin 0.9s linear infinite;
 }
 
 .app-main {
@@ -427,6 +465,10 @@ svg {
   text-align: center;
 }
 
+.error-boundary__alert {
+  text-align: center;
+}
+
 .error-boundary__icon {
   color: var(--color-danger);
 }
@@ -450,6 +492,12 @@ svg {
   justify-content: center;
   gap: var(--space-2);
   margin-top: var(--space-6);
+}
+
+.error-boundary .error-boundary__copy-status {
+  min-height: 1.5rem;
+  margin-top: var(--space-3);
+  font-size: 0.875rem;
 }
 
 @keyframes spin {

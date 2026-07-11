@@ -11,19 +11,24 @@ export function Pagination({
   page,
   totalPages,
 }: PaginationProps) {
-  const pageCount = Math.max(0, Math.trunc(totalPages))
-  const hasValidPage =
-    Number.isInteger(page) && page >= 0 && page < pageCount
-  const canGoBack = hasValidPage && page > 0
-  const canGoForward = hasValidPage && page < pageCount - 1
-  const visiblePage = hasValidPage ? page + 1 : 0
+  const pageCount = Number.isFinite(totalPages)
+    ? Math.max(0, Math.trunc(totalPages))
+    : 0
+  const requestedPage = Number.isFinite(page) ? Math.trunc(page) : 0
+  const currentPage =
+    pageCount === 0
+      ? 0
+      : Math.min(Math.max(requestedPage, 0), pageCount - 1)
+  const canGoBack = pageCount > 0 && currentPage > 0
+  const canGoForward = pageCount > 0 && currentPage < pageCount - 1
+  const visiblePage = pageCount > 0 ? currentPage + 1 : 0
 
   function changePage(nextPage: number) {
     if (
       Number.isInteger(nextPage) &&
       nextPage >= 0 &&
       nextPage < pageCount &&
-      nextPage !== page
+      nextPage !== currentPage
     ) {
       onPageChange(nextPage)
     }
@@ -35,7 +40,7 @@ export function Pagination({
         aria-label="上一页"
         className="icon-button pagination__button"
         disabled={!canGoBack}
-        onClick={() => changePage(page - 1)}
+        onClick={() => changePage(currentPage - 1)}
         title="上一页"
         type="button"
       >
@@ -48,7 +53,7 @@ export function Pagination({
         aria-label="下一页"
         className="icon-button pagination__button"
         disabled={!canGoForward}
-        onClick={() => changePage(page + 1)}
+        onClick={() => changePage(currentPage + 1)}
         title="下一页"
         type="button"
       >
