@@ -1,0 +1,159 @@
+.analysis-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-height: 26rem;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+}
+
+.analysis-table-wrap--recent,
+.analysis-table-loading--recent {
+  min-height: 22.25rem;
+}
+
+.analysis-table-loading {
+  width: 100%;
+  min-width: 0;
+}
+
+.analysis-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.analysis-table__col--title {
+  width: 34%;
+}
+
+.analysis-table__col--resume {
+  width: 22%;
+}
+
+.analysis-table__col--score {
+  width: 10%;
+}
+
+.analysis-table__col--status {
+  width: 16%;
+}
+
+.analysis-table__col--completed {
+  width: 18%;
+}
+
+.analysis-table th,
+.analysis-table td {
+  height: 3.75rem;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-ink-soft);
+  font-size: 0.875rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.analysis-table thead th {
+  height: 3.5rem;
+  background: #eef2f3;
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.analysis-table tbody th {
+  color: var(--color-ink);
+  font-weight: 650;
+}
+
+.analysis-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.analysis-table__title-link,
+.analysis-table__filename {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-table__title-link {
+  color: var(--color-ink);
+  text-decoration-color: #9eb4b5;
+  text-underline-offset: 0.2em;
+}
+
+.analysis-table__title-link:hover {
+  color: var(--color-teal);
+  text-decoration-color: currentColor;
+}
+
+.analysis-table__cell--score {
+  color: var(--color-teal);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.analysis-table__cell--completed {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.skeleton-line {
+  display: block;
+  width: min(100%, 8rem);
+  height: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: #e1e7e9;
+}
+
+.skeleton-line--title {
+  width: min(100%, 13rem);
+}
+
+.skeleton-line--short {
+  width: 2.5rem;
+}
+
+.skeleton-line--badge {
+  width: 4.75rem;
+  height: 1.5rem;
+}
+
+@media (max-width: 48rem) {
+  .analysis-table__col--resume,
+  .analysis-table__cell--resume,
+  .analysis-table__col--completed,
+  .analysis-table__cell--completed {
+    display: none;
+  }
+
+  .analysis-table__col--title {
+    width: auto;
+  }
+
+  .analysis-table__col--score {
+    width: 4.75rem;
+  }
+
+  .analysis-table__col--status {
+    width: 7.75rem;
+  }
+
+  .analysis-table th,
+  .analysis-table td {
+    padding: var(--space-2);
+  }
+
+  .analysis-table__cell--score {
+    text-align: center;
+  }
+}

@@ -1,0 +1,119 @@
+.analyses-page {
+  min-width: 0;
+}
+
+.analyses-page__header {
+  display: flex;
+  min-width: 0;
+  min-height: 2.25rem;
+  align-items: center;
+}
+
+.analyses-page__header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.25;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.analyses-toolbar {
+  display: flex;
+  min-width: 0;
+  min-height: 5rem;
+  align-items: end;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border-block: 1px solid var(--color-border);
+  background: var(--color-white);
+}
+
+.analyses-filter {
+  display: grid;
+  min-width: 12rem;
+  gap: var(--space-1);
+}
+
+.analyses-filter--size {
+  min-width: 7.5rem;
+}
+
+.analyses-filter label {
+  color: var(--color-ink-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.analyses-filter select {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: var(--space-2) 2rem var(--space-2) var(--space-3);
+  border: 1px solid #adbbc0;
+  border-radius: var(--radius-sm);
+  background: var(--color-white);
+  color: var(--color-ink);
+}
+
+.analyses-results {
+  min-width: 0;
+  margin-top: var(--space-4);
+}
+
+.analyses-results__summary {
+  min-height: 2rem;
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.analyses-results__pagination {
+  display: flex;
+  min-width: 0;
+  justify-content: flex-end;
+  margin-top: var(--space-4);
+}
+
+.analyses-page-state {
+  min-height: 30rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+}
+
+.analyses-empty-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: var(--space-6);
+}
+
+.analyses-empty-action .async-state {
+  min-height: auto;
+  padding: 0 0 var(--space-4);
+}
+
+@media (max-width: 48rem) {
+  .analyses-page__header h1 {
+    font-size: 1.5rem;
+  }
+
+  .analyses-toolbar {
+    display: grid;
+    align-items: end;
+    gap: var(--space-3);
+    grid-template-columns: minmax(0, 1fr) 7rem;
+    padding-inline: 0;
+    background: transparent;
+  }
+
+  .analyses-filter,
+  .analyses-filter--size {
+    min-width: 0;
+  }
+
+  .analyses-results__pagination {
+    justify-content: center;
+  }
+}

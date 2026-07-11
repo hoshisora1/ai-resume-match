@@ -1,5 +1,7 @@
 import { createBrowserRouter, type RouteObject } from 'react-router'
 
+import { AnalysesPage } from '../features/analyses/AnalysesPage'
+import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { AppShell } from './AppShell'
 import { ErrorBoundary } from './ErrorBoundary'
 import { PlaceholderPage } from './routeElements'
@@ -13,8 +15,8 @@ export const appRoutes = [
       </ErrorBoundary>
     ),
     children: [
-      { index: true, element: <PlaceholderPage title="分析总览" /> },
-      { path: 'analyses', element: <PlaceholderPage title="分析历史" /> },
+      { index: true, element: <DashboardPage /> },
+      { path: 'analyses', element: <AnalysesPage /> },
       { path: 'analyses/new', element: <PlaceholderPage title="新建分析" /> },
       { path: 'analyses/:taskId', element: <PlaceholderPage title="分析详情" /> },
     ],
