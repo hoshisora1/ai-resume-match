@@ -20,11 +20,18 @@ export interface CreateAnalysisSubmissionInput {
   jobContent: string
 }
 
-export function getAnalysisSummary() {
-  return apiRequest('/api/analysis/summary', analysisSummarySchema)
+export function getAnalysisSummary(signal?: AbortSignal) {
+  return apiRequest(
+    '/api/analysis/summary',
+    analysisSummarySchema,
+    signal ? { signal } : undefined,
+  )
 }
 
-export function listAnalyses({ status, page, size }: ListAnalysesParams) {
+export function listAnalyses(
+  { status, page, size }: ListAnalysesParams,
+  signal?: AbortSignal,
+) {
   const searchParams = new URLSearchParams()
   if (status !== undefined) {
     searchParams.set('status', status)
@@ -32,7 +39,11 @@ export function listAnalyses({ status, page, size }: ListAnalysesParams) {
   searchParams.set('page', String(page))
   searchParams.set('size', String(size))
 
-  return apiRequest(`/api/analysis?${searchParams.toString()}`, analysisPageSchema)
+  return apiRequest(
+    `/api/analysis?${searchParams.toString()}`,
+    analysisPageSchema,
+    signal ? { signal } : undefined,
+  )
 }
 
 export function createAnalysisSubmission({

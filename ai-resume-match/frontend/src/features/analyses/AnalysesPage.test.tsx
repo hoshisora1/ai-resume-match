@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { existsSync, readFileSync } from 'node:fs'
@@ -9,6 +9,7 @@ import { afterEach, expect, test } from 'vitest'
 import { createMemoryRouter } from 'react-router'
 
 import { App } from '../../app/App'
+import { createQueryClient } from '../../app/queryClient'
 import { appRoutes, type AppRouter } from '../../app/router'
 import { server } from '../../test/server'
 
@@ -37,19 +38,32 @@ interface RenderedApp {
 
 const renderedApps: RenderedApp[] = []
 
-function renderHistory(initialEntry = '/analyses') {
+function createProductionTestQueryClient() {
+  const queryClient = createQueryClient()
+  const defaultOptions = queryClient.getDefaultOptions()
+  queryClient.setDefaultOptions({
+    ...defaultOptions,
+    queries: {
+      ...defaultOptions.queries,
+      gcTime: Infinity,
+      retryDelay: 0,
+    },
+  })
+  return queryClient
+}
+
+function renderHistory(
+  initialEntry: string | string[] = '/analyses',
+  onRouterCreated?: (router: AppRouter) => void,
+) {
   server.use(
     http.get('/backend-health', () => HttpResponse.json({ status: 'UP' })),
   )
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { gcTime: Infinity, retry: false },
-      mutations: { retry: false },
-    },
-  })
+  const queryClient = createProductionTestQueryClient()
   const router: AppRouter = createMemoryRouter(appRoutes, {
-    initialEntries: [initialEntry],
+    initialEntries: Array.isArray(initialEntry) ? initialEntry : [initialEntry],
   })
+  onRouterCreated?.(router)
   const rendered = render(<App queryClient={queryClient} router={router} />)
   renderedApps.push({ queryClient, router, unmount: rendered.unmount })
 
@@ -108,7 +122,125 @@ test('keeps a six-row history table footprint while data is loading', async () =
   }
 })
 
-test('normalizes invalid URL filters with replace and requests the canonical query', async () => {
+test.each([
+  {
+    caseName: 'scientific notation',
+    initialEntry: '/analyses?page=1e3&size=2e1',
+    expectedSearch: '?page=0&size=20',
+    expectedPage: '0',
+    expectedSize: '20',
+  },
+  {
+    caseName: 'floating point notation',
+    initialEntry: '/analyses?page=1.0&size=20.0',
+    expectedSearch: '?page=0&size=20',
+    expectedPage: '0',
+    expectedSize: '20',
+  },
+  {
+    caseName: 'a page above Java Integer.MAX_VALUE',
+    initialEntry: '/analyses?page=2147483648&size=20',
+    expectedSearch: '?page=0&size=20',
+    expectedPage: '0',
+    expectedSize: '20',
+  },
+  {
+    caseName: 'negative values',
+    initialEntry: '/analyses?page=-1&size=-20',
+    expectedSearch: '?page=0&size=20',
+    expectedPage: '0',
+    expectedSize: '20',
+  },
+  {
+    caseName: 'explicit plus signs',
+    initialEntry: '/analyses?page=%2B1&size=%2B20',
+    expectedSearch: '?page=0&size=20',
+    expectedPage: '0',
+    expectedSize: '20',
+  },
+  {
+    caseName: 'empty values',
+    initialEntry: '/analyses?page=&size=',
+    expectedSearch: '?page=0&size=20',
+    expectedPage: '0',
+    expectedSize: '20',
+  },
+  {
+    caseName: 'duplicate values',
+    initialEntry: '/analyses?page=1&page=2&size=10&size=50',
+    expectedSearch: '?page=0&size=20',
+    expectedPage: '0',
+    expectedSize: '20',
+  },
+  {
+    caseName: 'non-canonical leading zeroes',
+    initialEntry: '/analyses?page=01&size=020',
+    expectedSearch: '?page=0&size=20',
+    expectedPage: '0',
+    expectedSize: '20',
+  },
+  {
+    caseName: 'an arbitrary in-range page size',
+    initialEntry: '/analyses?page=3&size=19',
+    expectedSearch: '?page=3&size=19',
+    expectedPage: '3',
+    expectedSize: '19',
+  },
+  {
+    caseName: 'the legal upper bounds',
+    initialEntry: '/analyses?page=2147483647&size=100',
+    expectedSearch: '?page=2147483647&size=100',
+    expectedPage: '2147483647',
+    expectedSize: '100',
+  },
+])(
+  'strictly canonicalizes $caseName before issuing one query',
+  async ({ initialEntry, expectedPage, expectedSearch, expectedSize }) => {
+    const observedUrls: URL[] = []
+    const observedLocationSearches: string[] = []
+    let requestRouter: AppRouter | undefined
+    server.use(
+      http.get('/api/analysis', ({ request }) => {
+        const observedUrl = new URL(request.url)
+        observedUrls.push(observedUrl)
+        observedLocationSearches.push(
+          requestRouter?.state.location.search ?? 'ROUTER_NOT_READY',
+        )
+        return HttpResponse.json(
+          pageResponse({
+            items: [],
+            page: Number(observedUrl.searchParams.get('page')),
+            size: Number(observedUrl.searchParams.get('size')),
+            totalElements: 0,
+          }),
+        )
+      }),
+    )
+
+    const { router } = renderHistory(initialEntry, (createdRouter) => {
+      requestRouter = createdRouter
+    })
+
+    await waitFor(() => {
+      expect(router.state.location.search).toBe(expectedSearch)
+    })
+    await waitFor(() => {
+      expect(observedUrls).toHaveLength(1)
+    })
+    const initialSearch = initialEntry.slice(initialEntry.indexOf('?'))
+    expect(router.state.historyAction).toBe(
+      initialSearch === expectedSearch ? 'POP' : 'REPLACE',
+    )
+    expect(observedUrls[0]?.searchParams.get('page')).toBe(expectedPage)
+    expect(observedUrls[0]?.searchParams.get('size')).toBe(expectedSize)
+    expect(observedLocationSearches).toEqual([expectedSearch])
+  },
+)
+
+test.each([
+  '/analyses?status=UNKNOWN&page=0&size=20',
+  '/analyses?status=SUCCESS&status=FAILED&page=0&size=20',
+])('normalizes an unknown or repeated status to all statuses: %s', async (url) => {
   let observedUrl: URL | undefined
   server.use(
     http.get('/api/analysis', ({ request }) => {
@@ -117,17 +249,14 @@ test('normalizes invalid URL filters with replace and requests the canonical que
     }),
   )
 
-  const { router } = renderHistory(
-    '/analyses?status=UNKNOWN&page=-2.5&size=19&ignored=value',
-  )
+  const { router } = renderHistory(url)
 
   await waitFor(() => {
     expect(router.state.location.search).toBe('?page=0&size=20')
-    expect(router.state.historyAction).toBe('REPLACE')
   })
+  expect(router.state.historyAction).toBe('REPLACE')
   expect(observedUrl?.searchParams.has('status')).toBe(false)
-  expect(observedUrl?.searchParams.get('page')).toBe('0')
-  expect(observedUrl?.searchParams.get('size')).toBe('20')
+  expect(screen.getByRole('combobox', { name: '状态' })).toHaveValue('')
 })
 
 test('uses the URL as the filter source and exposes every backend status label', async () => {
@@ -233,6 +362,7 @@ test('updates page and page size in the URL', async () => {
 
   await waitFor(() => {
     expect(router.state.location.search).toBe('?page=1&size=20')
+    expect(router.state.historyAction).toBe('REPLACE')
   })
 
   await user.selectOptions(
@@ -243,6 +373,52 @@ test('updates page and page size in the URL', async () => {
   await waitFor(() => {
     expect(router.state.location.search).toBe('?page=0&size=50')
   })
+})
+
+test('replaces page navigation and correction so Back never lands on a visually identical page', async () => {
+  let pageOneRequested = false
+  server.use(
+    http.get('/api/analysis', ({ request }) => {
+      const url = new URL(request.url)
+      const page = Number(url.searchParams.get('page'))
+      const size = Number(url.searchParams.get('size'))
+
+      if (page === 1) {
+        pageOneRequested = true
+        return HttpResponse.json(
+          pageResponse({ items: [], page, size, totalElements: 1 }),
+        )
+      }
+
+      return HttpResponse.json(
+        pageResponse({
+          page,
+          size,
+          totalElements: pageOneRequested ? 1 : 40,
+        }),
+      )
+    }),
+  )
+  const user = userEvent.setup()
+  const { router } = renderHistory([
+    '/analyses/new',
+    '/analyses?page=0&size=20',
+  ])
+
+  expect(await screen.findByText('第 1 / 2 页')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: '下一页' }))
+
+  await waitFor(() => {
+    expect(pageOneRequested).toBe(true)
+    expect(router.state.location.search).toBe('?page=0&size=20')
+    expect(router.state.historyAction).toBe('REPLACE')
+  })
+  expect(await screen.findByText('第 1 / 1 页')).toBeVisible()
+
+  await router.navigate(-1)
+
+  expect(await screen.findByRole('heading', { name: '新建分析' })).toBeVisible()
+  expect(router.state.location.pathname).toBe('/analyses/new')
 })
 
 test('accepts the Pagination owner correction for an out-of-range page', async () => {
@@ -292,8 +468,8 @@ test('distinguishes an empty history from an empty filtered result', async () =>
   const history = await screen.findByRole('region', { name: '分析历史' })
   expect(await within(history).findByText('还没有分析记录')).toBeVisible()
   expect(
-    within(history).getByRole('button', { name: '新建分析' }),
-  ).toBeVisible()
+    within(history).getByRole('link', { name: '新建分析' }),
+  ).toHaveAttribute('href', '/analyses/new')
 
   await user.selectOptions(screen.getByRole('combobox', { name: '状态' }), 'FAILED')
 
@@ -306,12 +482,12 @@ test('distinguishes an empty history from an empty filtered result', async () =>
   })
 })
 
-test('retries an API error without changing the current URL', async () => {
+test('exhausts the production retry once, then manually succeeds without changing the URL', async () => {
   let requestCount = 0
   server.use(
     http.get('/api/analysis', () => {
       requestCount += 1
-      return requestCount === 1
+      return requestCount <= 2
         ? HttpResponse.json(
             { code: 'LIST_UNAVAILABLE', message: 'Unavailable', requestId: null },
             { status: 503 },
@@ -327,13 +503,78 @@ test('retries an API error without changing the current URL', async () => {
   )
 
   expect(await screen.findByRole('alert')).toHaveTextContent('分析历史加载失败')
+  expect(requestCount).toBe(2)
   const searchBeforeRetry = router.state.location.search
 
   await user.click(screen.getByRole('button', { name: '重试' }))
 
   expect(await screen.findByRole('link', { name: longJobTitle })).toBeVisible()
   expect(router.state.location.search).toBe(searchBeforeRetry)
-  expect(requestCount).toBe(2)
+  expect(requestCount).toBe(3)
+})
+
+test('aborts a slow list request when the URL filter changes', async () => {
+  let markFirstRequestStarted: () => void = () => undefined
+  const firstRequestStarted = new Promise<void>((resolve) => {
+    markFirstRequestStarted = resolve
+  })
+  let releaseFirstRequest: () => void = () => undefined
+  const firstRequestRelease = new Promise<void>((resolve) => {
+    releaseFirstRequest = resolve
+  })
+  let markFirstRequestFinished: () => void = () => undefined
+  const firstRequestFinished = new Promise<void>((resolve) => {
+    markFirstRequestFinished = resolve
+  })
+  let firstRequestAborted = false
+
+  server.use(
+    http.get('/api/analysis', async ({ request }) => {
+      const url = new URL(request.url)
+      if (url.searchParams.get('status') === 'SUCCESS') {
+        return HttpResponse.json(pageResponse())
+      }
+
+      markFirstRequestStarted()
+      try {
+        await Promise.race([
+          firstRequestRelease,
+          new Promise<void>((resolve) => {
+            request.signal.addEventListener(
+              'abort',
+              () => {
+                firstRequestAborted = true
+                resolve()
+              },
+              { once: true },
+            )
+          }),
+        ])
+        return HttpResponse.json(pageResponse())
+      } finally {
+        markFirstRequestFinished()
+      }
+    }),
+  )
+  const user = userEvent.setup()
+
+  try {
+    renderHistory()
+    await firstRequestStarted
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: '状态' }),
+      'SUCCESS',
+    )
+
+    await waitFor(() => {
+      expect(firstRequestAborted).toBe(true)
+    })
+    expect(await screen.findByRole('link', { name: longJobTitle })).toBeVisible()
+  } finally {
+    releaseFirstRequest()
+    await firstRequestFinished
+  }
 })
 
 test('keeps the full long title accessible and formats nullable row data stably', async () => {

@@ -1,7 +1,6 @@
-import { useNavigate } from 'react-router'
+import { Link } from 'react-router'
 
 import { AsyncState } from '../../shared/components/AsyncState'
-import { Button } from '../../shared/components/Button'
 import {
   AnalysisTable,
   AnalysisTableSkeleton,
@@ -30,7 +29,6 @@ function MetricsSkeleton() {
 }
 
 export function DashboardPage() {
-  const navigate = useNavigate()
   const summaryQuery = useAnalysisSummaryQuery()
   const recentQuery = useAnalysesQuery({
     status: undefined,
@@ -91,13 +89,12 @@ export function DashboardPage() {
       >
         <div className="dashboard-section__heading">
           <h2 id="dashboard-recent-heading">最近分析</h2>
-          <Button
-            className="dashboard-section__history-action"
-            onClick={() => navigate('/analyses')}
-            variant="secondary"
+          <Link
+            className="button button--secondary dashboard-section__history-action"
+            to="/analyses"
           >
-            查看全部
-          </Button>
+            <span className="button__content">查看全部</span>
+          </Link>
         </div>
 
         <div className="dashboard-recent-slot">
@@ -124,7 +121,12 @@ export function DashboardPage() {
                 state="empty"
                 title="还没有近期分析"
               />
-              <Button onClick={() => navigate('/analyses/new')}>新建分析</Button>
+              <Link
+                className="button button--primary"
+                to="/analyses/new"
+              >
+                <span className="button__content">新建分析</span>
+              </Link>
             </div>
           ) : null}
           {recentQuery.isSuccess && recentQuery.data.items.length > 0 ? (

@@ -7,6 +7,6 @@ export const analysisSummaryQueryKey = ['analysis-summary'] as const
 export function useAnalysisSummaryQuery() {
   return useQuery({
     queryKey: analysisSummaryQueryKey,
-    queryFn: getAnalysisSummary,
+    queryFn: ({ signal }) => getAnalysisSummary(signal),
   })
 }

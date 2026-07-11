@@ -141,7 +141,16 @@ test('renders the responsive product shell navigation and active-page cue', asyn
     expect(await screen.findByText('API 已连接')).toBeVisible()
     expect(screen.queryByText(/数据库|队列/)).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '新建分析' }))
+    const topbar = screen
+      .getAllByRole('banner')
+      .find((banner) => banner.classList.contains('app-topbar'))
+    expect(topbar).toBeDefined()
+    const topbarCreateLink = within(topbar!).getByRole(
+      'link',
+      { name: '新建分析' },
+    )
+    expect(topbarCreateLink).toHaveAttribute('href', '/analyses/new')
+    await user.click(topbarCreateLink)
 
     expect(app.router.state.location.pathname).toBe('/analyses/new')
     expect(screen.getByRole('heading', { name: '新建分析' })).toBeVisible()

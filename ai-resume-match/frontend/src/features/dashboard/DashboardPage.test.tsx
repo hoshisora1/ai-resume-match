@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
@@ -6,6 +6,7 @@ import { afterEach, expect, test } from 'vitest'
 import { createMemoryRouter } from 'react-router'
 
 import { App } from '../../app/App'
+import { createQueryClient } from '../../app/queryClient'
 import { appRoutes, type AppRouter } from '../../app/router'
 import { server } from '../../test/server'
 
@@ -60,23 +61,39 @@ interface RenderedApp {
 
 const renderedApps: RenderedApp[] = []
 
+function createProductionTestQueryClient() {
+  const queryClient = createQueryClient()
+  const defaultOptions = queryClient.getDefaultOptions()
+  queryClient.setDefaultOptions({
+    ...defaultOptions,
+    queries: {
+      ...defaultOptions.queries,
+      gcTime: Infinity,
+      retryDelay: 0,
+    },
+  })
+  return queryClient
+}
+
 function renderDashboard() {
   server.use(
     http.get('/backend-health', () => HttpResponse.json({ status: 'UP' })),
   )
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { gcTime: Infinity, retry: false },
-      mutations: { retry: false },
-    },
-  })
+  const queryClient = createProductionTestQueryClient()
   const router: AppRouter = createMemoryRouter(appRoutes, {
     initialEntries: ['/'],
   })
   const rendered = render(<App queryClient={queryClient} router={router} />)
-  renderedApps.push({ queryClient, router, unmount: rendered.unmount })
+  let isUnmounted = false
+  const unmount = () => {
+    if (!isUnmounted) {
+      isUnmounted = true
+      rendered.unmount()
+    }
+  }
+  renderedApps.push({ queryClient, router, unmount })
 
-  return { queryClient, router }
+  return { queryClient, router, unmount }
 }
 
 afterEach(() => {
@@ -160,6 +177,10 @@ test('renders summary metrics and a semantic recent-analysis table', async () =>
   expect(within(table).getByText('88.0')).toBeVisible()
   expect(within(table).getByText('已完成')).toBeVisible()
   expect(within(table).getByText('2026-07-10 09:05')).toBeVisible()
+  expect(screen.getByRole('link', { name: '查看全部' })).toHaveAttribute(
+    'href',
+    '/analyses',
+  )
   expect(within(table).getByText('resume.pdf')).toHaveAttribute(
     'title',
     'resume.pdf',
@@ -172,12 +193,12 @@ test('renders summary metrics and a semantic recent-analysis table', async () =>
   expect(within(pendingRow!).getAllByText('—')).toHaveLength(3)
 })
 
-test('keeps recent records available when summary loading fails and reloads summary', async () => {
+test('exhausts the production summary retry once before a manual retry succeeds', async () => {
   let summaryRequests = 0
   server.use(
     http.get('/api/analysis/summary', () => {
       summaryRequests += 1
-      return summaryRequests === 1
+      return summaryRequests <= 2
         ? HttpResponse.json(
             { code: 'SUMMARY_UNAVAILABLE', message: 'Unavailable', requestId: null },
             { status: 503 },
@@ -197,11 +218,12 @@ test('keeps recent records available when summary loading fails and reloads summ
   expect(
     await screen.findByRole('link', { name: '高级后端工程师' }),
   ).toBeVisible()
+  expect(summaryRequests).toBe(2)
 
   await user.click(within(summary).getByRole('button', { name: '重试' }))
 
   expect(await within(summary).findByText('12')).toBeVisible()
-  expect(summaryRequests).toBe(2)
+  expect(summaryRequests).toBe(3)
 })
 
 test('keeps loaded metrics available when recent analyses fail', async () => {
@@ -244,7 +266,64 @@ test('shows a create-analysis action when there are no recent records', async ()
   const recent = await screen.findByRole('region', { name: '最近分析' })
   expect(await within(recent).findByText('还没有近期分析')).toBeVisible()
 
-  await user.click(within(recent).getByRole('button', { name: '新建分析' }))
+  const createLink = within(recent).getByRole('link', { name: '新建分析' })
+  expect(createLink).toHaveAttribute('href', '/analyses/new')
+  await user.click(createLink)
 
   expect(router.state.location.pathname).toBe('/analyses/new')
+})
+
+test('aborts a slow summary request when the dashboard unmounts', async () => {
+  let markSummaryStarted: () => void = () => undefined
+  const summaryStarted = new Promise<void>((resolve) => {
+    markSummaryStarted = resolve
+  })
+  let releaseSummary: () => void = () => undefined
+  const summaryRelease = new Promise<void>((resolve) => {
+    releaseSummary = resolve
+  })
+  let markSummaryFinished: () => void = () => undefined
+  const summaryFinished = new Promise<void>((resolve) => {
+    markSummaryFinished = resolve
+  })
+  let summaryAborted = false
+
+  server.use(
+    http.get('/api/analysis/summary', async ({ request }) => {
+      markSummaryStarted()
+      try {
+        await Promise.race([
+          summaryRelease,
+          new Promise<void>((resolve) => {
+            request.signal.addEventListener(
+              'abort',
+              () => {
+                summaryAborted = true
+                resolve()
+              },
+              { once: true },
+            )
+          }),
+        ])
+        return HttpResponse.json(summaryResponse)
+      } finally {
+        markSummaryFinished()
+      }
+    }),
+    http.get('/api/analysis', () => HttpResponse.json(recentResponse)),
+  )
+
+  try {
+    const { unmount } = renderDashboard()
+    await summaryStarted
+
+    unmount()
+
+    await waitFor(() => {
+      expect(summaryAborted).toBe(true)
+    })
+  } finally {
+    releaseSummary()
+    await summaryFinished
+  }
 })

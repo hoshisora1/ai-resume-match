@@ -21,7 +21,7 @@ test('disables the previous action on the first page and never emits a negative 
   await user.click(next)
 
   expect(onPageChange).toHaveBeenCalledTimes(1)
-  expect(onPageChange).toHaveBeenCalledWith(1)
+  expect(onPageChange).toHaveBeenCalledWith(1, { replace: true })
 })
 
 test('disables the next action on the last page and never emits a page past the end', async () => {
@@ -41,7 +41,7 @@ test('disables the next action on the last page and never emits a page past the 
   await user.click(previous)
 
   expect(onPageChange).toHaveBeenCalledTimes(1)
-  expect(onPageChange).toHaveBeenCalledWith(1)
+  expect(onPageChange).toHaveBeenCalledWith(1, { replace: true })
 })
 
 test('keeps both actions disabled when there are no pages', async () => {
@@ -73,7 +73,7 @@ test('synchronizes a negative controlled page to the first page', async () => {
 
   await waitFor(() => {
     expect(onPageChange).toHaveBeenCalledTimes(1)
-    expect(onPageChange).toHaveBeenCalledWith(0)
+    expect(onPageChange).toHaveBeenCalledWith(0, { replace: true })
   })
 })
 
@@ -91,7 +91,7 @@ test('synchronizes a page past the end before accepting previous-page input', as
 
   await waitFor(() => {
     expect(onPageChange).toHaveBeenCalledTimes(1)
-    expect(onPageChange).toHaveBeenCalledWith(2)
+    expect(onPageChange).toHaveBeenCalledWith(2, { replace: true })
   })
 
   rerender(<Pagination page={2} totalPages={3} onPageChange={onPageChange} />)
@@ -100,7 +100,7 @@ test('synchronizes a page past the end before accepting previous-page input', as
   await user.click(screen.getByRole('button', { name: '上一页' }))
 
   expect(onPageChange).toHaveBeenCalledTimes(2)
-  expect(onPageChange).toHaveBeenLastCalledWith(1)
+  expect(onPageChange).toHaveBeenLastCalledWith(1, { replace: true })
 })
 
 test('shows a stable single page with both actions disabled', () => {

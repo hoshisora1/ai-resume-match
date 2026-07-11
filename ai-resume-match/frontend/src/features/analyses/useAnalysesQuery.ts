@@ -13,9 +13,10 @@ export function analysesQueryKey({
   return ['analyses', { status, page, size }] as const
 }
 
-export function useAnalysesQuery(params: ListAnalysesParams) {
+export function useAnalysesQuery(params: ListAnalysesParams, enabled = true) {
   return useQuery({
     queryKey: analysesQueryKey(params),
-    queryFn: () => listAnalyses(params),
+    queryFn: ({ signal }) => listAnalyses(params, signal),
+    enabled,
   })
 }

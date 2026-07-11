@@ -255,6 +255,7 @@ svg {
   font-weight: 650;
   line-height: 1.25;
   text-align: center;
+  text-decoration: none;
 }
 
 .button__content,

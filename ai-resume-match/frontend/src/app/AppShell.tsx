@@ -6,10 +6,8 @@ import {
   NavLink,
   Outlet,
   useLocation,
-  useNavigate,
 } from 'react-router'
 
-import { Button } from '../shared/components/Button'
 import { backendHealthQueryOptions } from './backendHealthQuery'
 
 const navigationItems = [
@@ -20,7 +18,6 @@ const navigationItems = [
 
 export function AppShell() {
   const location = useLocation()
-  const navigate = useNavigate()
   const mainRef = useRef<HTMLElement>(null)
   const previousPathname = useRef(location.pathname)
   const healthQuery = useQuery(backendHealthQueryOptions)
@@ -145,14 +142,16 @@ export function AppShell() {
             </button>
           ) : null}
         </div>
-        <Button
-          className="app-topbar__action"
+        <Link
+          className="button button--primary app-topbar__action"
           data-shell-route-control="true"
-          onClick={() => navigate('/analyses/new')}
+          to="/analyses/new"
         >
-          <Plus aria-hidden="true" size={17} />
-          <span>新建分析</span>
-        </Button>
+          <span className="button__content">
+            <Plus aria-hidden="true" size={17} />
+            <span>新建分析</span>
+          </span>
+        </Link>
       </header>
 
       <main
