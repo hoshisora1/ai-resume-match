@@ -169,7 +169,7 @@ class DeploymentConfigurationTest {
     }
 
     @Test
-    void frontendImageUsesAReproducibleMultiStageNonRootBuild() throws IOException {
+    void frontendImageUsesAReproduciblePinnedMultiStageNonRootBuild() throws IOException {
         assertThat(ROOT.resolve("frontend/Dockerfile")).isRegularFile();
         assertThat(ROOT.resolve("frontend/.dockerignore")).isRegularFile();
 
@@ -177,11 +177,14 @@ class DeploymentConfigurationTest {
         String dockerignore = read("frontend/.dockerignore");
 
         assertThat(dockerfile)
-            .contains("FROM node:24-alpine AS build")
+            .contains("FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build")
             .contains("RUN npm ci")
             .contains("RUN npm run build")
-            .contains("FROM nginxinc/nginx-unprivileged:1.29-alpine")
+            .contains("FROM nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6")
+            .contains("COPY --chmod=755 nginx/frontend-entrypoint.sh /usr/local/bin/frontend-entrypoint.sh")
             .contains("COPY --from=build /workspace/dist /usr/share/nginx/html")
+            .contains("ENTRYPOINT [\"/usr/local/bin/frontend-entrypoint.sh\"]")
+            .contains("CMD [\"nginx\", \"-g\", \"daemon off;\"]")
             .contains("USER 101")
             .contains("EXPOSE 8080")
             .contains("HEALTHCHECK")
@@ -220,17 +223,23 @@ class DeploymentConfigurationTest {
     @Test
     void nginxTemplateSecuresAndRoutesFrontendTraffic() throws IOException {
         assertThat(ROOT.resolve("frontend/nginx/default.conf.template")).isRegularFile();
+        assertThat(ROOT.resolve("frontend/nginx/frontend-entrypoint.sh")).isRegularFile();
 
         String nginxTemplate = read("frontend/nginx/default.conf.template");
+        String frontendEntrypoint = read("frontend/nginx/frontend-entrypoint.sh");
 
         assertThat(nginxTemplate)
             .contains("client_max_body_size 6m")
+            .contains("geo $api_token_dollar")
+            .contains("default \"$\"")
             .contains("location = /frontend-health")
             .contains("location = /backend-health")
             .contains("proxy_pass http://app:8080/actuator/health/readiness")
             .contains("location /api/")
             .contains("proxy_pass http://app:8080")
-            .contains("proxy_set_header X-API-Token ${API_TOKEN}")
+            .contains("proxy_set_header X-API-Token \"${API_TOKEN_NGINX}\"")
+            .doesNotContain("proxy_set_header X-API-Token ${API_TOKEN}")
+            .contains("proxy_set_header X-Original-URI $request_uri")
             .contains("try_files $uri $uri/ /index.html")
             .contains("proxy_connect_timeout")
             .contains("proxy_send_timeout")
@@ -253,25 +262,30 @@ class DeploymentConfigurationTest {
             .contains("expires -1")
             .contains("location ^~ /assets/")
             .contains("expires 1y");
+        assertThat(frontendEntrypoint)
+            .contains("API_TOKEN_NGINX")
+            .contains("${api_token_dollar}")
+            .contains("tr -d '\\r\\n'")
+            .contains("NGINX_ENVSUBST_FILTER='^API_TOKEN_NGINX$'")
+            .contains("unset API_TOKEN")
+            .contains("exec /docker-entrypoint.sh \"$@\"");
     }
 
     @Test
-    void nginxRuntimeRenderingReplacesOnlyTheApiToken() throws IOException {
-        assertThat(ROOT.resolve("frontend/nginx/default.conf.template")).isRegularFile();
+    void nginxContainerRegressionCoversRealRenderingSyntaxAndProxyHeader() throws IOException {
+        assertThat(ROOT.resolve("frontend/tests/nginx-container-test.ps1")).isRegularFile();
 
-        String nginxTemplate = read("frontend/nginx/default.conf.template");
-        String renderedConfig = nginxTemplate.replace("${API_TOKEN}", "deployment-test-token");
+        String containerTest = read("frontend/tests/nginx-container-test.ps1");
 
-        assertThat(renderedConfig)
-            .doesNotContain("${API_TOKEN}")
-            .contains("proxy_set_header X-API-Token deployment-test-token")
-            .contains("$uri")
-            .contains("$http_x_request_id")
-            .contains("$http_x_correlation_id")
-            .contains("$host")
-            .contains("$remote_addr")
-            .contains("$proxy_add_x_forwarded_for")
-            .contains("$scheme");
+        assertThat(containerTest)
+            .contains("task11 token $uri")
+            .contains("nginx -t")
+            .contains("nginx -T")
+            .contains("try_files $uri $uri/ /index.html")
+            .contains("proxy_set_header X-Original-URI $request_uri")
+            .contains("X-API-Token")
+            .contains("docker logs")
+            .contains("API_TOKEN must not contain CR or LF");
     }
 
     private static Properties yaml(String relativePath) {
