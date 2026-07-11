@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { cwd, env } from 'node:process'
 import { build, createServer, type ViteDevServer } from 'vite'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { runCleanupSteps } from './resourceCleanup'
 
@@ -82,6 +82,85 @@ function restoreEnvironment(name: 'API_TOKEN' | 'API_PROXY_TARGET', value: strin
   }
 }
 
+interface ProxyTestResources {
+  previousToken: string | undefined
+  previousTarget: string | undefined
+  closeVite: () => Promise<void> | void
+  closeUpstream: () => Promise<void> | void
+  removeBuildDirectory: () => Promise<void> | void
+}
+
+async function cleanupProxyTestResources(
+  resources: ProxyTestResources,
+  timeoutMs = cleanupTimeoutMs,
+) {
+  restoreEnvironment('API_TOKEN', resources.previousToken)
+  restoreEnvironment('API_PROXY_TARGET', resources.previousTarget)
+  await runCleanupSteps(
+    [
+      {
+        label: 'Vite server',
+        run: resources.closeVite,
+      },
+      {
+        label: 'mock upstream',
+        run: resources.closeUpstream,
+      },
+      {
+        label: 'temporary build directory',
+        run: resources.removeBuildDirectory,
+      },
+    ],
+    timeoutMs,
+  )
+}
+
+test('restores env and attempts all resources when Vite close never settles', async () => {
+  vi.useFakeTimers()
+  const previousToken = env.API_TOKEN
+  const previousTarget = env.API_PROXY_TARGET
+  let upstreamCloseAttempted = false
+  let buildRemovalAttempted = false
+
+  env.API_TOKEN = 'temporary-lifecycle-token'
+  env.API_PROXY_TARGET = 'http://temporary-lifecycle-target.invalid'
+
+  try {
+    const cleanup = cleanupProxyTestResources(
+      {
+        previousToken,
+        previousTarget,
+        closeVite: () => new Promise<void>(() => undefined),
+        closeUpstream: () => {
+          upstreamCloseAttempted = true
+        },
+        removeBuildDirectory: () => {
+          buildRemovalAttempted = true
+        },
+      },
+      100,
+    )
+    const settlement = cleanup.then(
+      () => null,
+      (error: unknown) => error,
+    )
+
+    expect(env.API_TOKEN).toBe(previousToken)
+    expect(env.API_PROXY_TARGET).toBe(previousTarget)
+
+    await vi.advanceTimersByTimeAsync(100)
+    const cleanupError = await settlement
+
+    expect(cleanupError).toBeInstanceOf(AggregateError)
+    expect(upstreamCloseAttempted).toBe(true)
+    expect(buildRemovalAttempted).toBe(true)
+  } finally {
+    restoreEnvironment('API_TOKEN', previousToken)
+    restoreEnvironment('API_PROXY_TARGET', previousTarget)
+    vi.useRealTimers()
+  }
+})
+
 test('proxies server-only credentials and keeps them out of the client build', async () => {
   const token = 'task5-proxy-contract-token'
   const previousToken = env.API_TOKEN
@@ -142,9 +221,6 @@ test('proxies server-only credentials and keeps them out of the client build', a
       token: null,
     })
 
-    await viteServer.close()
-    viteServer = undefined
-
     buildDirectory = await mkdtemp(join(tmpdir(), 'matchlab-vite-build-'))
     await build({
       configFile: viteConfigPath,
@@ -163,27 +239,15 @@ test('proxies server-only credentials and keeps them out of the client build', a
     expect(clientOutput).not.toContain('X-API-Token')
     expect(clientOutput).not.toContain('API_PROXY_TARGET')
   } finally {
-    restoreEnvironment('API_TOKEN', previousToken)
-    restoreEnvironment('API_PROXY_TARGET', previousTarget)
-    await runCleanupSteps(
-      [
-        {
-          label: 'Vite server',
-          run: () => viteServer?.close(),
-        },
-        {
-          label: 'mock upstream',
-          run: () => closeHttpServer(upstream),
-        },
-        {
-          label: 'temporary build directory',
-          run: () =>
-            buildDirectory === undefined
-              ? undefined
-              : rm(buildDirectory, { force: true, recursive: true }),
-        },
-      ],
-      cleanupTimeoutMs,
-    )
+    await cleanupProxyTestResources({
+      previousToken,
+      previousTarget,
+      closeVite: () => viteServer?.close(),
+      closeUpstream: () => closeHttpServer(upstream),
+      removeBuildDirectory: () =>
+        buildDirectory === undefined
+          ? undefined
+          : rm(buildDirectory, { force: true, recursive: true }),
+    })
   }
 }, 30_000)
