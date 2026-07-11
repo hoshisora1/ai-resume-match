@@ -17,6 +17,7 @@ import { ApiError } from '../../shared/api/client'
 import { Button } from '../../shared/components/Button'
 import {
   analysisFormSchema,
+  hasNonJavaUnicodeWhitespaceCodePoint,
   type AnalysisFormValues,
 } from './analysisFormSchema'
 import './analysis-form.css'
@@ -62,6 +63,7 @@ export function NewAnalysisPage() {
   const {
     control,
     formState: { errors },
+    getValues,
     handleSubmit,
     register,
     reset,
@@ -80,8 +82,9 @@ export function NewAnalysisPage() {
   const jobContentRegistration = register('jobContent')
 
   const submissionMutation = useMutation({
-    gcTime: 0,
-    mutationFn: createAnalysisSubmission,
+    mutationFn: async () => ({
+      taskId: (await createAnalysisSubmission(getValues())).taskId,
+    }),
     onSuccess: async ({ taskId }) => {
       reset()
       if (fileInputRef.current !== null) {
@@ -102,6 +105,10 @@ export function NewAnalysisPage() {
   })
 
   const chooseFile = (file: File | undefined) => {
+    if (submissionMutation.isPending) {
+      return
+    }
+
     if (file === undefined) {
       resetField('file')
       return
@@ -120,12 +127,18 @@ export function NewAnalysisPage() {
 
   const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
+    if (submissionMutation.isPending) {
+      return
+    }
     dragDepthRef.current += 1
     setIsDragging(true)
   }
 
   const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
+    if (submissionMutation.isPending) {
+      return
+    }
     dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
     if (dragDepthRef.current === 0) {
       setIsDragging(false)
@@ -134,11 +147,16 @@ export function NewAnalysisPage() {
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
-    event.dataTransfer.dropEffect = 'copy'
+    event.dataTransfer.dropEffect = submissionMutation.isPending
+      ? 'none'
+      : 'copy'
   }
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
+    if (submissionMutation.isPending) {
+      return
+    }
     dragDepthRef.current = 0
     setIsDragging(false)
     if (fileInputRef.current !== null) {
@@ -147,14 +165,16 @@ export function NewAnalysisPage() {
     chooseFile(event.dataTransfer.files[0])
   }
 
-  const submitForm = (values: AnalysisFormValues) => {
+  const submitForm = () => {
     if (submissionInFlightRef.current) {
       return
     }
 
     submissionInFlightRef.current = true
+    dragDepthRef.current = 0
+    setIsDragging(false)
     submissionMutation.reset()
-    submissionMutation.mutate(values)
+    submissionMutation.mutate()
   }
 
   const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -165,7 +185,9 @@ export function NewAnalysisPage() {
     submissionMutation.error instanceof ApiError
       ? submissionMutation.error.requestId
       : undefined
-  const confirmationTitle = jobTitle.trim()
+  const confirmationTitle = hasNonJavaUnicodeWhitespaceCodePoint(jobTitle)
+    ? jobTitle
+    : ''
 
   return (
     <section
@@ -194,6 +216,7 @@ export function NewAnalysisPage() {
           </div>
 
           <div
+            aria-disabled={submissionMutation.isPending || undefined}
             aria-labelledby="analysis-resume-heading"
             className="analysis-upload-zone"
             data-dragging={isDragging}
@@ -207,6 +230,7 @@ export function NewAnalysisPage() {
             <FileUp aria-hidden="true" className="analysis-upload-zone__icon" size={28} />
             <div className="analysis-upload-zone__actions">
               <label
+                aria-disabled={submissionMutation.isPending || undefined}
                 className="button button--secondary analysis-file-label"
                 htmlFor={FILE_INPUT_ID}
               >
@@ -228,6 +252,7 @@ export function NewAnalysisPage() {
                   )}
                   aria-invalid={errors.file ? true : undefined}
                   className="analysis-file-input"
+                  disabled={submissionMutation.isPending}
                   id={FILE_INPUT_ID}
                   name={field.name}
                   onBlur={field.onBlur}
@@ -294,6 +319,7 @@ export function NewAnalysisPage() {
               )}
               aria-invalid={errors.jobTitle ? true : undefined}
               autoComplete="off"
+              disabled={submissionMutation.isPending}
               id={TITLE_INPUT_ID}
               type="text"
             />
@@ -317,6 +343,7 @@ export function NewAnalysisPage() {
                 errors.jobContent !== undefined,
               )}
               aria-invalid={errors.jobContent ? true : undefined}
+              disabled={submissionMutation.isPending}
               id={CONTENT_INPUT_ID}
               rows={9}
             />

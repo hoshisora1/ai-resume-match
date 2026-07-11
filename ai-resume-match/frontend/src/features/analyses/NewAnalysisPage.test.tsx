@@ -114,6 +114,56 @@ function expectFieldError(control: HTMLElement, message: string) {
   expect(describedBy).toContain(error.id)
 }
 
+function expectMutationCacheToExcludeSubmission(
+  queryClient: QueryClient,
+  submission: {
+    file: File
+    jobTitle: string
+    jobContent: string
+  },
+) {
+  const mutations = queryClient.getMutationCache().getAll()
+
+  expect(mutations.length).toBeGreaterThan(0)
+  for (const mutation of mutations) {
+    expect(mutation.state.variables).toBeUndefined()
+    expect(mutation.state.context).toBeUndefined()
+    expect(mutation.options.meta).toBeUndefined()
+
+    if (mutation.state.data !== undefined) {
+      expect(mutation.state.data).toEqual({ taskId: expect.any(Number) })
+    }
+
+    if (
+      typeof mutation.state.error === 'object' &&
+      mutation.state.error !== null
+    ) {
+      expect(mutation.state.error).not.toHaveProperty('payload')
+      expect(mutation.state.error).not.toHaveProperty('variables')
+      expect(mutation.state.error).not.toHaveProperty('file')
+      expect(mutation.state.error).not.toHaveProperty('jobTitle')
+      expect(mutation.state.error).not.toHaveProperty('jobContent')
+    }
+
+    const cachedSurfaces = JSON.stringify({
+      context: mutation.state.context,
+      data: mutation.state.data,
+      error:
+        mutation.state.error instanceof Error
+          ? {
+              ...Object.fromEntries(Object.entries(mutation.state.error)),
+              message: mutation.state.error.message,
+            }
+          : mutation.state.error,
+      meta: mutation.options.meta,
+      variables: mutation.state.variables,
+    })
+    expect(cachedSurfaces).not.toContain(submission.file.name)
+    expect(cachedSurfaces).not.toContain(submission.jobTitle)
+    expect(cachedSurfaces).not.toContain(submission.jobContent)
+  }
+}
+
 afterEach(() => {
   for (const app of renderedApps.splice(0)) {
     app.dispose()
@@ -376,6 +426,11 @@ test('counts the title and JD limits by Unicode code point and submits multipart
     expect(invalidateSpy).toHaveBeenCalledTimes(2)
   })
   try {
+    expectMutationCacheToExcludeSubmission(queryClient, {
+      file: submittedResume,
+      jobTitle: exactTitle,
+      jobContent: exactJobContent,
+    })
     expect(router.state.location.pathname).toBe('/analyses/new')
     expect(fileInput).toHaveValue('')
     expect((fileInput as HTMLInputElement).files).toHaveLength(0)
@@ -390,7 +445,17 @@ test('counts the title and JD limits by Unicode code point and submits multipart
   })
   expect(router.state.historyAction).toBe('REPLACE')
   await waitFor(() => {
-    expect(queryClient.getMutationCache().getAll()).toHaveLength(0)
+    expect(
+      queryClient
+        .getMutationCache()
+        .getAll()
+        .some((mutation) => mutation.state.status === 'success'),
+    ).toBe(true)
+  })
+  expectMutationCacheToExcludeSubmission(queryClient, {
+    file: submittedResume,
+    jobTitle: exactTitle,
+    jobContent: exactJobContent,
   })
   expect(submittedInput).toBe('/api/analysis-submissions')
   expect(submittedInit?.method).toBe('POST')
@@ -525,6 +590,11 @@ test('preserves all values after a structured server error, shows only a safe me
     ),
   ).toBeVisible()
   expect(queryClient.getDefaultOptions().mutations?.retry).toBe(0)
+  expectMutationCacheToExcludeSubmission(queryClient, {
+    file,
+    jobTitle: VALID_TITLE,
+    jobContent: VALID_JOB_CONTENT,
+  })
 
   await user.click(screen.getByRole('button', { name: '提交分析' }))
 
@@ -589,10 +659,12 @@ test('disables the stable submit button while one request is pending and blocks 
   )
   const user = userEvent.setup()
   const { router } = renderNewAnalysis()
-  await user.upload(
-    screen.getByLabelText('选择简历文件'),
-    new File(['resume'], 'single-submit.pdf'),
-  )
+  const fileInput = screen.getByLabelText('选择简历文件')
+  const titleInput = screen.getByRole('textbox', { name: '岗位名称' })
+  const jobContentInput = screen.getByRole('textbox', { name: '岗位 JD' })
+  const uploadZone = screen.getByTestId('analysis-upload-zone')
+  const originalFile = new File(['resume'], 'single-submit.pdf')
+  await user.upload(fileInput, originalFile)
   setTextValues()
   const submitButton = screen.getByRole('button', { name: '提交分析' })
 
@@ -602,6 +674,18 @@ test('disables the stable submit button while one request is pending and blocks 
   try {
     expect(submitButton).toBeDisabled()
     expect(submitButton).toHaveAttribute('aria-busy', 'true')
+    expect(fileInput).toBeDisabled()
+    expect(titleInput).toBeDisabled()
+    expect(jobContentInput).toBeDisabled()
+    expect(uploadZone).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.drop(uploadZone, {
+      dataTransfer: { files: [new File(['changed'], 'changed.pdf')] },
+    })
+    expect(
+      within(screen.getByRole('status', { name: '已选择简历' })).getByText(
+        originalFile.name,
+      ),
+    ).toBeVisible()
     await user.click(submitButton)
     expect(requestCount).toBe(1)
   } finally {
