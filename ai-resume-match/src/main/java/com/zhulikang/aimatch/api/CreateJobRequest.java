@@ -1,10 +1,13 @@
 package com.zhulikang.aimatch.api;
 
-import jakarta.validation.constraints.NotBlank;
+import com.zhulikang.aimatch.api.validation.UnicodeNotBlank;
 import org.hibernate.validator.constraints.CodePointLength;
 
+import static com.zhulikang.aimatch.api.validation.JobDescriptionConstraints.CONTENT_MAX_CODE_POINTS;
+import static com.zhulikang.aimatch.api.validation.JobDescriptionConstraints.TITLE_MAX_CODE_POINTS;
+
 public record CreateJobRequest(
-    @CodePointLength(max = 120) String title,
-    @NotBlank String content
+    @CodePointLength(max = TITLE_MAX_CODE_POINTS) String title,
+    @UnicodeNotBlank @CodePointLength(max = CONTENT_MAX_CODE_POINTS) String content
 ) {
 }

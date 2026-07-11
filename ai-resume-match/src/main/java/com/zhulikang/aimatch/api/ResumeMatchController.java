@@ -2,6 +2,7 @@ package com.zhulikang.aimatch.api;
 
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
+import com.zhulikang.aimatch.api.validation.UnicodeNotBlank;
 import com.zhulikang.aimatch.application.analysis.AnalysisSubmission;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisSubmissionUseCase;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
@@ -15,7 +16,6 @@ import com.zhulikang.aimatch.application.resume.UploadResumeUseCase;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.resume.Resume;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import org.hibernate.validator.constraints.CodePointLength;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +28,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import static com.zhulikang.aimatch.api.validation.JobDescriptionConstraints.CONTENT_MAX_CODE_POINTS;
+import static com.zhulikang.aimatch.api.validation.JobDescriptionConstraints.TITLE_MAX_CODE_POINTS;
 
 @RestController
 @RequestMapping("/api")
@@ -86,8 +89,8 @@ public class ResumeMatchController {
     @PostMapping(value = "/analysis-submissions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public AnalysisTaskResponse createAnalysisSubmission(
         @RequestParam("file") MultipartFile file,
-        @RequestParam("jobTitle") @NotBlank @CodePointLength(max = 120) String jobTitle,
-        @RequestParam("jobContent") @NotBlank String jobContent
+        @RequestParam("jobTitle") @UnicodeNotBlank @CodePointLength(max = TITLE_MAX_CODE_POINTS) String jobTitle,
+        @RequestParam("jobContent") @UnicodeNotBlank @CodePointLength(max = CONTENT_MAX_CODE_POINTS) String jobContent
     ) {
         AnalysisSubmission submission = createAnalysisSubmissionUseCase.create(file, jobTitle, jobContent);
         return AnalysisTaskResponse.from(submission);

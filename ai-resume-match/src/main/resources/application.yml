@@ -5,8 +5,9 @@ spring:
     default: dev
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 5MB
+      # Multipart parsing runs first; one extra servlet byte lets the 5 MiB business limit reach ResumeFileValidator.
+      max-file-size: 5242881B
+      max-request-size: 6MB
   jpa:
     hibernate:
       ddl-auto: validate

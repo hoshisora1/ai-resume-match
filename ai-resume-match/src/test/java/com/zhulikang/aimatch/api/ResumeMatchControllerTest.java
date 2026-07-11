@@ -280,6 +280,26 @@ class ResumeMatchControllerTest {
             .andExpect(jsonPath("$.message").value("Invalid request"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"\u3000", "\u00A0"})
+    void returnsInvalidRequestWhenAnalysisSubmissionTitleIsUnicodeWhitespace(String jobTitle) throws Exception {
+        mockMvc.perform(analysisSubmissionRequest(resumeFile("resume.pdf"), jobTitle, "Java Redis"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"))
+            .andExpect(jsonPath("$.requestId").isNotEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\u3000", "\u00A0"})
+    void returnsInvalidRequestWhenAnalysisSubmissionContentIsUnicodeWhitespace(String jobContent) throws Exception {
+        mockMvc.perform(analysisSubmissionRequest(resumeFile("resume.pdf"), "Backend Engineer", jobContent))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"))
+            .andExpect(jsonPath("$.requestId").isNotEmpty());
+    }
+
     @Test
     void acceptsAnalysisSubmissionTitleWithMaximumCodePointLength() throws Exception {
         String title = "x".repeat(119) + "\uD83D\uDE80";
@@ -300,6 +320,29 @@ class ResumeMatchControllerTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
             .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
+    void acceptsAnalysisSubmissionContentWithMaximumCodePointLength() throws Exception {
+        String jobContent = "x".repeat(19_999) + "\uD83D\uDE80";
+        MockMultipartFile file = resumeFile("resume.pdf");
+        when(createAnalysisSubmissionUseCase.create(file, "Backend Engineer", jobContent))
+            .thenReturn(submission("Backend Engineer", "resume.pdf"));
+
+        mockMvc.perform(analysisSubmissionRequest(file, "Backend Engineer", jobContent))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.taskId").value(30));
+    }
+
+    @Test
+    void returnsInvalidRequestWhenAnalysisSubmissionContentExceedsCodePointLimit() throws Exception {
+        String jobContent = "x".repeat(20_000) + "\uD83D\uDE80";
+
+        mockMvc.perform(analysisSubmissionRequest(resumeFile("resume.pdf"), "Backend Engineer", jobContent))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"))
+            .andExpect(jsonPath("$.requestId").isNotEmpty());
     }
 
     @Test
@@ -514,6 +557,19 @@ class ResumeMatchControllerTest {
             .andExpect(jsonPath("$.message").value("Invalid request"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"\u3000", "\u00A0"})
+    void returnsInvalidRequestWhenJobContentIsUnicodeWhitespace(String content) throws Exception {
+        mockMvc.perform(post("/api/jobs")
+                .header("X-API-Token", "test-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"" + content + "\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"))
+            .andExpect(jsonPath("$.requestId").isNotEmpty());
+    }
+
     @Test
     void acceptsJobTitleWithMaximumCodePointLength() throws Exception {
         String title = "x".repeat(119) + "\uD83D\uDE80";
@@ -541,6 +597,35 @@ class ResumeMatchControllerTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
             .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
+    void acceptsJobContentWithMaximumCodePointLength() throws Exception {
+        String content = "x".repeat(19_999) + "\uD83D\uDE80";
+        JobDescription savedJob = new JobDescription("Backend Engineer", content, "Java");
+        ReflectionTestUtils.setField(savedJob, "id", 20L);
+        when(createJobDescriptionUseCase.create("Backend Engineer", content)).thenReturn(savedJob);
+
+        mockMvc.perform(post("/api/jobs")
+                .header("X-API-Token", "test-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Backend Engineer\",\"content\":\"" + content + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.jobDescriptionId").value(20));
+    }
+
+    @Test
+    void returnsInvalidRequestWhenJobContentExceedsCodePointLimit() throws Exception {
+        String content = "x".repeat(20_000) + "\uD83D\uDE80";
+
+        mockMvc.perform(post("/api/jobs")
+                .header("X-API-Token", "test-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Backend Engineer\",\"content\":\"" + content + "\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"))
+            .andExpect(jsonPath("$.requestId").isNotEmpty());
     }
 
     @Test
