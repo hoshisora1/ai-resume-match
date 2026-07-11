@@ -1,12 +1,14 @@
 # Frontend Product Experience Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** Completed on 2026-07-12. All implementation, deterministic browser tests, Docker-backed verification, full-stack browser acceptance, documentation, and visual QA are complete.
+
+> **Review workflow:** Each major task receives one combined specification/quality review. Important findings are fixed together and verified directly; repeated reviews without new evidence are avoided.
 
 **Goal:** Build a production-shaped React frontend for the complete resume-to-job analysis flow, including history, resilient async task UX, same-origin proxying, and browser-level verification.
 
 **Architecture:** Add a standalone `frontend/` Vite SPA served by an unprivileged Nginx container. Nginx and the Vite development proxy inject the existing API token server-side, while Spring Boot gains only the UI-facing write/query contracts required by the approved design. MySQL remains the source of truth, RabbitMQ remains ID-only, and the existing outbox/worker/report path stays intact.
 
-**Tech Stack:** Java 21, Spring Boot 3.3, Flyway, MySQL, Redis, RabbitMQ, React 19, TypeScript 7, Vite 8, React Router 8, TanStack Query 5, React Hook Form, Zod 4, React Markdown, Vitest, Testing Library, MSW, Playwright, Nginx, Docker Compose.
+**Tech Stack:** Java 21, Spring Boot 3.3, Flyway, MySQL, Redis, RabbitMQ, React 19, TypeScript 6, Vite 8, React Router 8, TanStack Query 5, React Hook Form, Zod 4, React Markdown, Vitest, Testing Library, MSW, Playwright, Nginx, Docker Compose.
 
 ---
 
@@ -60,7 +62,7 @@
 - Modify: `src/main/resources/application-dev.yml`
 - Modify: `src/main/resources/application-docker.yml`
 
-- [ ] **Step 1: Add the failing configuration test**
+- [x] **Step 1: Add the failing configuration test**
 
 Add this test to `DeploymentConfigurationTest`:
 
@@ -80,7 +82,7 @@ void datasourceUrlsUseConnectorSupportedUtf8Configuration() {
 
 Add `java.util.List` to the imports.
 
-- [ ] **Step 2: Run the focused test and confirm the expected failure**
+- [x] **Step 2: Run the focused test and confirm the expected failure**
 
 Run:
 
@@ -90,7 +92,7 @@ mvn "-Dtest=DeploymentConfigurationTest#datasourceUrlsUseConnectorSupportedUtf8C
 
 Expected: FAIL because both URLs contain `characterEncoding=utf8mb4`.
 
-- [ ] **Step 3: Correct both JDBC URLs**
+- [x] **Step 3: Correct both JDBC URLs**
 
 Use these URL values:
 
@@ -102,7 +104,7 @@ url: ${MYSQL_URL:jdbc:mysql://localhost:3306/ai_resume_match?useUnicode=true&con
 url: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useUnicode=true&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai
 ```
 
-- [ ] **Step 4: Verify configuration tests**
+- [x] **Step 4: Verify configuration tests**
 
 Run:
 
@@ -112,7 +114,7 @@ mvn "-Dtest=DeploymentConfigurationTest" test
 
 Expected: all deployment configuration tests PASS.
 
-- [ ] **Step 5: Commit the prerequisite fix**
+- [x] **Step 5: Commit the prerequisite fix**
 
 ```powershell
 git add src/main/resources/application-dev.yml src/main/resources/application-docker.yml src/test/java/com/zhulikang/aimatch/config/DeploymentConfigurationTest.java
@@ -136,7 +138,7 @@ git commit -m "fix: use supported mysql utf8 connection settings"
 - Modify: `src/integration-test/java/com/zhulikang/aimatch/FlywayMigrationIT.java`
 - Modify: all tests constructing `JobDescription`
 
-- [ ] **Step 1: Write failing title and migration tests**
+- [x] **Step 1: Write failing title and migration tests**
 
 Create `JobTitleNormalizerTest`:
 
@@ -170,7 +172,7 @@ Extend both migration tests with a `columnExists` helper and:
 assertThat(columnExists(connection, "job_description", "title")).isTrue();
 ```
 
-- [ ] **Step 2: Run the focused tests and confirm failure**
+- [x] **Step 2: Run the focused tests and confirm failure**
 
 ```powershell
 mvn "-Dtest=JobTitleNormalizerTest,FlywayMigrationTest" test
@@ -178,7 +180,7 @@ mvn "-Dtest=JobTitleNormalizerTest,FlywayMigrationTest" test
 
 Expected: compilation fails because `JobTitleNormalizer` does not exist, and the migration assertion cannot pass yet.
 
-- [ ] **Step 3: Add the Flyway migration**
+- [x] **Step 3: Add the Flyway migration**
 
 Create `V2__add_job_title.sql`:
 
@@ -192,7 +194,7 @@ where title is null or trim(title) = '';
 alter table job_description modify column title varchar(120) not null;
 ```
 
-- [ ] **Step 4: Add title normalization and entity support**
+- [x] **Step 4: Add title normalization and entity support**
 
 Create `JobTitleNormalizer`:
 
@@ -244,7 +246,7 @@ public String getTitle() {
 
 Add `@Column(nullable = false, length = 120) private String title;`.
 
-- [ ] **Step 5: Preserve the old JSON contract while accepting a title**
+- [x] **Step 5: Preserve the old JSON contract while accepting a title**
 
 Use these records and use-case signature:
 
@@ -270,11 +272,11 @@ public JobDescription create(String title, String content) {
 
 Update the controller to call `create(request.title(), request.content())` and return `JobDescriptionResponse.from(job)`. Existing bodies containing only `content` remain valid because `title` is nullable.
 
-- [ ] **Step 6: Update constructors and assertions**
+- [x] **Step 6: Update constructors and assertions**
 
 Update every `new JobDescription(content, tags)` call to `new JobDescription(title, content, tags)`. Add controller assertions for the returned `title`, and verify the missing-title request derives `Java Redis` from the first line.
 
-- [ ] **Step 7: Run focused and full fast tests**
+- [x] **Step 7: Run focused and full fast tests**
 
 ```powershell
 mvn "-Dtest=JobTitleNormalizerTest,CreateJobDescriptionUseCaseTest,ResumeMatchControllerTest,FlywayMigrationTest" test
@@ -283,7 +285,7 @@ mvn test
 
 Expected: all tests PASS.
 
-- [ ] **Step 8: Commit job-title support**
+- [x] **Step 8: Commit job-title support**
 
 ```powershell
 git add src/main src/test src/integration-test
@@ -309,7 +311,7 @@ git commit -m "feat: add display titles to job descriptions"
 - Modify: `AnalysisTaskRepository.java`, `MatchReportRepository.java`, `GetAnalysisTaskUseCase.java`
 - Modify: `AnalysisTaskResponse.java`, `ResumeMatchController.java`, controller tests
 
-- [ ] **Step 1: Write failing application tests**
+- [x] **Step 1: Write failing application tests**
 
 Use fixed entities with IDs and verify these contracts:
 
@@ -345,7 +347,7 @@ GET /api/analysis/summary
 GET /api/analysis/{taskId} with jobTitle, resumeFileName, matchScore
 ```
 
-- [ ] **Step 2: Run the new tests and confirm failure**
+- [x] **Step 2: Run the new tests and confirm failure**
 
 ```powershell
 mvn "-Dtest=ListAnalysisTasksUseCaseTest,GetAnalysisSummaryUseCaseTest,ResumeMatchControllerTest" test
@@ -353,7 +355,7 @@ mvn "-Dtest=ListAnalysisTasksUseCaseTest,GetAnalysisSummaryUseCaseTest,ResumeMat
 
 Expected: compilation failure for the new view/use-case types.
 
-- [ ] **Step 3: Add repository query primitives**
+- [x] **Step 3: Add repository query primitives**
 
 Add:
 
@@ -376,7 +378,7 @@ Double averageMatchScore();
 
 to `MatchReportRepository`.
 
-- [ ] **Step 4: Add the application view records**
+- [x] **Step 4: Add the application view records**
 
 Use these stable shapes:
 
@@ -423,7 +425,7 @@ public record AnalysisSummary(
 }
 ```
 
-- [ ] **Step 5: Implement batched list assembly and summary**
+- [x] **Step 5: Implement batched list assembly and summary**
 
 `ListAnalysisTasksUseCase.list` must:
 
@@ -445,7 +447,7 @@ BigDecimal average = Optional.ofNullable(reportRepository.averageMatchScore())
 
 Update `GetAnalysisTaskUseCase.find` to return `Optional<AnalysisTaskDetails>` and load the single task's job, resume, and optional report.
 
-- [ ] **Step 6: Add API response records and endpoints**
+- [x] **Step 6: Add API response records and endpoints**
 
 `AnalysisTaskResponse` gains nullable `jobTitle`, `resumeFileName`, and `matchScore`, with both `from(AnalysisTask)` and `from(AnalysisTaskDetails)` factories.
 
@@ -469,7 +471,7 @@ public AnalysisSummaryResponse analysisSummary() {
 
 Keep the existing POST `/api/analysis` and path-variable endpoints unchanged.
 
-- [ ] **Step 7: Verify focused and fast suites**
+- [x] **Step 7: Verify focused and fast suites**
 
 ```powershell
 mvn "-Dtest=ListAnalysisTasksUseCaseTest,GetAnalysisSummaryUseCaseTest,ResumeMatchControllerTest,DomainRepositoryTest" test
@@ -478,7 +480,7 @@ mvn test
 
 Expected: all tests PASS; history ordering and nullable scores are covered.
 
-- [ ] **Step 8: Commit read APIs**
+- [x] **Step 8: Commit read APIs**
 
 ```powershell
 git add src/main/java src/test/java
@@ -502,7 +504,7 @@ git commit -m "feat: expose analysis history and summary"
 - Modify: `ResumeMatchController.java`, `ResumeMatchControllerTest.java`
 - Modify: `EndToEndAnalysisFlowIT.java`
 
-- [ ] **Step 1: Write failing preparation and submission tests**
+- [x] **Step 1: Write failing preparation and submission tests**
 
 Add tests proving:
 
@@ -559,7 +561,7 @@ class AnalysisSubmissionTransactionTest {
 }
 ```
 
-- [ ] **Step 2: Run focused tests and confirm failure**
+- [x] **Step 2: Run focused tests and confirm failure**
 
 ```powershell
 mvn "-Dtest=PrepareResumeUseCaseTest,CreateAnalysisSubmissionUseCaseTest,ResumeMatchControllerTest" test
@@ -567,7 +569,7 @@ mvn "-Dtest=PrepareResumeUseCaseTest,CreateAnalysisSubmissionUseCaseTest,ResumeM
 
 Expected: compilation failure for the new use cases and endpoint.
 
-- [ ] **Step 3: Extract resume preparation**
+- [x] **Step 3: Extract resume preparation**
 
 Use:
 
@@ -593,7 +595,7 @@ public class PrepareResumeUseCase {
 
 Refactor `UploadResumeUseCase.upload` to `return resumeRepository.save(prepareResumeUseCase.prepare(file).toEntity());`.
 
-- [ ] **Step 4: Extract the common task creator**
+- [x] **Step 4: Extract the common task creator**
 
 Move task save/outbox/metric behavior into:
 
@@ -611,7 +613,7 @@ public class AnalysisTaskCreator {
 
 `CreateAnalysisTaskUseCase` keeps its existence checks and delegates to this component. This preserves the legacy API behavior without duplicating outbox creation.
 
-- [ ] **Step 5: Implement the atomic persistence boundary**
+- [x] **Step 5: Implement the atomic persistence boundary**
 
 Use these records and services:
 
@@ -649,7 +651,7 @@ public class PersistAnalysisSubmissionUseCase {
 
 Because `PrepareResumeUseCase` is a separate bean called before `PersistAnalysisSubmissionUseCase`, parser work occurs before the database transaction.
 
-- [ ] **Step 6: Add the multipart endpoint**
+- [x] **Step 6: Add the multipart endpoint**
 
 Add:
 
@@ -671,7 +673,7 @@ public AnalysisTaskResponse createAnalysisSubmission(
 
 Add an `AnalysisTaskResponse.from(AnalysisSubmission)` factory. Annotate the controller with `@Validated` so request-param constraints execute.
 
-- [ ] **Step 7: Extend the real E2E flow**
+- [x] **Step 7: Extend the real E2E flow**
 
 Change one DOCX test to submit through `/api/analysis-submissions`, then assert:
 
@@ -683,7 +685,7 @@ GET /api/analysis/summary -> totalCount >= 1 and averageMatchScore = 91.0
 
 Keep the PDF test on the legacy three-call path to preserve backward-compatibility coverage.
 
-- [ ] **Step 8: Verify fast tests**
+- [x] **Step 8: Verify fast tests**
 
 ```powershell
 mvn "-Dtest=PrepareResumeUseCaseTest,UploadResumeUseCaseTest,CreateAnalysisSubmissionUseCaseTest,PersistAnalysisSubmissionUseCaseTest,ResumeMatchControllerTest" test
@@ -692,7 +694,7 @@ mvn test
 
 Expected: 0 failures.
 
-- [ ] **Step 9: Commit atomic submission**
+- [x] **Step 9: Commit atomic submission**
 
 ```powershell
 git add src/main/java src/test/java src/integration-test/java
@@ -713,7 +715,7 @@ git commit -m "feat: add atomic analysis submission flow"
 - Create: `frontend/src/test/setup.ts`
 - Create: `frontend/src/app/App.test.tsx`
 
-- [ ] **Step 1: Create the package manifest and install the lockfile**
+- [x] **Step 1: Create the package manifest and install the lockfile**
 
 Use this manifest, keeping the exact resolved lockfile generated by `npm install`:
 
@@ -775,7 +777,7 @@ Use this manifest, keeping the exact resolved lockfile generated by `npm install
 
 Run `npm install` in `frontend/` and commit `package-lock.json`; do not use CDN imports.
 
-- [ ] **Step 2: Add a failing app smoke test**
+- [x] **Step 2: Add a failing app smoke test**
 
 ```tsx
 test('renders the product shell and dashboard route', async () => {
@@ -788,7 +790,7 @@ test('renders the product shell and dashboard route', async () => {
 
 Run `npm test -- App.test.tsx`; expect FAIL because `App` does not exist.
 
-- [ ] **Step 3: Add strict TypeScript, Vite, Vitest, and ESLint configuration**
+- [x] **Step 3: Add strict TypeScript, Vite, Vitest, and ESLint configuration**
 
 Set `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes` in `tsconfig.app.json`. Configure Vitest with `environment: 'jsdom'`, `setupFiles: ['./src/test/setup.ts']`, and CSS enabled. Configure Vite to proxy `/api` and `/backend-health`; load `API_TOKEN` without a `VITE_` prefix and set it only in proxy headers.
 
@@ -816,11 +818,11 @@ export default defineConfig(({ mode }) => {
 })
 ```
 
-- [ ] **Step 4: Add providers and placeholder routes**
+- [x] **Step 4: Add providers and placeholder routes**
 
 Create a `QueryClient` with one retry for GET queries and zero mutation retries. Use `createBrowserRouter` with the four approved routes and an `AppShell` placeholder. Import `tokens.css` and `global.css` from `main.tsx`.
 
-- [ ] **Step 5: Run frontend baseline checks**
+- [x] **Step 5: Run frontend baseline checks**
 
 ```powershell
 npm run lint
@@ -831,7 +833,7 @@ npm run build
 
 Expected: all commands PASS and `dist/index.html` exists.
 
-- [ ] **Step 6: Commit the frontend scaffold**
+- [x] **Step 6: Commit the frontend scaffold**
 
 ```powershell
 git add frontend
@@ -850,7 +852,7 @@ git commit -m "feat: scaffold typed react frontend"
 - Create: `frontend/src/test/server.ts`, `handlers.ts`
 - Modify: `frontend/src/test/setup.ts`
 
-- [ ] **Step 1: Write failing API-client tests**
+- [x] **Step 1: Write failing API-client tests**
 
 Cover success, structured errors, invalid JSON shape, and multipart submission:
 
@@ -874,7 +876,7 @@ test('rejects a response that violates the runtime schema', async () => {
 })
 ```
 
-- [ ] **Step 2: Run the tests and confirm failure**
+- [x] **Step 2: Run the tests and confirm failure**
 
 ```powershell
 npm test -- src/shared/api/client.test.ts
@@ -882,7 +884,7 @@ npm test -- src/shared/api/client.test.ts
 
 Expected: FAIL because the API client is missing.
 
-- [ ] **Step 3: Define Zod schemas matching the backend**
+- [x] **Step 3: Define Zod schemas matching the backend**
 
 Define and export schemas for:
 
@@ -899,7 +901,7 @@ healthSchema
 
 All server timestamps are ISO strings, `failureCode`, `failureMessage`, `jobTitle`, `resumeFileName`, `matchScore`, and `averageMatchScore` are nullable where the Java response permits null.
 
-- [ ] **Step 4: Implement one fetch boundary**
+- [x] **Step 4: Implement one fetch boundary**
 
 Use this behavior:
 
@@ -948,7 +950,7 @@ export async function apiRequest<T>(
 
 Do not log `payload` on parse failure.
 
-- [ ] **Step 5: Add endpoint functions**
+- [x] **Step 5: Add endpoint functions**
 
 Export:
 
@@ -964,7 +966,7 @@ getBackendHealth()
 
 `createAnalysisSubmission` must build a `FormData` and must not set `Content-Type` manually.
 
-- [ ] **Step 6: Verify the API layer**
+- [x] **Step 6: Verify the API layer**
 
 ```powershell
 npm test -- src/shared/api/client.test.ts
@@ -974,7 +976,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the API layer**
+- [x] **Step 7: Commit the API layer**
 
 ```powershell
 git add frontend/src/shared/api frontend/src/test
@@ -991,7 +993,7 @@ git commit -m "feat: add validated frontend api client"
 - Create component tests
 - Modify: app router and shared CSS
 
-- [ ] **Step 1: Write failing shell and component tests**
+- [x] **Step 1: Write failing shell and component tests**
 
 Assert:
 
@@ -1005,23 +1007,23 @@ expect(screen.getByText('可重试失败')).toHaveAttribute('data-status', 'FAIL
 
 Test the error boundary fallback and pagination disabled states.
 
-- [ ] **Step 2: Run focused tests and confirm failure**
+- [x] **Step 2: Run focused tests and confirm failure**
 
 ```powershell
 npm test -- src/app src/shared/components
 ```
 
-- [ ] **Step 3: Implement the approved shell**
+- [x] **Step 3: Implement the approved shell**
 
 Desktop: fixed-width dark ink sidebar, white top bar, constrained content. Mobile: horizontal navigation with no off-screen controls. Use Lucide `LayoutDashboard`, `History`, `Plus`, `RefreshCw`, `Copy`, and `AlertTriangle` icons; icon-only actions receive `aria-label` and `title`.
 
 The health label must say `API 已连接` or `API 暂不可用`; do not claim database or queue health.
 
-- [ ] **Step 4: Implement shared states**
+- [x] **Step 4: Implement shared states**
 
 `StatusBadge` maps every backend enum to Chinese text and a non-color cue. `AsyncState` supports loading, empty, error, and content. `Button` has `primary`, `secondary`, `danger`, loading, and disabled states. `Pagination` uses icon buttons with visible current-page text.
 
-- [ ] **Step 5: Verify shared UI**
+- [x] **Step 5: Verify shared UI**
 
 ```powershell
 npm test -- src/app src/shared/components
@@ -1029,7 +1031,7 @@ npm run lint
 npm run typecheck
 ```
 
-- [ ] **Step 6: Commit the shell**
+- [x] **Step 6: Commit the shell**
 
 ```powershell
 git add frontend/src/app frontend/src/shared/components frontend/src/styles
@@ -1045,7 +1047,7 @@ git commit -m "feat: add frontend application shell"
 - Create: `frontend/src/features/analyses/AnalysesPage.tsx`, hooks, tests, styles
 - Modify: router
 
-- [ ] **Step 1: Write failing dashboard tests**
+- [x] **Step 1: Write failing dashboard tests**
 
 Use MSW and assert:
 
@@ -1058,17 +1060,17 @@ expect(screen.getByRole('link', { name: /高级后端工程师/ })).toHaveAttrib
 
 Add separate tests for loading skeletons, empty recent history, and summary failure with a reload action.
 
-- [ ] **Step 2: Write failing history tests**
+- [x] **Step 2: Write failing history tests**
 
 Verify status selection updates `?status=SUCCESS&page=0&size=20`, pagination updates the URL, empty filters differ from empty history, and a long title does not replace the accessible full name.
 
-- [ ] **Step 3: Run focused tests and confirm failure**
+- [x] **Step 3: Run focused tests and confirm failure**
 
 ```powershell
 npm test -- src/features/dashboard src/features/analyses/AnalysesPage.test.tsx
 ```
 
-- [ ] **Step 4: Implement TanStack Query hooks**
+- [x] **Step 4: Implement TanStack Query hooks**
 
 Use query keys:
 
@@ -1079,11 +1081,11 @@ Use query keys:
 
 Dashboard requests summary and `{ page: 0, size: 5 }` in parallel. History derives filters from `useSearchParams` and never duplicates them into component state.
 
-- [ ] **Step 5: Implement responsive views**
+- [x] **Step 5: Implement responsive views**
 
 Use three metric panels and a semantic table. At mobile width hide only the resume filename and completion-time columns, preserving title, score, and status. All loading placeholders keep the same grid/table dimensions as loaded content.
 
-- [ ] **Step 6: Verify both pages**
+- [x] **Step 6: Verify both pages**
 
 ```powershell
 npm test -- src/features/dashboard src/features/analyses/AnalysesPage.test.tsx
@@ -1091,7 +1093,7 @@ npm run lint
 npm run typecheck
 ```
 
-- [ ] **Step 7: Commit dashboard and history**
+- [x] **Step 7: Commit dashboard and history**
 
 ```powershell
 git add frontend/src/features/dashboard frontend/src/features/analyses frontend/src/app/router.tsx frontend/src/styles
@@ -1108,7 +1110,7 @@ git commit -m "feat: add analysis dashboard and history"
 - Create: `frontend/src/features/analyses/NewAnalysisPage.test.tsx`
 - Modify: feature styles and router
 
-- [ ] **Step 1: Write failing form tests**
+- [x] **Step 1: Write failing form tests**
 
 Cover:
 
@@ -1125,13 +1127,13 @@ server error preserves selected filename/title/JD
 
 The success test must assert navigation to `/analyses/42` and that the summary/history queries are invalidated.
 
-- [ ] **Step 2: Run the focused test and confirm failure**
+- [x] **Step 2: Run the focused test and confirm failure**
 
 ```powershell
 npm test -- src/features/analyses/NewAnalysisPage.test.tsx
 ```
 
-- [ ] **Step 3: Add Zod form validation**
+- [x] **Step 3: Add Zod form validation**
 
 Use:
 
@@ -1146,11 +1148,11 @@ export const analysisFormSchema = z.object({
 })
 ```
 
-- [ ] **Step 4: Implement the accessible upload form**
+- [x] **Step 4: Implement the accessible upload form**
 
 Use a visible file label, drag/drop zone, accepted-format text, filename/size display, visible labels for title/JD, field-level errors, and a submission summary. Keep all values only in React Hook Form memory. On success call `reset()`, invalidate summary/history, then navigate.
 
-- [ ] **Step 5: Verify the form**
+- [x] **Step 5: Verify the form**
 
 ```powershell
 npm test -- src/features/analyses/NewAnalysisPage.test.tsx
@@ -1158,7 +1160,7 @@ npm run lint
 npm run typecheck
 ```
 
-- [ ] **Step 6: Commit the submission UI**
+- [x] **Step 6: Commit the submission UI**
 
 ```powershell
 git add frontend/src/features/analyses frontend/src/app/router.tsx
@@ -1176,7 +1178,7 @@ git commit -m "feat: add guided analysis submission"
 - Create tests for polling, terminal states, retry, and Markdown
 - Modify: feature styles and router
 
-- [ ] **Step 1: Write failing polling tests**
+- [x] **Step 1: Write failing polling tests**
 
 Use fake timers and prove:
 
@@ -1189,7 +1191,7 @@ SUCCESS / FAILED_RETRYABLE / FAILED_FINAL -> no further polling
 
 Do not model a network failure as a business status change.
 
-- [ ] **Step 2: Write failing report and retry tests**
+- [x] **Step 2: Write failing report and retry tests**
 
 Assert that:
 
@@ -1199,17 +1201,17 @@ Assert that:
 - raw `<script>` and raw HTML are displayed as text or omitted, never executed.
 - external links receive `target="_blank"` and `rel="noreferrer noopener"`.
 
-- [ ] **Step 3: Run focused tests and confirm failure**
+- [x] **Step 3: Run focused tests and confirm failure**
 
 ```powershell
 npm test -- src/features/analyses/AnalysisDetailPage.test.tsx src/features/reports
 ```
 
-- [ ] **Step 4: Implement status-driven detail behavior**
+- [x] **Step 4: Implement status-driven detail behavior**
 
 Use a query `refetchInterval` function returning `2000`, `4000`, then `8000` based on successful active fetch count, and `false` for terminal states. Set `refetchIntervalInBackground: false`. Display task metadata, attempts, timestamps, last-known state on transport failure, and a manual refresh action.
 
-- [ ] **Step 5: Implement safe Markdown**
+- [x] **Step 5: Implement safe Markdown**
 
 Render:
 
@@ -1228,7 +1230,7 @@ Render:
 
 Do not install or enable `rehype-raw`.
 
-- [ ] **Step 6: Verify detail behavior**
+- [x] **Step 6: Verify detail behavior**
 
 ```powershell
 npm test -- src/features/analyses src/features/reports
@@ -1237,7 +1239,7 @@ npm run typecheck
 npm run build
 ```
 
-- [ ] **Step 7: Commit the detail/report flow**
+- [x] **Step 7: Commit the detail/report flow**
 
 ```powershell
 git add frontend/src/features/analyses frontend/src/features/reports
@@ -1248,13 +1250,15 @@ git commit -m "feat: add resilient analysis detail experience"
 
 ### Task 11: Add Nginx and Docker Compose delivery
 
+> Final hardening note: the reviewed implementation pins both frontend base-image digests and renders an escaped `API_TOKEN_NGINX` through `frontend-entrypoint.sh`. The original snippets below express the delivery intent; they must not be copied as the final secret-rendering implementation.
+
 **Files:**
 - Create: `frontend/Dockerfile`, `.dockerignore`
 - Create: `frontend/nginx/default.conf.template`
 - Modify: `docker-compose.yml`, `.env.example`
 - Modify: `DeploymentConfigurationTest.java`
 
-- [ ] **Step 1: Write failing deployment asset tests**
+- [x] **Step 1: Write failing deployment asset tests**
 
 Extend `DeploymentConfigurationTest` to assert:
 
@@ -1271,13 +1275,13 @@ assertThat(nginxTemplate).contains("proxy_set_header X-API-Token ${API_TOKEN}")
     .contains("Content-Security-Policy");
 ```
 
-- [ ] **Step 2: Run the focused test and confirm failure**
+- [x] **Step 2: Run the focused test and confirm failure**
 
 ```powershell
 mvn "-Dtest=DeploymentConfigurationTest" test
 ```
 
-- [ ] **Step 3: Add the frontend multi-stage image**
+- [x] **Step 3: Add the frontend multi-stage image**
 
 Use:
 
@@ -1298,7 +1302,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -q -O - http://127.0.0.1:8080/frontend-health || exit 1
 ```
 
-- [ ] **Step 4: Add the Nginx template**
+- [x] **Step 4: Add the Nginx template**
 
 Required locations:
 
@@ -1316,7 +1320,7 @@ location / { try_files $uri $uri/ /index.html; }
 
 Add CSP, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `X-Frame-Options: DENY`. Permit only same-origin scripts, styles, images, fonts, forms, and connections.
 
-- [ ] **Step 5: Extend Compose without breaking API access**
+- [x] **Step 5: Extend Compose without breaking API access**
 
 Add `frontend` with `API_TOKEN`, `${FRONTEND_PORT:-3000}:8080`, app health dependency, and restart policy. Make dependency host ports configurable:
 
@@ -1329,7 +1333,7 @@ management: "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
 
 Document the four new variables in `.env.example`.
 
-- [ ] **Step 6: Verify build assets**
+- [x] **Step 6: Verify build assets**
 
 ```powershell
 mvn "-Dtest=DeploymentConfigurationTest" test
@@ -1340,7 +1344,7 @@ docker build -t ai-resume-match-frontend:local frontend
 
 Expected: all commands succeed.
 
-- [ ] **Step 7: Commit delivery assets**
+- [x] **Step 7: Commit delivery assets**
 
 ```powershell
 git add frontend/Dockerfile frontend/.dockerignore frontend/nginx docker-compose.yml .env.example src/test/java/com/zhulikang/aimatch/config/DeploymentConfigurationTest.java
@@ -1357,7 +1361,7 @@ git commit -m "feat: deliver frontend through nginx compose service"
 - Create: `frontend/e2e/product-flow.spec.ts`
 - Create: `frontend/e2e/responsive.spec.ts`
 
-- [ ] **Step 1: Configure Chromium and the Vite web server**
+- [x] **Step 1: Configure Chromium and the Vite web server**
 
 Use:
 
@@ -1379,7 +1383,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 2: Write the failing full product-flow test**
+- [x] **Step 2: Write the failing full product-flow test**
 
 Intercept same-origin API calls and model:
 
@@ -1393,11 +1397,11 @@ history -> includes task 42
 
 Drive the page by accessible labels and roles only. Assert the user can move from dashboard to submission, upload an in-memory PDF payload, wait for the report, and return to history.
 
-- [ ] **Step 3: Add retry and error-path coverage**
+- [x] **Step 3: Add retry and error-path coverage**
 
 Add a test where task 43 is `FAILED_RETRYABLE`, click `重新分析`, mock the POST retry response, then assert the page returns to `PENDING`. Add a final-failure case with visible request ID and no retry button.
 
-- [ ] **Step 4: Add responsive and overflow checks**
+- [x] **Step 4: Add responsive and overflow checks**
 
 At `1440x900` and `390x844`, assert:
 
@@ -1408,7 +1412,7 @@ expect(overflow).toBe(false)
 
 Capture stable screenshots for dashboard, new analysis, active task, and report.
 
-- [ ] **Step 5: Install the browser and run tests**
+- [x] **Step 5: Install the browser and run tests**
 
 ```powershell
 npx --prefix frontend playwright install chromium
@@ -1417,7 +1421,7 @@ npm --prefix frontend run test:e2e
 
 Expected: all Playwright tests PASS.
 
-- [ ] **Step 6: Commit browser tests**
+- [x] **Step 6: Commit browser tests**
 
 ```powershell
 git add frontend/playwright.config.ts frontend/e2e
@@ -1435,7 +1439,7 @@ git commit -m "test: cover frontend product flow in browser"
 - Create: `frontend/scripts/run-full-stack-e2e.mjs`
 - Modify: `frontend/package.json`, lockfile if needed
 
-- [ ] **Step 1: Add a deterministic OpenAI-compatible mock service**
+- [x] **Step 1: Add a deterministic OpenAI-compatible mock service**
 
 The Node server must expose `GET /health` and `POST /v1/chat/completions`, record no request bodies, and return:
 
@@ -1451,11 +1455,11 @@ The Node server must expose `GET /health` and `POST /v1/chat/completions`, recor
 }
 ```
 
-- [ ] **Step 2: Add the E2E Compose override**
+- [x] **Step 2: Add the E2E Compose override**
 
 Add `mock-ai` from `node:24-alpine`, mount `e2e/mock-ai/server.mjs` read-only, and override app `AI_ENDPOINT` to `http://mock-ai:18089/v1/chat/completions`. Add a Node-based healthcheck and make app depend on healthy mock AI.
 
-- [ ] **Step 3: Write the full-stack Playwright test**
+- [x] **Step 3: Write the full-stack Playwright test**
 
 Use `pdf-lib` to create a valid in-memory PDF:
 
@@ -1474,7 +1478,7 @@ await page.getByLabel('简历文件').setInputFiles({
 
 Submit a synthetic JD, wait for score `91`, revisit history, and assert the job title and filename are present.
 
-- [ ] **Step 4: Add a cross-platform orchestration script**
+- [x] **Step 4: Add a cross-platform orchestration script**
 
 `run-full-stack-e2e.mjs` must:
 
@@ -1484,7 +1488,7 @@ Submit a synthetic JD, wait for score `91`, revisit history, and assert the job 
 4. Always run `docker compose ... down -v` in `finally`.
 5. Forward child stdout/stderr and exit nonzero on failure without printing secrets.
 
-- [ ] **Step 5: Run full-stack acceptance**
+- [x] **Step 5: Run full-stack acceptance**
 
 ```powershell
 npm --prefix frontend run test:e2e:full-stack
@@ -1492,7 +1496,7 @@ npm --prefix frontend run test:e2e:full-stack
 
 Expected: Compose becomes healthy, the browser test reports score 91, and teardown removes containers/volumes.
 
-- [ ] **Step 6: Commit full-stack acceptance**
+- [x] **Step 6: Commit full-stack acceptance**
 
 ```powershell
 git add e2e docker-compose.e2e.yml frontend/e2e/full-stack.spec.ts frontend/scripts frontend/package.json frontend/package-lock.json
@@ -1510,7 +1514,7 @@ git commit -m "test: add full stack frontend acceptance flow"
 - Modify: `docs/operations/runbook.md`
 - Modify: this plan checklist as tasks complete
 
-- [ ] **Step 1: Update user and developer documentation**
+- [x] **Step 1: Update user and developer documentation**
 
 Document:
 
@@ -1525,7 +1529,7 @@ mocked browser tests vs full-stack browser acceptance
 resume/JD browser-storage prohibition
 ```
 
-- [ ] **Step 2: Run all fast checks**
+- [x] **Step 2: Run all fast checks**
 
 ```powershell
 mvn test
@@ -1538,7 +1542,7 @@ npm --prefix frontend run test:e2e
 
 Expected: all commands PASS.
 
-- [ ] **Step 3: Run infrastructure-backed checks**
+- [x] **Step 3: Run infrastructure-backed checks**
 
 ```powershell
 $env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'
@@ -1549,7 +1553,7 @@ docker compose --env-file .env.example config --quiet
 
 Expected: all unit, integration, backend E2E, deterministic browser, and full-stack browser tests PASS.
 
-- [ ] **Step 4: Perform visual QA in the in-app browser**
+- [x] **Step 4: Perform visual QA in the in-app browser**
 
 Start the real full stack on free ports and inspect at least:
 
@@ -1560,7 +1564,7 @@ Start the real full stack on free ports and inspect at least:
 
 Verify no overlap, horizontal page overflow, clipped long text, blank content, layout shift, or missing focus state. Save final screenshots outside tracked source unless documentation explicitly needs one.
 
-- [ ] **Step 5: Check privacy and repository hygiene**
+- [x] **Step 5: Check privacy and repository hygiene**
 
 ```powershell
 rg -n "real token|Bearer sk-|BEGIN PRIVATE|真实简历" . -g '!target/**' -g '!frontend/node_modules/**' -g '!frontend/dist/**'
@@ -1570,13 +1574,13 @@ git status --short
 
 Expected: no secrets or real resume/JD content, no whitespace errors, only intended files changed.
 
-- [ ] **Step 6: Commit documentation and close the plan**
+- [x] **Step 6: Commit documentation and close the plan**
 
 ```powershell
 git add README.md docs frontend src docker-compose.yml docker-compose.e2e.yml .env.example e2e
 git commit -m "docs: document frontend product workflow"
 ```
 
-- [ ] **Step 7: Request final code review and integrate**
+- [x] **Step 7: Request final code review and integrate**
 
-Use `superpowers:requesting-code-review`, resolve any findings with focused tests, rerun the final verification commands, then use `superpowers:finishing-a-development-branch` to merge the branch and clean up the worktree.
+Perform one combined final review, resolve confirmed important findings with focused tests, rerun the final verification commands, then fast-forward the verified branch into `master` and remove the temporary worktree without touching unrelated user files.

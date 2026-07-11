@@ -1,8 +1,8 @@
 # AI Resume Match Development Guide
 
-本文档是 `ai-resume-match` 后续工程化重构的日常开发入口。详细设计以
-`docs/superpowers/specs/2026-07-04-engineering-hardening-design.md` 为准；每个阶段的具体改动以
-`docs/superpowers/plans/` 下对应计划为准。
+本文档是 `ai-resume-match` 的日常开发入口。后端工程化设计见
+`docs/superpowers/specs/2026-07-04-engineering-hardening-design.md`，前端产品设计见
+`docs/superpowers/specs/2026-07-10-frontend-product-experience-design.md`；阶段改动以 `docs/superpowers/plans/` 下对应计划为准。
 
 ## 1. 基本原则
 
@@ -45,7 +45,8 @@
    - 先写或调整测试，确认测试因预期原因失败。
    - 实现最小必要改动。
    - 跑聚焦测试并确认通过。
-   - 对同一任务做规格符合性检查和代码质量检查。
+   - 对同一任务做一次合并的规格与代码质量检查。
+   - 集中修复重要发现并直接验证；只有关键行为发生较大变化时才补一次短复查。
    - 提交一个范围清晰的 commit。
 
 6. 阶段完成后运行全量测试。
@@ -81,6 +82,29 @@ PowerShell 中 `-Dtest=A,B` 推荐整体加引号，避免参数解析问题。
 ```powershell
 mvn verify
 ```
+
+前端开发与验证：
+
+```powershell
+npm --prefix frontend ci
+npm --prefix frontend run dev
+npm --prefix frontend run lint
+npm --prefix frontend run typecheck
+npm --prefix frontend run test
+npm --prefix frontend run build
+```
+
+浏览器测试分两层：
+
+```powershell
+# 同源 API 使用确定性 mock，覆盖主流程、错误分支和桌面/移动布局
+npm --prefix frontend run test:e2e
+
+# 构建独立 Compose 项目，覆盖真实 Spring/outbox/RabbitMQ/Redis/AI mock 链路
+npm --prefix frontend run test:e2e:full-stack
+```
+
+`test:e2e:full-stack` 需要 Docker Desktop，使用专用端口和 volume，并在 `finally` 中清理。不要把 full-stack spec 并入普通浏览器套件运行。
 
 ## 4. 代码约定
 
@@ -118,6 +142,14 @@ API 层：
 - `prod` profile 使用 `ddl-auto=validate` 和 Flyway migration，不包含 `root`、`guest`、`localhost` 或开发 token 默认值。
 - `.env` 不得提交，`.env.example` 只保存示例值。
 
+前端：
+
+- API DTO 必须先经过 Zod 运行时校验，再进入页面状态。
+- 数据读取使用 TanStack Query；敏感 multipart 提交使用可取消的直接请求，卸载时终止。
+- 状态与错误通过可访问名称、live region 和结构化 request ID 呈现。
+- 报告 Markdown 禁用远程图片，不允许危险 scheme；不要把简历、JD、token 写入 Web Storage。
+- 生产浏览器只访问 Nginx 同源代理；`API_TOKEN` 不得进入 `VITE_*`、bundle、DOM 或前端日志。
+
 ## 5. 子代理使用
 
 适合使用子代理的场景：
@@ -132,8 +164,9 @@ API 层：
 1. 主线程负责读设计、拆任务、维护计划和最终集成。
 2. worker 子代理只处理明确文件范围内的实现任务。
 3. explorer 子代理只回答具体问题，不直接改文件。
-4. 每个实现任务后做两轮独立检查：规格符合性、代码质量。
-5. 主线程最终运行测试并提交。
+4. 每个主要任务最多安排一次合并审查，优先报告会影响正确性、安全性、隐私或交付的问题。
+5. 发现集中修复一次并由主线程直接验证；避免在同一代码上重复发起无新增信息的复审。
+6. 主线程最终运行测试并提交。
 
 给子代理的提示应包含：
 
@@ -171,7 +204,8 @@ mvn test
 - Phase 4：已完成。Dockerfile、app compose service、health checks、profiles、`.env.example`、README 启动流。
 - Phase 5：已完成。request/correlation ID、结构化任务日志、Micrometer 指标、运行手册补强。
 - Phase 6：已完成。端到端验证、mock AI HTTP server、PDF/DOCX fixtures、Redis Testcontainers、`mvn verify`。
+- 前端产品化：已完成。原子提交、历史/汇总 API、React 工作台、状态轮询与重试、安全报告、Nginx/Compose 交付、Playwright 和真实全栈验收。
 
-当前 B+ 工程化重构计划的验收闭环是：`mvn test`、Docker-backed `mvn verify`、`docker compose --env-file .env.example config --quiet` 全部通过。
+当前工程化验收闭环是：`mvn test`、Docker-backed `mvn verify`、前端 lint/typecheck/unit/build、`test:e2e`、`test:e2e:full-stack`、`docker compose --env-file .env.example config --quiet` 全部通过。
 
 `docs/superpowers/plans/2026-05-12-rag-resume-job-match.md` 保留为历史实现上下文，不作为当前工程化重构的执行计划。

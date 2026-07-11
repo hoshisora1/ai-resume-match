@@ -1,6 +1,6 @@
 # AI Resume Match Operations Runbook
 
-本文档记录 `ai-resume-match` 当前可执行的本地运行、检查和排障流程。应用已经 Docker 化，Compose 可启动 app、MySQL、Redis、RabbitMQ，并提供 Actuator readiness/liveness health、request/correlation ID、结构化任务日志和 Micrometer metrics。
+本文档记录 `ai-resume-match` 当前可执行的本地运行、检查和排障流程。Compose 可启动 frontend、app、MySQL、Redis、RabbitMQ，并提供前端/后端健康检查、request/correlation ID、结构化任务日志和 Micrometer metrics。
 
 ## 1. 完整 Docker Compose 启动
 
@@ -29,6 +29,7 @@ docker compose up -d --build
 
 ```powershell
 docker compose ps
+curl.exe -i http://localhost:3000/frontend-health
 curl.exe -i http://localhost:8080/actuator/health/readiness
 ```
 
@@ -36,11 +37,16 @@ curl.exe -i http://localhost:8080/actuator/health/readiness
 
 默认本地端口：
 
+- 产品前端：`http://localhost:3000`，由 Nginx 提供。
 - App：`http://localhost:8080`。
 - MySQL：`localhost:3306`，database 默认 `ai_resume_match`，用户/密码来自 `.env`。
 - Redis：`localhost:6379`，密码来自 `.env`。
 - RabbitMQ：`localhost:5672`，用户名/密码来自 `.env`。
 - RabbitMQ 管理页：`http://localhost:15672`。
+
+这些 host 端口均可通过 `.env` 中的 `FRONTEND_PORT`、`APP_PORT`、`MYSQL_PORT`、`REDIS_PORT`、`RABBITMQ_AMQP_PORT`、`RABBITMQ_MANAGEMENT_PORT` 覆盖。前端容器只有在 app readiness 通过后才启动；`/frontend-health` 用于检查 Nginx 静态服务。
+
+浏览器不持有 API token。Nginx 从容器环境读取 `API_TOKEN`，在代理 `/api` 时写入 `X-API-Token`；不要把 token 改成 `VITE_*` 变量或写入静态文件。
 
 ## 2. 本机 Maven 开发启动
 
@@ -57,6 +63,15 @@ mvn spring-boot:run
 ```
 
 `dev` profile 默认连接 `localhost` 依赖；`docker` profile 使用 Compose 服务名；`prod` profile 不包含本地默认凭据。
+
+另开终端启动前端开发服务：
+
+```powershell
+npm --prefix frontend ci
+$env:API_PROXY_TARGET="http://localhost:8080"
+$env:API_TOKEN="dev-token"
+npm --prefix frontend run dev
+```
 
 ## 3. 停止与清理
 
@@ -97,11 +112,27 @@ docker compose --env-file .env.example config
 
 ```powershell
 docker build -t ai-resume-match:local .
+docker build -t ai-resume-match-frontend:local frontend
 ```
 
 当前 `mvn verify` 会通过 Testcontainers 验证 MySQL Flyway migration、MySQL+RabbitMQ outbox 生命周期、publisher confirm/return 行为、Redis cache-aside，以及 mock AI HTTP server 驱动的 PDF/DOCX 端到端分析流。
 
+前端和完整产品流验证：
+
+```powershell
+npm --prefix frontend run lint
+npm --prefix frontend run typecheck
+npm --prefix frontend run test
+npm --prefix frontend run build
+npm --prefix frontend run test:e2e
+npm --prefix frontend run test:e2e:full-stack
+```
+
+`test:e2e` 使用浏览器路由 mock，不访问外部网络。`test:e2e:full-stack` 使用独立 Compose 项目和 mock AI 服务，验证真实上传、outbox、worker、91 分报告及历史回查，结束后自动 `down -v`。
+
 ## 5. 基础业务 smoke flow
+
+浏览器 smoke flow：打开 `http://localhost:3000`，确认顶部显示“API 已连接”，然后依次检查“新建分析”、任务进度、报告和“分析记录”。
 
 检查 API token 拦截：
 
@@ -126,7 +157,7 @@ curl.exe -i `
 curl.exe -i `
   -H "X-API-Token: dev-token" `
   -H "Content-Type: application/json" `
-  -d "{\"content\":\"Java Spring Boot Redis RabbitMQ\"}" `
+  -d "{\"title\":\"高级后端工程师\",\"content\":\"Java Spring Boot Redis RabbitMQ\"}" `
   http://localhost:8080/api/jobs
 ```
 
@@ -138,6 +169,24 @@ curl.exe -i `
   -H "Content-Type: application/json" `
   -d "{\"resumeId\":1,\"jobDescriptionId\":1}" `
   http://localhost:8080/api/analysis
+```
+
+浏览器默认使用原子提交接口，一次请求创建简历、JD、任务和 outbox：
+
+```powershell
+curl.exe -i `
+  -H "X-API-Token: dev-token" `
+  -F "file=@C:\Users\chen\Documents\sample-resume.pdf" `
+  -F "jobTitle=高级后端工程师" `
+  -F "jobContent=Java Spring Boot Redis RabbitMQ" `
+  http://localhost:8080/api/analysis-submissions
+```
+
+历史与总览：
+
+```powershell
+curl.exe -i -H "X-API-Token: dev-token" "http://localhost:8080/api/analysis?page=0&size=20"
+curl.exe -i -H "X-API-Token: dev-token" http://localhost:8080/api/analysis/summary
 ```
 
 查询任务状态：
@@ -256,13 +305,38 @@ RabbitMQ 管理页：`http://localhost:15672`。
 - Phase 3 已提供 `nextRetryAt`、自动重试调度和带 publisher confirm/return 的 outbox 重投递。
 - `FAILED_FINAL` 是终态；如需重新分析，应创建新任务。
 
+### 6.7 前端无法访问或显示 API 暂不可用
+
+检查：
+
+```powershell
+docker compose ps frontend app
+docker compose logs frontend --tail 100
+curl.exe -i http://localhost:3000/frontend-health
+curl.exe -i http://localhost:3000/backend-health
+```
+
+- frontend 不健康：检查运行时 `API_TOKEN` 是否存在且不含 CR/LF，并执行 `nginx -t`。
+- `/frontend-health` 正常但 `/backend-health` 失败：检查 app readiness 和依赖容器。
+- 浏览器刷新子路由返回 404：确认使用仓库提供的 Nginx template，SPA fallback 应回到 `index.html`。
+
 ## 7. 数据与安全
 
 - 不要把真实简历、JD、AI prompt 或 AI 原始输出贴入 issue、commit message、日志样例或文档。
 - 当前服务会把简历/JD 相关内容发送给配置的 AI provider。
+- 前端不得把简历、JD、token 写入 localStorage/sessionStorage；页面卸载会取消仍在进行的敏感上传请求。
+- Markdown 报告不加载远程图片，避免报告内容触发第三方请求。
 - `.env`、真实 API key、真实 token 不得提交。
 - `.env.example` 只放示例值，不放真实密钥。
 - 生产环境必须使用 `prod` profile，并通过环境变量注入真实配置。
+
+### 7.1 Flyway 发布与前向恢复
+
+- 当前 Compose 交付按单实例维护窗口升级，不承诺新旧应用版本滚动共存。
+- 发布前备份 MySQL，并在维护窗口停止旧 app；先让新 app 启动完成 Flyway migration，再开放 frontend 流量。
+- migration 只做前向、可重复验证的 schema 演进。已在共享环境执行的 migration 不修改 checksum，也不依赖手工回滚 SQL。
+- 如果 migration 失败，保持 frontend/app 不接流量，修复原因后新增前向 migration 或恢复发布前备份；不要用 `flyway repair` 掩盖未知差异。
+- 本次岗位标题字段为 nullable，旧客户端与旧数据可继续读取，应用和 schema 应在同一维护窗口发布。
 
 ## 8. 可观测性检查
 
