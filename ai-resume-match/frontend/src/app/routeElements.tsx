@@ -1,22 +1,5 @@
-import { Link, Outlet } from 'react-router'
-
 interface PlaceholderPageProps {
   title: string
-}
-
-export function AppShell() {
-  return (
-    <div className="app-shell">
-      <header className="app-header">
-        <Link className="brand-link" to="/">
-          MatchLab
-        </Link>
-      </header>
-      <main className="app-main">
-        <Outlet />
-      </main>
-    </div>
-  )
 }
 
 export function PlaceholderPage({ title }: PlaceholderPageProps) {
