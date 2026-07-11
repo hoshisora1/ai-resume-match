@@ -46,11 +46,10 @@ export function listAnalyses(
   )
 }
 
-export function createAnalysisSubmission({
-  file,
-  jobTitle,
-  jobContent,
-}: CreateAnalysisSubmissionInput) {
+export function createAnalysisSubmission(
+  { file, jobTitle, jobContent }: CreateAnalysisSubmissionInput,
+  signal?: AbortSignal,
+) {
   const formData = new FormData()
   formData.set('file', file)
   formData.set('jobTitle', jobTitle)
@@ -59,6 +58,7 @@ export function createAnalysisSubmission({
   return apiRequest('/api/analysis-submissions', analysisTaskSchema, {
     method: 'POST',
     body: formData,
+    ...(signal ? { signal } : {}),
   })
 }
 

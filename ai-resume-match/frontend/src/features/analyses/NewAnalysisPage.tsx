@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { FileText, FileUp, Send } from 'lucide-react'
 import {
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -13,13 +14,16 @@ import { useNavigate } from 'react-router'
 
 import { analysisSummaryQueryKey } from '../dashboard/useAnalysisSummaryQuery'
 import { createAnalysisSubmission } from '../../shared/api/analyses'
-import { ApiError } from '../../shared/api/client'
 import { Button } from '../../shared/components/Button'
 import {
   analysisFormSchema,
   hasNonJavaUnicodeWhitespaceCodePoint,
   type AnalysisFormValues,
 } from './analysisFormSchema'
+import {
+  summarizeSubmissionError,
+  type SubmissionError,
+} from './submissionError'
 import './analysis-form.css'
 
 const FILE_INPUT_ID = 'analysis-resume-file'
@@ -59,11 +63,15 @@ export function NewAnalysisPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragDepthRef = useRef(0)
   const submissionInFlightRef = useRef(false)
+  const submissionAbortControllerRef = useRef<AbortController | null>(null)
+  const isMountedRef = useRef(true)
   const [isDragging, setIsDragging] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submissionError, setSubmissionError] =
+    useState<SubmissionError | null>(null)
   const {
     control,
     formState: { errors },
-    getValues,
     handleSubmit,
     register,
     reset,
@@ -81,31 +89,18 @@ export function NewAnalysisPage() {
   const jobTitleRegistration = register('jobTitle')
   const jobContentRegistration = register('jobContent')
 
-  const submissionMutation = useMutation({
-    mutationFn: async () => ({
-      taskId: (await createAnalysisSubmission(getValues())).taskId,
-    }),
-    onSuccess: async ({ taskId }) => {
-      reset()
-      if (fileInputRef.current !== null) {
-        fileInputRef.current.value = ''
-      }
-      dragDepthRef.current = 0
-      setIsDragging(false)
+  useEffect(() => {
+    isMountedRef.current = true
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: analysisSummaryQueryKey }),
-        queryClient.invalidateQueries({ queryKey: ['analyses'] }),
-      ])
-      await navigate(`/analyses/${taskId}`, { replace: true })
-    },
-    onSettled: () => {
-      submissionInFlightRef.current = false
-    },
-  })
+    return () => {
+      isMountedRef.current = false
+      submissionAbortControllerRef.current?.abort()
+      submissionAbortControllerRef.current = null
+    }
+  }, [])
 
   const chooseFile = (file: File | undefined) => {
-    if (submissionMutation.isPending) {
+    if (isSubmitting) {
       return
     }
 
@@ -127,7 +122,7 @@ export function NewAnalysisPage() {
 
   const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
-    if (submissionMutation.isPending) {
+    if (isSubmitting) {
       return
     }
     dragDepthRef.current += 1
@@ -136,7 +131,7 @@ export function NewAnalysisPage() {
 
   const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
-    if (submissionMutation.isPending) {
+    if (isSubmitting) {
       return
     }
     dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
@@ -147,14 +142,12 @@ export function NewAnalysisPage() {
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
-    event.dataTransfer.dropEffect = submissionMutation.isPending
-      ? 'none'
-      : 'copy'
+    event.dataTransfer.dropEffect = isSubmitting ? 'none' : 'copy'
   }
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
-    if (submissionMutation.isPending) {
+    if (isSubmitting) {
       return
     }
     dragDepthRef.current = 0
@@ -165,26 +158,61 @@ export function NewAnalysisPage() {
     chooseFile(event.dataTransfer.files[0])
   }
 
-  const submitForm = () => {
+  const submitForm = (values: AnalysisFormValues) => {
     if (submissionInFlightRef.current) {
       return
     }
 
     submissionInFlightRef.current = true
+    setIsSubmitting(true)
+    setSubmissionError(null)
     dragDepthRef.current = 0
     setIsDragging(false)
-    submissionMutation.reset()
-    submissionMutation.mutate()
+    const abortController = new AbortController()
+    submissionAbortControllerRef.current = abortController
+
+    void createAnalysisSubmission(values, abortController.signal)
+      .then(async ({ taskId }) => {
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return
+        }
+
+        reset()
+        if (fileInputRef.current !== null) {
+          fileInputRef.current.value = ''
+        }
+        dragDepthRef.current = 0
+        setIsDragging(false)
+
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: analysisSummaryQueryKey }),
+          queryClient.invalidateQueries({ queryKey: ['analyses'] }),
+        ])
+        if (abortController.signal.aborted || !isMountedRef.current) {
+          return
+        }
+        await navigate(`/analyses/${taskId}`, { replace: true })
+      })
+      .catch((error: unknown) => {
+        if (!abortController.signal.aborted && isMountedRef.current) {
+          setSubmissionError(summarizeSubmissionError(error))
+        }
+      })
+      .finally(() => {
+        if (submissionAbortControllerRef.current === abortController) {
+          submissionAbortControllerRef.current = null
+        }
+        if (isMountedRef.current) {
+          submissionInFlightRef.current = false
+          setIsSubmitting(false)
+        }
+      })
   }
 
   const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
     void handleSubmit(submitForm)(event)
   }
 
-  const requestId =
-    submissionMutation.error instanceof ApiError
-      ? submissionMutation.error.requestId
-      : undefined
   const confirmationTitle = hasNonJavaUnicodeWhitespaceCodePoint(jobTitle)
     ? jobTitle
     : ''
@@ -216,7 +244,7 @@ export function NewAnalysisPage() {
           </div>
 
           <div
-            aria-disabled={submissionMutation.isPending || undefined}
+            aria-disabled={isSubmitting || undefined}
             aria-labelledby="analysis-resume-heading"
             className="analysis-upload-zone"
             data-dragging={isDragging}
@@ -230,7 +258,7 @@ export function NewAnalysisPage() {
             <FileUp aria-hidden="true" className="analysis-upload-zone__icon" size={28} />
             <div className="analysis-upload-zone__actions">
               <label
-                aria-disabled={submissionMutation.isPending || undefined}
+                aria-disabled={isSubmitting || undefined}
                 className="button button--secondary analysis-file-label"
                 htmlFor={FILE_INPUT_ID}
               >
@@ -252,7 +280,7 @@ export function NewAnalysisPage() {
                   )}
                   aria-invalid={errors.file ? true : undefined}
                   className="analysis-file-input"
-                  disabled={submissionMutation.isPending}
+                  disabled={isSubmitting}
                   id={FILE_INPUT_ID}
                   name={field.name}
                   onBlur={field.onBlur}
@@ -319,7 +347,7 @@ export function NewAnalysisPage() {
               )}
               aria-invalid={errors.jobTitle ? true : undefined}
               autoComplete="off"
-              disabled={submissionMutation.isPending}
+              disabled={isSubmitting}
               id={TITLE_INPUT_ID}
               type="text"
             />
@@ -343,7 +371,7 @@ export function NewAnalysisPage() {
                 errors.jobContent !== undefined,
               )}
               aria-invalid={errors.jobContent ? true : undefined}
-              disabled={submissionMutation.isPending}
+              disabled={isSubmitting}
               id={CONTENT_INPUT_ID}
               rows={9}
             />
@@ -378,17 +406,19 @@ export function NewAnalysisPage() {
         </section>
 
         <div className="analysis-form__actions">
-          {submissionMutation.isError ? (
+          {submissionError ? (
             <div className="analysis-submit-error" role="alert">
-              <span>提交失败，请稍后重试。</span>
-              {requestId ? <span>关联 ID：{requestId}</span> : null}
+              <span>{submissionError.message}</span>
+              {submissionError.requestId ? (
+                <span>关联 ID：{submissionError.requestId}</span>
+              ) : null}
             </div>
           ) : (
             <span aria-hidden="true" className="analysis-form__action-spacer" />
           )}
           <Button
             className="analysis-form__submit"
-            loading={submissionMutation.isPending}
+            loading={isSubmitting}
             type="submit"
           >
             <Send aria-hidden="true" size={17} />

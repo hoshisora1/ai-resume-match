@@ -11,8 +11,10 @@ import { createMemoryRouter } from 'react-router'
 import { App } from '../../app/App'
 import { createQueryClient } from '../../app/queryClient'
 import { appRoutes, type AppRouter } from '../../app/router'
+import { ApiError } from '../../shared/api/client'
 import { server } from '../../test/server'
 import { analysisFormSchema } from './analysisFormSchema'
+import { summarizeSubmissionError } from './submissionError'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024
 const VALID_TITLE = '高级后端工程师'
@@ -112,56 +114,6 @@ function expectFieldError(control: HTMLElement, message: string) {
   expect(control).toHaveAttribute('aria-invalid', 'true')
   expect(error).toHaveAttribute('id')
   expect(describedBy).toContain(error.id)
-}
-
-function expectMutationCacheToExcludeSubmission(
-  queryClient: QueryClient,
-  submission: {
-    file: File
-    jobTitle: string
-    jobContent: string
-  },
-) {
-  const mutations = queryClient.getMutationCache().getAll()
-
-  expect(mutations.length).toBeGreaterThan(0)
-  for (const mutation of mutations) {
-    expect(mutation.state.variables).toBeUndefined()
-    expect(mutation.state.context).toBeUndefined()
-    expect(mutation.options.meta).toBeUndefined()
-
-    if (mutation.state.data !== undefined) {
-      expect(mutation.state.data).toEqual({ taskId: expect.any(Number) })
-    }
-
-    if (
-      typeof mutation.state.error === 'object' &&
-      mutation.state.error !== null
-    ) {
-      expect(mutation.state.error).not.toHaveProperty('payload')
-      expect(mutation.state.error).not.toHaveProperty('variables')
-      expect(mutation.state.error).not.toHaveProperty('file')
-      expect(mutation.state.error).not.toHaveProperty('jobTitle')
-      expect(mutation.state.error).not.toHaveProperty('jobContent')
-    }
-
-    const cachedSurfaces = JSON.stringify({
-      context: mutation.state.context,
-      data: mutation.state.data,
-      error:
-        mutation.state.error instanceof Error
-          ? {
-              ...Object.fromEntries(Object.entries(mutation.state.error)),
-              message: mutation.state.error.message,
-            }
-          : mutation.state.error,
-      meta: mutation.options.meta,
-      variables: mutation.state.variables,
-    })
-    expect(cachedSurfaces).not.toContain(submission.file.name)
-    expect(cachedSurfaces).not.toContain(submission.jobTitle)
-    expect(cachedSurfaces).not.toContain(submission.jobContent)
-  }
 }
 
 afterEach(() => {
@@ -382,6 +334,8 @@ test('counts the title and JD limits by Unicode code point and submits multipart
     '/analyses/999',
     '/analyses/new',
   ])
+  const mutationBaseline = queryClient.getMutationCache().getAll()
+  expect(mutationBaseline).toHaveLength(0)
   const firstHistoryKey = [
     'analyses',
     { status: undefined, page: 0, size: 5 },
@@ -426,11 +380,7 @@ test('counts the title and JD limits by Unicode code point and submits multipart
     expect(invalidateSpy).toHaveBeenCalledTimes(2)
   })
   try {
-    expectMutationCacheToExcludeSubmission(queryClient, {
-      file: submittedResume,
-      jobTitle: exactTitle,
-      jobContent: exactJobContent,
-    })
+    expect(queryClient.getMutationCache().getAll()).toEqual(mutationBaseline)
     expect(router.state.location.pathname).toBe('/analyses/new')
     expect(fileInput).toHaveValue('')
     expect((fileInput as HTMLInputElement).files).toHaveLength(0)
@@ -444,19 +394,7 @@ test('counts the title and JD limits by Unicode code point and submits multipart
     expect(router.state.location.pathname).toBe('/analyses/42')
   })
   expect(router.state.historyAction).toBe('REPLACE')
-  await waitFor(() => {
-    expect(
-      queryClient
-        .getMutationCache()
-        .getAll()
-        .some((mutation) => mutation.state.status === 'success'),
-    ).toBe(true)
-  })
-  expectMutationCacheToExcludeSubmission(queryClient, {
-    file: submittedResume,
-    jobTitle: exactTitle,
-    jobContent: exactJobContent,
-  })
+  expect(queryClient.getMutationCache().getAll()).toEqual(mutationBaseline)
   expect(submittedInput).toBe('/api/analysis-submissions')
   expect(submittedInit?.method).toBe('POST')
   expect(new Headers(submittedInit?.headers).has('Content-Type')).toBe(false)
@@ -561,6 +499,8 @@ test('preserves all values after a structured server error, shows only a safe me
   )
   const user = userEvent.setup()
   const { queryClient, router } = renderNewAnalysis()
+  const mutationBaseline = queryClient.getMutationCache().getAll()
+  expect(mutationBaseline).toHaveLength(0)
   const file = new File(['resume'], 'retry-me.pdf')
   await user.upload(screen.getByLabelText('选择简历文件'), file)
   setTextValues()
@@ -589,12 +529,7 @@ test('preserves all values after a structured server error, shows only a safe me
       file.name,
     ),
   ).toBeVisible()
-  expect(queryClient.getDefaultOptions().mutations?.retry).toBe(0)
-  expectMutationCacheToExcludeSubmission(queryClient, {
-    file,
-    jobTitle: VALID_TITLE,
-    jobContent: VALID_JOB_CONTENT,
-  })
+  expect(queryClient.getMutationCache().getAll()).toEqual(mutationBaseline)
 
   await user.click(screen.getByRole('button', { name: '提交分析' }))
 
@@ -602,6 +537,56 @@ test('preserves all values after a structured server error, shows only a safe me
     expect(router.state.location.pathname).toBe('/analyses/42')
   })
   expect(requestCount).toBe(2)
+  expect(queryClient.getMutationCache().getAll()).toEqual(mutationBaseline)
+})
+
+test('reduces an error and its sensitive cause chain to a plain allowlisted summary', () => {
+  const submittedValues = {
+    file: new File(['private resume'], 'private-resume.pdf'),
+    jobTitle: 'private job title',
+    jobContent: 'private job description',
+  }
+  const rootCause = Object.assign(new Error('private network failure'), {
+    cause: submittedValues,
+  })
+  const apiError = Object.assign(
+    new ApiError(
+      422,
+      'RAW_SERVER_CODE',
+      'private server payload',
+      'req-safe-123',
+      { cause: rootCause },
+    ),
+    { payload: submittedValues },
+  )
+
+  const summary: unknown = summarizeSubmissionError(apiError)
+
+  expect(summary).toEqual({
+    code: 'RAW_SERVER_CODE',
+    message: '提交失败，请稍后重试。',
+    requestId: 'req-safe-123',
+  })
+  expect(summary).not.toBeInstanceOf(Error)
+  expect(Object.getPrototypeOf(summary)).toBe(Object.prototype)
+  expect(Object.keys(summary as object).sort()).toEqual([
+    'code',
+    'message',
+    'requestId',
+  ])
+  expect(Object.values(summary as object)).toSatisfy((values: unknown[]) =>
+    values.every((value) => typeof value === 'string'),
+  )
+  expect(summary).not.toHaveProperty('cause')
+  expect(summary).not.toHaveProperty('payload')
+  expect(summary).not.toHaveProperty('file')
+  expect(summary).not.toHaveProperty('jobTitle')
+  expect(summary).not.toHaveProperty('jobContent')
+
+  expect(summarizeSubmissionError(rootCause)).toEqual({
+    code: 'SUBMISSION_FAILED',
+    message: '提交失败，请稍后重试。',
+  })
 })
 
 test('preserves the form after a network error without exposing the raw failure', async () => {
@@ -696,6 +681,74 @@ test('disables the stable submit button while one request is pending and blocks 
     expect(router.state.location.pathname).toBe('/analyses/42')
   })
   expect(requestCount).toBe(1)
+})
+
+test('aborts a slow submission on unmount without cache, invalidation or navigation side effects', async () => {
+  let observedSignal: AbortSignal | null | undefined
+  let markRequestStarted: () => void = () => undefined
+  let rejectSubmission: (reason?: unknown) => void = () => undefined
+  let abortObserved = false
+  const requestStarted = new Promise<void>((resolve) => {
+    markRequestStarted = resolve
+  })
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    if (input === '/backend-health') {
+      return Response.json({ status: 'UP' })
+    }
+
+    if (input !== '/api/analysis-submissions') {
+      throw new Error(`Unexpected fetch input: ${String(input)}`)
+    }
+
+    observedSignal = init?.signal
+    markRequestStarted()
+    return new Promise<Response>((_resolve, reject) => {
+      rejectSubmission = reject
+      observedSignal?.addEventListener(
+        'abort',
+        () => {
+          abortObserved = true
+          reject(new DOMException('Aborted', 'AbortError'))
+        },
+        { once: true },
+      )
+    })
+  })
+  const user = userEvent.setup()
+  const app = renderNewAnalysis()
+  const mutationBaseline = app.queryClient.getMutationCache().getAll()
+  const invalidateSpy = vi.spyOn(app.queryClient, 'invalidateQueries')
+  const navigateSpy = vi.spyOn(app.router, 'navigate')
+  await user.upload(
+    screen.getByLabelText('选择简历文件'),
+    new File(['resume'], 'abort-me.pdf'),
+  )
+  setTextValues()
+
+  try {
+    await user.click(screen.getByRole('button', { name: '提交分析' }))
+    await requestStarted
+
+    expect(mutationBaseline).toHaveLength(0)
+    expect(app.queryClient.getMutationCache().getAll()).toEqual(
+      mutationBaseline,
+    )
+    expect(observedSignal).toBeInstanceOf(AbortSignal)
+    expect(observedSignal?.aborted).toBe(false)
+
+    app.dispose()
+
+    expect(observedSignal?.aborted).toBe(true)
+    await waitFor(() => {
+      expect(abortObserved).toBe(true)
+    })
+    expect(invalidateSpy).not.toHaveBeenCalled()
+    expect(navigateSpy).not.toHaveBeenCalled()
+    expect(app.router.state.location.pathname).toBe('/analyses/new')
+  } finally {
+    rejectSubmission(new DOMException('Test cleanup', 'AbortError'))
+    app.dispose()
+  }
 })
 
 test('keeps upload, long filename, textarea and submit dimensions stable across responsive layouts', () => {
