@@ -1,33 +1,8 @@
-import { Link, Outlet, RouterProvider, createBrowserRouter } from 'react-router'
+import { createBrowserRouter, type RouteObject } from 'react-router'
 
-interface PlaceholderPageProps {
-  title: string
-}
+import { AppShell, PlaceholderPage } from './routeElements'
 
-function AppShell() {
-  return (
-    <div className="app-shell">
-      <header className="app-header">
-        <Link className="brand-link" to="/">
-          MatchLab
-        </Link>
-      </header>
-      <main className="app-main">
-        <Outlet />
-      </main>
-    </div>
-  )
-}
-
-function PlaceholderPage({ title }: PlaceholderPageProps) {
-  return (
-    <section aria-labelledby="page-title" className="placeholder-page">
-      <h1 id="page-title">{title}</h1>
-    </section>
-  )
-}
-
-const router = createBrowserRouter([
+export const appRoutes = [
   {
     path: '/',
     element: <AppShell />,
@@ -38,8 +13,10 @@ const router = createBrowserRouter([
       { path: 'analyses/:taskId', element: <PlaceholderPage title="分析详情" /> },
     ],
   },
-])
+] satisfies RouteObject[]
 
-export function AppRouter() {
-  return <RouterProvider router={router} />
+export type AppRouter = ReturnType<typeof createBrowserRouter>
+
+export function createAppBrowserRouter() {
+  return createBrowserRouter(appRoutes)
 }
