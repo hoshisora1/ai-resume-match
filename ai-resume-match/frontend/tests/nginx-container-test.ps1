@@ -59,7 +59,8 @@ try {
     }
     foreach ($expectedLine in @(
         'try_files $uri $uri/ /index.html;',
-        'proxy_set_header X-Original-URI $request_uri;'
+        'proxy_set_header X-Request-Id $http_x_request_id;',
+        'proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;'
     )) {
         if (-not $renderedConfig.Contains($expectedLine)) {
             throw "Rendered Nginx config lost a native Nginx variable"

@@ -239,7 +239,6 @@ class DeploymentConfigurationTest {
             .contains("proxy_pass http://app:8080")
             .contains("proxy_set_header X-API-Token \"${API_TOKEN_NGINX}\"")
             .doesNotContain("proxy_set_header X-API-Token ${API_TOKEN}")
-            .contains("proxy_set_header X-Original-URI $request_uri")
             .contains("try_files $uri $uri/ /index.html")
             .contains("proxy_connect_timeout")
             .contains("proxy_send_timeout")
@@ -282,7 +281,8 @@ class DeploymentConfigurationTest {
             .contains("nginx -t")
             .contains("nginx -T")
             .contains("try_files $uri $uri/ /index.html")
-            .contains("proxy_set_header X-Original-URI $request_uri")
+            .contains("proxy_set_header X-Request-Id $http_x_request_id")
+            .contains("proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for")
             .contains("X-API-Token")
             .contains("docker logs")
             .contains("API_TOKEN must not contain CR or LF");
