@@ -1,0 +1,122 @@
+.match-report {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-5);
+}
+
+.match-report__score {
+  display: flex;
+  min-width: 0;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-block: 1px solid var(--color-border);
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+}
+
+.match-report__score strong {
+  color: var(--color-teal);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.match-report__content {
+  min-width: 0;
+  color: var(--color-ink-soft);
+  line-height: 1.65;
+}
+
+.match-report__content > :first-child {
+  margin-top: 0;
+}
+
+.match-report__content > :last-child {
+  margin-bottom: 0;
+}
+
+.match-report__content h1,
+.match-report__content h2,
+.match-report__content h3,
+.match-report__content h4 {
+  margin: var(--space-6) 0 var(--space-3);
+  color: var(--color-ink);
+  font-size: 1rem;
+  line-height: 1.4;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.match-report__content h1 {
+  font-size: 1.25rem;
+}
+
+.match-report__content p,
+.match-report__content li,
+.match-report__content blockquote,
+.match-report__content a,
+.match-report__content code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.match-report__content pre {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #eef2f3;
+}
+
+.match-report__content pre code {
+  overflow-wrap: normal;
+  white-space: pre;
+  word-break: normal;
+}
+
+.match-report__content blockquote {
+  margin-inline: 0;
+  padding-left: var(--space-4);
+  border-left: 3px solid #9eb4b5;
+  color: var(--color-ink-muted);
+}
+
+.match-report__table-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.match-report__table-scroll table {
+  width: 100%;
+  min-width: 32rem;
+  border-collapse: collapse;
+}
+
+.match-report__table-scroll th,
+.match-report__table-scroll td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.match-report__table-scroll th {
+  background: #eef2f3;
+  color: var(--color-ink);
+}
+
+@media (max-width: 48rem) {
+  .match-report__score {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+}

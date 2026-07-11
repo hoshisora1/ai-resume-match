@@ -62,18 +62,27 @@ export function createAnalysisSubmission(
   })
 }
 
-export function getAnalysisTask(taskId: number) {
-  return apiRequest(`/api/analysis/${taskId}`, analysisTaskSchema)
+export function getAnalysisTask(taskId: number, signal?: AbortSignal) {
+  return apiRequest(
+    `/api/analysis/${taskId}`,
+    analysisTaskSchema,
+    signal ? { signal } : undefined,
+  )
 }
 
-export function retryAnalysisTask(taskId: number) {
+export function retryAnalysisTask(taskId: number, signal?: AbortSignal) {
   return apiRequest(`/api/analysis/${taskId}/retry`, analysisTaskSchema, {
     method: 'POST',
+    ...(signal ? { signal } : {}),
   })
 }
 
-export function getMatchReport(taskId: number) {
-  return apiRequest(`/api/analysis/${taskId}/report`, matchReportSchema)
+export function getMatchReport(taskId: number, signal?: AbortSignal) {
+  return apiRequest(
+    `/api/analysis/${taskId}/report`,
+    matchReportSchema,
+    signal ? { signal } : undefined,
+  )
 }
 
 export function getBackendHealth(signal?: AbortSignal) {

@@ -1038,14 +1038,3 @@ test('keeps upload, long filename, textarea and submit dimensions stable across 
   expect(source).not.toMatch(/\bconsole\./)
   expect(source).not.toContain('Content-Type')
 })
-
-test('leaves the analysis detail route as a placeholder for Task 10', async () => {
-  renderNewAnalysis(['/analyses/42'])
-
-  expect(
-    await screen.findByRole('heading', { name: '分析详情' }),
-  ).toBeVisible()
-  expect(
-    screen.queryByRole('form', { name: '新建分析表单' }),
-  ).not.toBeInTheDocument()
-})

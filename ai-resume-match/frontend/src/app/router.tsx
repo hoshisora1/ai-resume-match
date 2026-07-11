@@ -1,11 +1,11 @@
 import { createBrowserRouter, type RouteObject } from 'react-router'
 
 import { AnalysesPage } from '../features/analyses/AnalysesPage'
+import { AnalysisDetailPage } from '../features/analyses/AnalysisDetailPage'
 import { NewAnalysisPage } from '../features/analyses/NewAnalysisPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { AppShell } from './AppShell'
 import { ErrorBoundary } from './ErrorBoundary'
-import { PlaceholderPage } from './routeElements'
 
 export const appRoutes = [
   {
@@ -19,7 +19,7 @@ export const appRoutes = [
       { index: true, element: <DashboardPage /> },
       { path: 'analyses', element: <AnalysesPage /> },
       { path: 'analyses/new', element: <NewAnalysisPage /> },
-      { path: 'analyses/:taskId', element: <PlaceholderPage title="分析详情" /> },
+      { path: 'analyses/:taskId', element: <AnalysisDetailPage /> },
     ],
   },
 ] satisfies RouteObject[]

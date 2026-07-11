@@ -631,6 +631,46 @@ describe('analysis endpoints', () => {
     await expect(getMatchReport(30)).resolves.toEqual(report)
   })
 
+  test.each([
+    [
+      'task lookup',
+      (signal: AbortSignal) => getAnalysisTask(30, signal),
+      pendingTaskResponse,
+    ],
+    [
+      'task retry',
+      (signal: AbortSignal) => retryAnalysisTask(30, signal),
+      pendingTaskResponse,
+    ],
+    [
+      'report lookup',
+      (signal: AbortSignal) => getMatchReport(30, signal),
+      {
+        taskId: 30,
+        matchScore: 88,
+        reportContent: '# 匹配报告',
+        createdAt: '2026-07-10T09:05:00',
+      },
+    ],
+  ] as const)('forwards an explicit AbortSignal for %s', async (_name, request, payload) => {
+    const controller = new AbortController()
+    let observedSignal: AbortSignal | null | undefined
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input, init) => {
+        observedSignal = init?.signal
+        return Response.json(payload)
+      },
+    )
+
+    try {
+      await request(controller.signal)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+
+    expect(observedSignal).toBe(controller.signal)
+  })
+
   test('gets backend readiness health', async () => {
     server.use(
       http.get('/backend-health', () => HttpResponse.json({ status: 'UP' })),
