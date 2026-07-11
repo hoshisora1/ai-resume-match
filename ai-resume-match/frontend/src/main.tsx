@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 
 import { App } from './app/App'
 import { createQueryClient } from './app/queryClient'
+import { reactRootOptions } from './app/reactRootOptions'
 import { createAppBrowserRouter } from './app/router'
 import './styles/tokens.css'
 import './styles/global.css'
@@ -16,7 +17,7 @@ if (rootElement === null) {
 const queryClient = createQueryClient()
 const router = createAppBrowserRouter()
 
-createRoot(rootElement).render(
+createRoot(rootElement, reactRootOptions).render(
   <StrictMode>
     <App queryClient={queryClient} router={router} />
   </StrictMode>,
