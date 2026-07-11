@@ -1,6 +1,7 @@
 import { createBrowserRouter, type RouteObject } from 'react-router'
 
 import { AnalysesPage } from '../features/analyses/AnalysesPage'
+import { NewAnalysisPage } from '../features/analyses/NewAnalysisPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { AppShell } from './AppShell'
 import { ErrorBoundary } from './ErrorBoundary'
@@ -17,7 +18,7 @@ export const appRoutes = [
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'analyses', element: <AnalysesPage /> },
-      { path: 'analyses/new', element: <PlaceholderPage title="新建分析" /> },
+      { path: 'analyses/new', element: <NewAnalysisPage /> },
       { path: 'analyses/:taskId', element: <PlaceholderPage title="分析详情" /> },
     ],
   },
