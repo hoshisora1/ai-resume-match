@@ -6,8 +6,11 @@ import { cwd, env } from 'node:process'
 import { build, createServer, type ViteDevServer } from 'vite'
 import { expect, test } from 'vitest'
 
+import { runCleanupSteps } from './resourceCleanup'
+
 const frontendRoot = cwd()
 const viteConfigPath = join(frontendRoot, 'vite.config.ts')
+const cleanupTimeoutMs = 5_000
 
 async function listenOnEphemeralPort(server: Server) {
   await new Promise<void>((resolve, reject) => {
@@ -160,14 +163,27 @@ test('proxies server-only credentials and keeps them out of the client build', a
     expect(clientOutput).not.toContain('X-API-Token')
     expect(clientOutput).not.toContain('API_PROXY_TARGET')
   } finally {
-    if (viteServer !== undefined) {
-      await viteServer.close()
-    }
-    await closeHttpServer(upstream)
-    if (buildDirectory !== undefined) {
-      await rm(buildDirectory, { force: true, recursive: true })
-    }
     restoreEnvironment('API_TOKEN', previousToken)
     restoreEnvironment('API_PROXY_TARGET', previousTarget)
+    await runCleanupSteps(
+      [
+        {
+          label: 'Vite server',
+          run: () => viteServer?.close(),
+        },
+        {
+          label: 'mock upstream',
+          run: () => closeHttpServer(upstream),
+        },
+        {
+          label: 'temporary build directory',
+          run: () =>
+            buildDirectory === undefined
+              ? undefined
+              : rm(buildDirectory, { force: true, recursive: true }),
+        },
+      ],
+      cleanupTimeoutMs,
+    )
   }
 }, 30_000)
