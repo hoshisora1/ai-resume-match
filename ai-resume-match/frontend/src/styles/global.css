@@ -594,7 +594,8 @@ svg {
 
 @media (prefers-reduced-motion: reduce) {
   .button__spinner,
-  .async-state__loader {
+  .async-state__loader,
+  .is-spinning {
     animation: none;
   }
 }

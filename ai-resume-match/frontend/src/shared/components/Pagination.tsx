@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 
 interface PaginationProps {
   onPageChange: (page: number) => void
@@ -19,12 +20,41 @@ export function Pagination({
     pageCount === 0
       ? 0
       : Math.min(Math.max(requestedPage, 0), pageCount - 1)
-  const canGoBack = pageCount > 0 && currentPage > 0
-  const canGoForward = pageCount > 0 && currentPage < pageCount - 1
+  const needsOwnerSync = pageCount > 0 && page !== currentPage
+  const lastCorrection = useRef<{
+    currentPage: number
+    page: number
+    pageCount: number
+  } | null>(null)
+  const canGoBack =
+    pageCount > 0 && !needsOwnerSync && currentPage > 0
+  const canGoForward =
+    pageCount > 0 && !needsOwnerSync && currentPage < pageCount - 1
   const visiblePage = pageCount > 0 ? currentPage + 1 : 0
+
+  useEffect(() => {
+    if (!needsOwnerSync) {
+      lastCorrection.current = null
+      return
+    }
+
+    const previousCorrection = lastCorrection.current
+    if (
+      previousCorrection &&
+      Object.is(previousCorrection.page, page) &&
+      previousCorrection.pageCount === pageCount &&
+      previousCorrection.currentPage === currentPage
+    ) {
+      return
+    }
+
+    lastCorrection.current = { currentPage, page, pageCount }
+    onPageChange(currentPage)
+  }, [currentPage, needsOwnerSync, onPageChange, page, pageCount])
 
   function changePage(nextPage: number) {
     if (
+      !needsOwnerSync &&
       Number.isInteger(nextPage) &&
       nextPage >= 0 &&
       nextPage < pageCount &&

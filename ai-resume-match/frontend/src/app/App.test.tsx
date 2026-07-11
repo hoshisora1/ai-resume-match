@@ -2,12 +2,16 @@ import { QueryClient, focusManager } from '@tanstack/react-query'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
-import { createMemoryRouter } from 'react-router'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { createMemoryRouter, type RouteObject } from 'react-router'
 import { expect, test, vi } from 'vitest'
 
 import { server } from '../test/server'
 import { App } from './App'
+import { AppShell } from './AppShell'
 import { backendHealthQueryOptions } from './backendHealthQuery'
+import { ErrorBoundary } from './ErrorBoundary'
 import { appRoutes, type AppRouter } from './router'
 
 function createTestQueryClient() {
@@ -27,6 +31,7 @@ function createTestQueryClient() {
 function renderTestApp(
   initialEntries: string[] = ['/'],
   backendHealth: 'up' | 'error' | 'custom' = 'up',
+  routes: RouteObject[] = appRoutes,
 ) {
   if (backendHealth !== 'custom') {
     server.use(
@@ -38,7 +43,7 @@ function renderTestApp(
     )
   }
   const queryClient = createTestQueryClient()
-  const router: AppRouter = createMemoryRouter(appRoutes, { initialEntries })
+  const router: AppRouter = createMemoryRouter(routes, { initialEntries })
   const rendered = render(<App queryClient={queryClient} router={router} />)
   let disposed = false
 
@@ -62,6 +67,53 @@ function renderTestApp(
       }
     },
   }
+}
+
+function FocusedAnalysisPage() {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  return (
+    <div>
+      <h1>分析筛选</h1>
+      <input aria-label="分析筛选条件" ref={inputRef} />
+    </div>
+  )
+}
+
+function PortalFocusPage({ portalRoot }: { portalRoot: HTMLElement }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  return createPortal(
+    <div aria-label="分析快捷操作" role="dialog">
+      <input aria-label="快捷操作名称" ref={inputRef} />
+    </div>,
+    portalRoot,
+  )
+}
+
+function focusTestRoutes(analysisElement: ReactNode) {
+  return [
+    {
+      path: '/',
+      element: (
+        <ErrorBoundary>
+          <AppShell />
+        </ErrorBoundary>
+      ),
+      children: [
+        { index: true, element: <h1>分析总览</h1> },
+        { path: 'analyses', element: analysisElement },
+      ],
+    },
+  ] satisfies RouteObject[]
 }
 
 test('renders the responsive product shell navigation and active-page cue', async () => {
@@ -271,6 +323,55 @@ test('offers skip navigation and focuses main only after explicit navigation', a
     })
   } finally {
     app.dispose()
+  }
+})
+
+test('preserves focus established by the destination route inside main', async () => {
+  const user = userEvent.setup()
+  const app = renderTestApp(
+    ['/'],
+    'up',
+    focusTestRoutes(<FocusedAnalysisPage />),
+  )
+
+  try {
+    expect(await screen.findByText('API 已连接')).toBeVisible()
+
+    await user.click(screen.getByRole('link', { name: '分析记录' }))
+
+    const destinationInput = await screen.findByRole('textbox', {
+      name: '分析筛选条件',
+    })
+    expect(destinationInput).toHaveFocus()
+    expect(screen.getByRole('main')).not.toHaveFocus()
+  } finally {
+    app.dispose()
+  }
+})
+
+test('preserves focus established by a destination dialog portal', async () => {
+  const portalRoot = document.createElement('div')
+  document.body.append(portalRoot)
+  const user = userEvent.setup()
+  const app = renderTestApp(
+    ['/'],
+    'up',
+    focusTestRoutes(<PortalFocusPage portalRoot={portalRoot} />),
+  )
+
+  try {
+    expect(await screen.findByText('API 已连接')).toBeVisible()
+
+    await user.click(screen.getByRole('link', { name: '分析记录' }))
+
+    const portalInput = await screen.findByRole('textbox', {
+      name: '快捷操作名称',
+    })
+    expect(portalInput).toHaveFocus()
+    expect(screen.getByRole('main')).not.toHaveFocus()
+  } finally {
+    app.dispose()
+    portalRoot.remove()
   }
 })
 

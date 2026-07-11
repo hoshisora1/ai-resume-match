@@ -4,6 +4,7 @@ import { cwd } from 'node:process'
 import { expect, test } from 'vitest'
 
 const tokensCss = readFileSync(resolve(cwd(), 'src/styles/tokens.css'), 'utf8')
+const globalCss = readFileSync(resolve(cwd(), 'src/styles/global.css'), 'utf8')
 
 function readColorToken(name: string) {
   const match = tokensCss.match(
@@ -50,3 +51,9 @@ test.each(['color-surface', 'color-white'])(
     ).toBeGreaterThanOrEqual(4.5)
   },
 )
+
+test('disables all shared loading animations when reduced motion is requested', () => {
+  expect(globalCss).toMatch(
+    /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*\.button__spinner,\s*\.async-state__loader,\s*\.is-spinning\s*\{\s*animation:\s*none;\s*\}\s*\}/,
+  )
+})

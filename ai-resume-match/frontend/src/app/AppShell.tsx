@@ -60,7 +60,24 @@ export function AppShell() {
     }
 
     previousPathname.current = location.pathname
-    mainRef.current?.focus()
+    const main = mainRef.current
+    const activeElement = document.activeElement
+
+    if (!main || (activeElement && main.contains(activeElement))) {
+      return
+    }
+
+    const hasNoActiveControl =
+      !activeElement ||
+      activeElement === document.body ||
+      activeElement === document.documentElement
+    const focusRemainsOnRouteControl =
+      activeElement instanceof HTMLElement &&
+      activeElement.dataset.shellRouteControl === 'true'
+
+    if (hasNoActiveControl || focusRemainsOnRouteControl) {
+      main.focus()
+    }
   }, [location.pathname])
 
   return (
@@ -76,7 +93,7 @@ export function AppShell() {
         跳到主要内容
       </a>
       <aside className="app-sidebar">
-        <Link className="brand-link" to="/">
+        <Link className="brand-link" data-shell-route-control="true" to="/">
           <span className="brand-mark" aria-hidden="true">
             M
           </span>
@@ -88,6 +105,7 @@ export function AppShell() {
               className={({ isActive }) =>
                 `app-nav__link${isActive ? ' app-nav__link--active' : ''}`
               }
+              data-shell-route-control="true"
               end={to === '/analyses' ? isNewAnalysisPath : end}
               key={to}
               to={to}
@@ -129,6 +147,7 @@ export function AppShell() {
         </div>
         <Button
           className="app-topbar__action"
+          data-shell-route-control="true"
           onClick={() => navigate('/analyses/new')}
         >
           <Plus aria-hidden="true" size={17} />
