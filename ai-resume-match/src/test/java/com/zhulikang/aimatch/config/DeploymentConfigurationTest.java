@@ -127,6 +127,11 @@ class DeploymentConfigurationTest {
         String content = read(".env.example");
 
         assertThat(content).contains("APP_PORT=8080");
+        assertThat(content).contains("FRONTEND_PORT=3000");
+        assertThat(content).contains("MYSQL_PORT=3306");
+        assertThat(content).contains("REDIS_PORT=6379");
+        assertThat(content).contains("RABBITMQ_AMQP_PORT=5672");
+        assertThat(content).contains("RABBITMQ_MANAGEMENT_PORT=15672");
         assertThat(content).contains("MYSQL_DATABASE=ai_resume_match");
         assertThat(content).contains("MYSQL_USER=ai_match");
         assertThat(content).contains("MYSQL_PASSWORD=dev-mysql-password");
@@ -161,6 +166,112 @@ class DeploymentConfigurationTest {
         assertThat(dockerignore).contains(".worktrees/");
         assertThat(gitignore).contains(".env");
         assertThat(gitignore).doesNotContain(".env.example");
+    }
+
+    @Test
+    void frontendImageUsesAReproducibleMultiStageNonRootBuild() throws IOException {
+        assertThat(ROOT.resolve("frontend/Dockerfile")).isRegularFile();
+        assertThat(ROOT.resolve("frontend/.dockerignore")).isRegularFile();
+
+        String dockerfile = read("frontend/Dockerfile");
+        String dockerignore = read("frontend/.dockerignore");
+
+        assertThat(dockerfile)
+            .contains("FROM node:24-alpine AS build")
+            .contains("RUN npm ci")
+            .contains("RUN npm run build")
+            .contains("FROM nginxinc/nginx-unprivileged:1.29-alpine")
+            .contains("COPY --from=build /workspace/dist /usr/share/nginx/html")
+            .contains("USER 101")
+            .contains("EXPOSE 8080")
+            .contains("HEALTHCHECK")
+            .contains("/frontend-health");
+        assertThat(dockerignore)
+            .contains("node_modules/")
+            .contains("dist/")
+            .contains("reports/")
+            .contains(".env")
+            .contains("secrets/");
+    }
+
+    @Test
+    void frontendComposeServiceUsesRuntimeTokenAndConfigurablePorts() throws IOException {
+        String compose = read("docker-compose.yml");
+
+        assertThat(compose)
+            .contains("frontend:")
+            .contains("context: ./frontend")
+            .contains("API_TOKEN: ${API_TOKEN}")
+            .contains("NGINX_ENVSUBST_FILTER: \"^API_TOKEN$\"")
+            .contains("${FRONTEND_PORT:-3000}:8080")
+            .contains("${APP_PORT:-8080}:8080")
+            .contains("${MYSQL_PORT:-3306}:3306")
+            .contains("${REDIS_PORT:-6379}:6379")
+            .contains("${RABBITMQ_AMQP_PORT:-5672}:5672")
+            .contains("${RABBITMQ_MANAGEMENT_PORT:-15672}:15672");
+        int frontendStart = compose.indexOf("  frontend:");
+        int frontendEnd = compose.indexOf("\n  mysql:", frontendStart);
+        assertThat(compose.substring(frontendStart, frontendEnd))
+            .contains("app:")
+            .contains("condition: service_healthy")
+            .contains("restart: unless-stopped");
+    }
+
+    @Test
+    void nginxTemplateSecuresAndRoutesFrontendTraffic() throws IOException {
+        assertThat(ROOT.resolve("frontend/nginx/default.conf.template")).isRegularFile();
+
+        String nginxTemplate = read("frontend/nginx/default.conf.template");
+
+        assertThat(nginxTemplate)
+            .contains("client_max_body_size 6m")
+            .contains("location = /frontend-health")
+            .contains("location = /backend-health")
+            .contains("proxy_pass http://app:8080/actuator/health/readiness")
+            .contains("location /api/")
+            .contains("proxy_pass http://app:8080")
+            .contains("proxy_set_header X-API-Token ${API_TOKEN}")
+            .contains("try_files $uri $uri/ /index.html")
+            .contains("proxy_connect_timeout")
+            .contains("proxy_send_timeout")
+            .contains("proxy_read_timeout")
+            .contains("Content-Security-Policy")
+            .contains("default-src 'self'")
+            .contains("script-src 'self'")
+            .contains("style-src 'self'")
+            .contains("img-src 'self'")
+            .contains("font-src 'self'")
+            .contains("connect-src 'self'")
+            .contains("form-action 'self'")
+            .contains("object-src 'none'")
+            .contains("base-uri 'self'")
+            .contains("frame-ancestors 'none'")
+            .contains("X-Content-Type-Options \"nosniff\"")
+            .contains("Referrer-Policy \"no-referrer\"")
+            .contains("X-Frame-Options \"DENY\"")
+            .contains("location = /index.html")
+            .contains("expires -1")
+            .contains("location ^~ /assets/")
+            .contains("expires 1y");
+    }
+
+    @Test
+    void nginxRuntimeRenderingReplacesOnlyTheApiToken() throws IOException {
+        assertThat(ROOT.resolve("frontend/nginx/default.conf.template")).isRegularFile();
+
+        String nginxTemplate = read("frontend/nginx/default.conf.template");
+        String renderedConfig = nginxTemplate.replace("${API_TOKEN}", "deployment-test-token");
+
+        assertThat(renderedConfig)
+            .doesNotContain("${API_TOKEN}")
+            .contains("proxy_set_header X-API-Token deployment-test-token")
+            .contains("$uri")
+            .contains("$http_x_request_id")
+            .contains("$http_x_correlation_id")
+            .contains("$host")
+            .contains("$remote_addr")
+            .contains("$proxy_add_x_forwarded_for")
+            .contains("$scheme");
     }
 
     private static Properties yaml(String relativePath) {
