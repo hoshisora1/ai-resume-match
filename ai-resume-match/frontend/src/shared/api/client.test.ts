@@ -110,24 +110,87 @@ describe('apiRequest', () => {
     await apiRequest('/api/header-probe', healthSchema, {
       headers: tupleHeaders,
     })
+    await apiRequest('/api/header-probe', healthSchema, {
+      headers: {
+        Accept: 'application/xml',
+        'X-Custom-Header': 'object-value',
+        'X-Request-Id': 'object-caller-request-id',
+      },
+    })
 
     expect(observations.map(({ accept }) => accept)).toEqual([
+      'application/json',
       'application/json',
       'application/json',
     ])
     expect(observations.map(({ customHeader }) => customHeader)).toEqual([
       'headers-value',
       'tuple-value',
+      'object-value',
     ])
-    expect(observations.map(({ token }) => token)).toEqual([null, null])
+    expect(observations.map(({ token }) => token)).toEqual([null, null, null])
     const requestIds = observations.map(({ requestId }) => requestId)
     expect(requestIds).not.toContain('caller-request-id')
     expect(requestIds).not.toContain('another-caller-request-id')
+    expect(requestIds).not.toContain('object-caller-request-id')
     expect(requestIds).toEqual([
       expect.stringMatching(/^[0-9a-f-]{36}$/i),
       expect.stringMatching(/^[0-9a-f-]{36}$/i),
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
     ])
-    expect(new Set(requestIds).size).toBe(2)
+    expect(new Set(requestIds).size).toBe(3)
+  })
+
+  test('uses getRandomValues when randomUUID is unavailable and still sends the request', async () => {
+    let observedRequestId: string | null = null
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        observedRequestId = new Headers(init?.headers).get('X-Request-Id')
+        return Response.json({ status: 'UP' })
+      },
+    )
+    vi.stubGlobal('crypto', {
+      getRandomValues: (values: Uint8Array) => {
+        values.set(Array.from({ length: 16 }, (_value, index) => index))
+        return values
+      },
+    })
+
+    try {
+      await expect(getBackendHealth()).resolves.toEqual({ status: 'UP' })
+    } finally {
+      fetchSpy.mockRestore()
+      vi.unstubAllGlobals()
+    }
+
+    expect(observedRequestId).toBe('00010203-0405-4607-8809-0a0b0c0d0e0f')
+  })
+
+  test('omits the request id when crypto capabilities are unavailable and still sends the request', async () => {
+    let requestCount = 0
+    let observedRequestId: string | null = null
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        requestCount += 1
+        observedRequestId = new Headers(init?.headers).get('X-Request-Id')
+        return Response.json({ status: 'UP' })
+      },
+    )
+    vi.stubGlobal('crypto', {})
+
+    try {
+      await expect(
+        apiRequest('/backend-health', healthSchema, {
+          headers: { 'X-Request-Id': 'caller-supplied-id' },
+        }),
+      ).resolves.toEqual({ status: 'UP' })
+    } finally {
+      fetchSpy.mockRestore()
+      vi.unstubAllGlobals()
+    }
+
+    expect(requestCount).toBe(1)
+    expect(observedRequestId).toBeNull()
   })
 
   test('throws a structured ApiError with the backend request id', async () => {
@@ -139,7 +202,10 @@ describe('apiRequest', () => {
             message: 'Analysis task not found',
             requestId: 'req-404',
           },
-          { status: 404 },
+          {
+            status: 404,
+            headers: { 'X-Request-Id': 'response-404' },
+          },
         ),
       ),
     )
@@ -152,6 +218,30 @@ describe('apiRequest', () => {
       message: 'Analysis task not found',
       requestId: 'req-404',
       status: 404,
+    })
+  })
+
+  test('uses the response request id when a structured error has a null request id', async () => {
+    server.use(
+      http.get('/api/analysis/409', () =>
+        HttpResponse.json(
+          {
+            code: 'CONFLICT',
+            message: 'Analysis conflict',
+            requestId: null,
+          },
+          {
+            status: 409,
+            headers: { 'X-Request-Id': 'response-409' },
+          },
+        ),
+      ),
+    )
+
+    await expect(getAnalysisTask(409)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      requestId: 'response-409',
+      status: 409,
     })
   })
 
@@ -178,16 +268,58 @@ describe('apiRequest', () => {
     })
   })
 
-  test('rejects a successful response that violates the runtime schema', async () => {
+  test('uses the outgoing request id for a non-structured error without a response id', async () => {
+    let outgoingRequestId: string | null = null
+    server.use(
+      http.get('/api/analysis/500', ({ request }) => {
+        outgoingRequestId = request.headers.get('X-Request-Id')
+        return HttpResponse.text('Internal error', { status: 500 })
+      }),
+    )
+
+    const error = await getAnalysisTask(500).catch((reason: unknown) => reason)
+
+    expect(outgoingRequestId).toEqual(expect.any(String))
+    expect(error).toMatchObject({
+      code: 'HTTP_ERROR',
+      requestId: outgoingRequestId,
+      status: 500,
+    })
+  })
+
+  test('uses the response request id for a successful response with an invalid schema', async () => {
     server.use(
       http.get('/api/analysis/1', () =>
-        HttpResponse.json({ taskId: 'not-a-number' }),
+        HttpResponse.json(
+          { taskId: 'not-a-number' },
+          { headers: { 'X-Request-Id': 'response-invalid' } },
+        ),
       ),
     )
 
     await expect(getAnalysisTask(1)).rejects.toMatchObject({
       code: 'INVALID_RESPONSE',
       message: '服务返回了无法识别的数据',
+      requestId: 'response-invalid',
+      status: 200,
+    })
+  })
+
+  test('uses the outgoing request id when an invalid response has no response id', async () => {
+    let outgoingRequestId: string | null = null
+    server.use(
+      http.get('/api/analysis/2', ({ request }) => {
+        outgoingRequestId = request.headers.get('X-Request-Id')
+        return HttpResponse.json({ taskId: 'not-a-number' })
+      }),
+    )
+
+    const error = await getAnalysisTask(2).catch((reason: unknown) => reason)
+
+    expect(outgoingRequestId).toEqual(expect.any(String))
+    expect(error).toMatchObject({
+      code: 'INVALID_RESPONSE',
+      requestId: outgoingRequestId,
       status: 200,
     })
   })
@@ -227,15 +359,100 @@ describe('apiRequest', () => {
   })
 
   test('maps an ordinary fetch failure to a stable network error', async () => {
+    let outgoingRequestId: string | null = null
     server.use(
-      http.get('/backend-health', () => HttpResponse.error()),
+      http.get('/backend-health', ({ request }) => {
+        outgoingRequestId = request.headers.get('X-Request-Id')
+        return HttpResponse.error()
+      }),
     )
 
-    await expect(getBackendHealth()).rejects.toMatchObject({
+    const error = await getBackendHealth().catch((reason: unknown) => reason)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({
       code: 'NETWORK_ERROR',
       message: '无法连接到服务',
+      requestId: outgoingRequestId,
       status: 0,
     })
+    if (error instanceof ApiError) {
+      expect(error.cause).toBeInstanceOf(TypeError)
+    }
+  })
+
+  test('maps a successful response body stream failure to a network error with cause', async () => {
+    const bodyFailure = new TypeError('Response body stream failed')
+    const response = Response.json(
+      { status: 'UP' },
+      { headers: { 'X-Request-Id': 'response-stream-error' } },
+    )
+    const jsonSpy = vi.spyOn(response, 'json').mockRejectedValue(bodyFailure)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
+
+    try {
+      const error = await getBackendHealth().catch((reason: unknown) => reason)
+
+      expect(error).toBeInstanceOf(ApiError)
+      expect(error).toMatchObject({
+        cause: bodyFailure,
+        code: 'NETWORK_ERROR',
+        name: 'ApiError',
+        requestId: 'response-stream-error',
+        status: 0,
+      })
+      expect(Object.getPrototypeOf(error)).toBe(ApiError.prototype)
+    } finally {
+      jsonSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test('maps a non-2xx response body stream failure to a network error with the outgoing request id', async () => {
+    const bodyFailure = new TypeError('Response decoding failed')
+    const response = new Response('Unavailable', { status: 503 })
+    const jsonSpy = vi.spyOn(response, 'json').mockRejectedValue(bodyFailure)
+    let outgoingRequestId: string | null = null
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        outgoingRequestId = new Headers(init?.headers).get('X-Request-Id')
+        return response
+      },
+    )
+
+    try {
+      const error = await getBackendHealth().catch((reason: unknown) => reason)
+
+      expect(outgoingRequestId).toEqual(expect.any(String))
+      expect(error).toMatchObject({
+        cause: bodyFailure,
+        code: 'NETWORK_ERROR',
+        requestId: outgoingRequestId,
+        status: 0,
+      })
+    } finally {
+      jsonSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test('rethrows an existing ApiError from response processing unchanged', async () => {
+    const existingError = new ApiError(
+      409,
+      'EXISTING_ERROR',
+      'Existing error',
+      'existing-request-id',
+    )
+    const response = Response.json({ status: 'UP' })
+    const jsonSpy = vi.spyOn(response, 'json').mockRejectedValue(existingError)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
+
+    try {
+      await expect(getBackendHealth()).rejects.toBe(existingError)
+    } finally {
+      jsonSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
   })
 
   test('preserves AbortError as cancellation instead of reporting a server error', async () => {
