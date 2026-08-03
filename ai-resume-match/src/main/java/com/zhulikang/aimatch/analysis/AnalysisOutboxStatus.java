@@ -4,5 +4,6 @@ public enum AnalysisOutboxStatus {
     PENDING,
     PROCESSING,
     PUBLISHED,
-    FAILED
+    FAILED,
+    DEAD
 }

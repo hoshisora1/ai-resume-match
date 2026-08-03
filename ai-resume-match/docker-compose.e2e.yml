@@ -2,11 +2,21 @@ services:
   app:
     environment:
       AI_API_KEY: e2e-mock-key
-      AI_ENDPOINT: http://mock-ai:18089/v1/chat/completions
+      ANALYSIS_ENGINE: agent
       ANALYSIS_OUTBOX_FIXED_DELAY_MS: 500
       ANALYSIS_OUTBOX_RETRY_DELAY: 1s
       ANALYSIS_RETRY_DELAY: 1s
       ANALYSIS_RETRY_SCHEDULER_FIXED_DELAY_MS: 1000
+    depends_on:
+      mock-ai:
+        condition: service_healthy
+
+  agent:
+    environment:
+      AI_API_KEY: e2e-mock-key
+      AI_ENDPOINT: http://mock-ai:18089/v1/chat/completions
+      AI_MODEL: e2e-agent-model
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN}
     depends_on:
       mock-ai:
         condition: service_healthy

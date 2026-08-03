@@ -137,7 +137,9 @@ test('renders the responsive product shell navigation and active-page cue', asyn
     expect(createLink).toHaveAttribute('href', '/analyses/new')
     expect(historyLink).toHaveAttribute('aria-current', 'page')
     expect(dashboardLink).not.toHaveAttribute('aria-current')
-    expect(screen.getByRole('heading', { name: '分析历史' })).toBeVisible()
+    expect(
+      await screen.findByRole('heading', { name: '分析历史' }),
+    ).toBeVisible()
     expect(await screen.findByText('API 已连接')).toBeVisible()
     expect(screen.queryByText(/数据库|队列/)).not.toBeInTheDocument()
 
@@ -153,7 +155,9 @@ test('renders the responsive product shell navigation and active-page cue', asyn
     await user.click(topbarCreateLink)
 
     expect(app.router.state.location.pathname).toBe('/analyses/new')
-    expect(screen.getByRole('heading', { name: '新建分析' })).toBeVisible()
+    expect(
+      await screen.findByRole('heading', { name: '新建分析' }),
+    ).toBeVisible()
   } finally {
     app.dispose()
   }
@@ -274,7 +278,13 @@ test('keeps analysis history active for detail routes but not the new route', as
   const detailApp = renderTestApp(['/analyses/42'])
 
   try {
-    expect(await screen.findByRole('heading', { name: '分析详情' })).toBeVisible()
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: '分析详情' },
+        { timeout: 3_000 },
+      ),
+    ).toBeVisible()
     const navigation = screen.getByRole('navigation', { name: '主导航' })
     expect(
       within(navigation).getByRole('link', { name: '分析记录' }),
@@ -437,7 +447,9 @@ test('isolates router history and query cache between app instances', async () =
     })
 
     expect(first.router.state.location.pathname).toBe('/analyses')
-    expect(screen.getByRole('heading', { name: '分析历史' })).toBeVisible()
+    expect(
+      await screen.findByRole('heading', { name: '分析历史' }),
+    ).toBeVisible()
   } finally {
     first.dispose()
   }
@@ -447,7 +459,9 @@ test('isolates router history and query cache between app instances', async () =
   try {
     expect(second.router.state.location.pathname).toBe('/')
     expect(second.queryClient.getQueryData(cacheKey)).toBeUndefined()
-    expect(screen.getByRole('heading', { name: '分析总览' })).toBeVisible()
+    expect(
+      await screen.findByRole('heading', { name: '分析总览' }),
+    ).toBeVisible()
   } finally {
     second.dispose()
   }

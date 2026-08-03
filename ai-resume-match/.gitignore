@@ -2,3 +2,13 @@ target/
 .env
 .env.local
 .superpowers/
+agent-service/.venv/
+agent-service/.pytest_cache/
+agent-service/**/__pycache__/
+agent-service/.coverage
+agent-service/eval-results/
+agent-service/*.egg-info/
+
+# Local career preparation and work-log notes are not part of the public product.
+docs/career/
+docs/reports/

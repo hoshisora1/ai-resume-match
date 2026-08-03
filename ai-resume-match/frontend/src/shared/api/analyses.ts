@@ -18,6 +18,7 @@ export interface CreateAnalysisSubmissionInput {
   file: File
   jobTitle: string
   jobContent: string
+  idempotencyKey?: string
 }
 
 export function getAnalysisSummary(signal?: AbortSignal) {
@@ -47,7 +48,7 @@ export function listAnalyses(
 }
 
 export function createAnalysisSubmission(
-  { file, jobTitle, jobContent }: CreateAnalysisSubmissionInput,
+  { file, jobTitle, jobContent, idempotencyKey }: CreateAnalysisSubmissionInput,
   signal?: AbortSignal,
 ) {
   const formData = new FormData()
@@ -58,6 +59,9 @@ export function createAnalysisSubmission(
   return apiRequest('/api/analysis-submissions', analysisTaskSchema, {
     method: 'POST',
     body: formData,
+    ...(idempotencyKey
+      ? { headers: { 'Idempotency-Key': idempotencyKey } }
+      : {}),
     ...(signal ? { signal } : {}),
   })
 }

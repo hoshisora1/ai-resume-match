@@ -13,6 +13,7 @@ import org.springframework.amqp.rabbit.connection.CorrelationData.Confirm;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Pageable;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -48,12 +50,13 @@ class AnalysisOutboxPublisherTest {
         AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
         AnalysisOutboxEvent event = AnalysisOutboxEvent.analysisRequested(99L);
-        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), any(Pageable.class)))
+        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), eq(10), any(Pageable.class)))
             .thenReturn(List.of(10L));
         when(repository.markProcessingIfDue(
             10L,
             CLAIMABLE_STATUSES,
             now,
+            10,
             AnalysisOutboxStatus.PROCESSING,
             now.plusSeconds(30)
         )).thenReturn(1);
@@ -82,12 +85,13 @@ class AnalysisOutboxPublisherTest {
     void skipsPublishWhenEventCannotBeClaimed() {
         AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
-        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), any(Pageable.class)))
+        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), eq(10), any(Pageable.class)))
             .thenReturn(List.of(10L));
         when(repository.markProcessingIfDue(
             10L,
             CLAIMABLE_STATUSES,
             now,
+            10,
             AnalysisOutboxStatus.PROCESSING,
             now.plusSeconds(30)
         )).thenReturn(0);
@@ -112,12 +116,13 @@ class AnalysisOutboxPublisherTest {
         AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
         AnalysisOutboxEvent event = AnalysisOutboxEvent.analysisRequested(99L);
-        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), any(Pageable.class)))
+        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), eq(10), any(Pageable.class)))
             .thenReturn(List.of(10L));
         when(repository.markProcessingIfDue(
             10L,
             CLAIMABLE_STATUSES,
             now,
+            10,
             AnalysisOutboxStatus.PROCESSING,
             now.plusSeconds(30)
         )).thenReturn(1);
@@ -150,12 +155,13 @@ class AnalysisOutboxPublisherTest {
         AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
         AnalysisOutboxEvent event = AnalysisOutboxEvent.analysisRequested(99L);
-        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), any(Pageable.class)))
+        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), eq(10), any(Pageable.class)))
             .thenReturn(List.of(10L));
         when(repository.markProcessingIfDue(
             10L,
             CLAIMABLE_STATUSES,
             now,
+            10,
             AnalysisOutboxStatus.PROCESSING,
             now.plusSeconds(30)
         )).thenReturn(1);
@@ -185,12 +191,13 @@ class AnalysisOutboxPublisherTest {
         AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
         AnalysisOutboxEvent event = AnalysisOutboxEvent.analysisRequested(99L);
-        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), any(Pageable.class)))
+        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), eq(10), any(Pageable.class)))
             .thenReturn(List.of(10L));
         when(repository.markProcessingIfDue(
             10L,
             CLAIMABLE_STATUSES,
             now,
+            10,
             AnalysisOutboxStatus.PROCESSING,
             now.plusSeconds(30)
         )).thenReturn(1);
@@ -227,12 +234,13 @@ class AnalysisOutboxPublisherTest {
         AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
         AnalysisOutboxEvent event = AnalysisOutboxEvent.analysisRequested(99L, "correlation-1");
-        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), any(Pageable.class)))
+        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), eq(10), any(Pageable.class)))
             .thenReturn(List.of(10L));
         when(repository.markProcessingIfDue(
             10L,
             CLAIMABLE_STATUSES,
             now,
+            10,
             AnalysisOutboxStatus.PROCESSING,
             now.plusSeconds(30)
         )).thenReturn(1);
@@ -257,6 +265,173 @@ class AnalysisOutboxPublisherTest {
         Long eventId = processed.getMessageProperties().getHeader("analysisOutboxEventId");
         assertThat(correlationId).isEqualTo("correlation-1");
         assertThat(eventId).isEqualTo(10L);
+    }
+
+    @Test
+    void movesEventToDeadAfterConfiguredMaximumFailures() {
+        AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
+        AnalysisTaskService taskService = mock(AnalysisTaskService.class);
+        RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+        AnalysisOutboxEvent event = AnalysisOutboxEvent.analysisRequested(99L);
+        for (int attempt = 1; attempt < 10; attempt++) {
+            assertThat(event.markPublishFailed("previous failure", now, 10)).isFalse();
+        }
+        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), eq(10), any(Pageable.class)))
+            .thenReturn(List.of(10L));
+        when(repository.markProcessingIfDue(
+            10L,
+            CLAIMABLE_STATUSES,
+            now,
+            10,
+            AnalysisOutboxStatus.PROCESSING,
+            now.plusSeconds(30)
+        )).thenReturn(1);
+        when(repository.findById(10L)).thenReturn(Optional.of(event));
+        doThrow(new AmqpException("x".repeat(1_500)))
+            .when(rabbitTemplate)
+            .convertAndSend(
+                eq(RabbitConfig.ANALYSIS_EXCHANGE),
+                eq(RabbitConfig.ANALYSIS_ROUTING_KEY),
+                eq(99L),
+                any(MessagePostProcessor.class),
+                any(CorrelationData.class)
+            );
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        AnalysisOutboxPublisher publisher = publisher(repository, taskService, rabbitTemplate, meterRegistry);
+
+        publisher.publishPending();
+
+        assertThat(event.getStatus()).isEqualTo(AnalysisOutboxStatus.DEAD);
+        assertThat(event.getAttemptCount()).isEqualTo(10);
+        assertThat(event.getNextAttemptAt()).isNull();
+        assertThat(event.getPublishedAt()).isNull();
+        assertThat(event.getLastError()).hasSize(1_024);
+        assertThat(meterRegistry.counter("analysis.outbox.events", "outcome", "dead").count())
+            .isEqualTo(1.0);
+        assertThat(meterRegistry.counter("analysis.outbox.events", "outcome", "failed").count())
+            .isZero();
+        verify(taskService).markDeliveryFailed(99L, now);
+    }
+
+    @Test
+    void sweepsLegacyExhaustedEventsToDeadWithGuardedTaskTransition() {
+        AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
+        AnalysisTaskService taskService = mock(AnalysisTaskService.class);
+        RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+        AnalysisOutboxEvent event = AnalysisOutboxEvent.analysisRequested(101L);
+        ReflectionTestUtils.setField(event, "status", AnalysisOutboxStatus.FAILED);
+        ReflectionTestUtils.setField(event, "attemptCount", 10);
+        ReflectionTestUtils.setField(event, "lastError", "broker down\r\nforged-entry\u202E");
+        when(repository.findExhaustedNonTerminalIds(
+            eq(CLAIMABLE_STATUSES),
+            eq(10),
+            any(Pageable.class)
+        )).thenReturn(List.of(10L));
+        when(repository.markDeadIfExhausted(
+            10L,
+            CLAIMABLE_STATUSES,
+            10,
+            AnalysisOutboxStatus.DEAD
+        )).thenAnswer(invocation -> {
+            ReflectionTestUtils.setField(event, "status", AnalysisOutboxStatus.DEAD);
+            return 1;
+        });
+        when(repository.findById(10L)).thenReturn(Optional.of(event));
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        AnalysisOutboxPublisher publisher = publisher(repository, taskService, rabbitTemplate, meterRegistry);
+
+        publisher.publishPending();
+
+        assertThat(event.getStatus()).isEqualTo(AnalysisOutboxStatus.DEAD);
+        assertThat(event.getLastError()).isEqualTo("broker down forged-entry");
+        verify(taskService).markDeliveryFailed(101L, now);
+        verify(repository).save(event);
+        verify(rabbitTemplate, never()).convertAndSend(
+            anyString(),
+            anyString(),
+            any(Long.class),
+            any(MessagePostProcessor.class),
+            any(CorrelationData.class)
+        );
+        assertThat(meterRegistry.counter("analysis.outbox.events", "outcome", "dead").count())
+            .isEqualTo(1.0);
+    }
+
+    @Test
+    void interruptionReleasesCurrentEventWithoutConsumingAttemptAndStopsBatch() {
+        AnalysisOutboxRepository repository = mock(AnalysisOutboxRepository.class);
+        RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+        AnalysisOutboxEvent event = AnalysisOutboxEvent.analysisRequested(99L);
+        ReflectionTestUtils.setField(event, "status", AnalysisOutboxStatus.PROCESSING);
+        when(repository.findDueForPublishIds(eq(CLAIMABLE_STATUSES), eq(now), eq(10), any(Pageable.class)))
+            .thenReturn(List.of(10L, 11L));
+        when(repository.markProcessingIfDue(
+            10L,
+            CLAIMABLE_STATUSES,
+            now,
+            10,
+            AnalysisOutboxStatus.PROCESSING,
+            now.plusSeconds(30)
+        )).thenReturn(1);
+        when(repository.findById(10L)).thenReturn(Optional.of(event));
+        doAnswer(invocation -> {
+            Thread.currentThread().interrupt();
+            return null;
+        }).when(rabbitTemplate).convertAndSend(
+            eq(RabbitConfig.ANALYSIS_EXCHANGE),
+            eq(RabbitConfig.ANALYSIS_ROUTING_KEY),
+            eq(99L),
+            any(MessagePostProcessor.class),
+            any(CorrelationData.class)
+        );
+        AnalysisOutboxPublisher publisher = publisher(repository, rabbitTemplate);
+
+        try {
+            publisher.publishPending();
+
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            assertThat(event.getStatus()).isEqualTo(AnalysisOutboxStatus.FAILED);
+            assertThat(event.getAttemptCount()).isZero();
+            assertThat(event.getNextAttemptAt()).isEqualTo(now);
+            assertThat(event.getLastError()).isEqualTo("Outbox publish interrupted");
+            verify(repository, never()).markProcessingIfDue(
+                eq(11L),
+                any(),
+                any(),
+                any(Integer.class),
+                any(),
+                any()
+            );
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void rejectsInvalidRuntimeBounds() {
+        assertThatThrownBy(() -> new AnalysisOutboxPublisher(
+            mock(AnalysisOutboxRepository.class),
+            mock(AnalysisTaskService.class),
+            mock(RabbitTemplate.class),
+            20,
+            0,
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(5),
+            clock,
+            new AnalysisMetrics(new SimpleMeterRegistry())
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("max-attempts");
+
+        assertThatThrownBy(() -> publisherWithBounds(0, 10, Duration.ofSeconds(30), Duration.ofSeconds(5)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("batch-size");
+        assertThatThrownBy(() -> publisherWithBounds(20, 10, Duration.ZERO, Duration.ofSeconds(5)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("retry-delay");
+        assertThatThrownBy(() -> publisherWithBounds(20, 10, Duration.ofSeconds(30), Duration.ofSeconds(-1)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("confirm-timeout");
     }
 
     private void completePublishWithAck(RabbitTemplate rabbitTemplate) {
@@ -285,14 +460,44 @@ class AnalysisOutboxPublisherTest {
         RabbitTemplate rabbitTemplate,
         SimpleMeterRegistry meterRegistry
     ) {
+        return publisher(repository, mock(AnalysisTaskService.class), rabbitTemplate, meterRegistry);
+    }
+
+    private AnalysisOutboxPublisher publisher(
+        AnalysisOutboxRepository repository,
+        AnalysisTaskService taskService,
+        RabbitTemplate rabbitTemplate,
+        SimpleMeterRegistry meterRegistry
+    ) {
         return new AnalysisOutboxPublisher(
             repository,
+            taskService,
             rabbitTemplate,
             20,
+            10,
             Duration.ofSeconds(30),
             Duration.ofSeconds(5),
             clock,
             new AnalysisMetrics(meterRegistry)
+        );
+    }
+
+    private AnalysisOutboxPublisher publisherWithBounds(
+        int batchSize,
+        int maxAttempts,
+        Duration retryDelay,
+        Duration confirmTimeout
+    ) {
+        return new AnalysisOutboxPublisher(
+            mock(AnalysisOutboxRepository.class),
+            mock(AnalysisTaskService.class),
+            mock(RabbitTemplate.class),
+            batchSize,
+            maxAttempts,
+            retryDelay,
+            confirmTimeout,
+            clock,
+            new AnalysisMetrics(new SimpleMeterRegistry())
         );
     }
 }

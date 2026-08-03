@@ -33,6 +33,8 @@ class DeploymentConfigurationTest {
         assertThat(properties.getProperty("management.endpoint.health.group.readiness.include")).isEqualTo("readinessState");
         assertThat(properties.getProperty("management.endpoints.web.exposure.include")).contains("health");
         assertThat(properties.getProperty("management.endpoints.web.exposure.include")).contains("metrics");
+        assertThat(properties.getProperty("analysis.outbox.max-attempts"))
+            .isEqualTo("${ANALYSIS_OUTBOX_MAX_ATTEMPTS:10}");
         assertThat(properties.getProperty("logging.pattern.level"))
             .contains("requestId")
             .contains("correlationId");
@@ -140,6 +142,9 @@ class DeploymentConfigurationTest {
         assertThat(content).contains("RABBITMQ_DEFAULT_PASS=dev-rabbit-password");
         assertThat(content).contains("API_TOKEN=dev-token");
         assertThat(content).contains("AI_API_KEY=replace-with-your-dev-key");
+        assertThat(content).contains("ANALYSIS_RUNNING_RECOVERY_FIXED_DELAY_MS=30000");
+        assertThat(content).contains("ANALYSIS_RUNNING_RECOVERY_BATCH_SIZE=20");
+        assertThat(content).contains("ANALYSIS_OUTBOX_MAX_ATTEMPTS=10");
     }
 
     @Test
@@ -154,6 +159,10 @@ class DeploymentConfigurationTest {
         assertThat(compose).contains("mysql-data:");
         assertThat(compose).contains("redis-data:");
         assertThat(compose).contains("rabbitmq-data:");
+        assertThat(compose)
+            .contains("ANALYSIS_RUNNING_RECOVERY_FIXED_DELAY_MS: ${ANALYSIS_RUNNING_RECOVERY_FIXED_DELAY_MS:-30000}")
+            .contains("ANALYSIS_RUNNING_RECOVERY_BATCH_SIZE: ${ANALYSIS_RUNNING_RECOVERY_BATCH_SIZE:-20}")
+            .contains("ANALYSIS_OUTBOX_MAX_ATTEMPTS: ${ANALYSIS_OUTBOX_MAX_ATTEMPTS:-10}");
         assertThat(dockerfile).contains("FROM maven:");
         assertThat(dockerfile).contains("FROM eclipse-temurin:21-jre");
         assertThat(dockerfile).contains("COPY --from=build /workspace/target/*.jar /app/app.jar");
@@ -162,6 +171,8 @@ class DeploymentConfigurationTest {
         assertThat(dockerfile).contains("/actuator/health/readiness");
         assertThat(dockerfile).contains("exec java $JAVA_OPTS -jar /app/app.jar");
         assertThat(dockerignore).contains("target/");
+        assertThat(dockerignore).contains("**/node_modules/");
+        assertThat(dockerignore).contains("**/.venv/");
         assertThat(dockerignore).contains(".git/");
         assertThat(dockerignore).contains(".worktrees/");
         assertThat(gitignore).contains(".env");

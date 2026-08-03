@@ -15,7 +15,7 @@
     <artifactId>ai-resume-match</artifactId>
     <version>0.1.0</version>
     <name>ai-resume-match</name>
-    <description>RAG resume and job matching backend</description>
+    <description>Reliable resume and job matching system with a bounded tool-calling Agent</description>
 
     <properties>
         <java.version>21</java.version>
@@ -74,7 +74,7 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
-            <version>5.3.0</version>
+            <version>5.5.1</version>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>

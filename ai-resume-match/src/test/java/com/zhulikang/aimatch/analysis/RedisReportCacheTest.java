@@ -5,6 +5,9 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -20,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(OutputCaptureExtension.class)
 class RedisReportCacheTest {
     private final StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
     @SuppressWarnings("unchecked")
@@ -64,11 +68,18 @@ class RedisReportCacheTest {
     }
 
     @Test
-    void returnsEmptyWhenRedisReadFails() {
-        when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException("down"));
+    void returnsEmptyWhenRedisReadFailsWithoutLoggingConnectionDetails(CapturedOutput output) {
+        when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException(
+            "redis://cache-user:secret-password@internal-host:6379"
+        ));
 
         assertThat(cache.get(99L)).isEmpty();
         assertThat(meterRegistry.counter("report.cache.requests", "result", "error").count()).isEqualTo(1.0);
+        assertThat(output)
+            .contains("event=report_cache_read_failed taskId=99")
+            .contains("exceptionType=org.springframework.data.redis.RedisConnectionFailureException")
+            .doesNotContain("secret-password")
+            .doesNotContain("internal-host");
     }
 
     @Test
@@ -83,11 +94,18 @@ class RedisReportCacheTest {
     }
 
     @Test
-    void ignoresRedisWriteFailure() {
+    void ignoresRedisWriteFailureWithoutLoggingConnectionDetails(CapturedOutput output) {
         MatchReportView report = new MatchReportView(99L, 88, "cached", LocalDateTime.now());
-        when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException("down"));
+        when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException(
+            "redis://cache-user:secret-password@internal-host:6379"
+        ));
 
         cache.put(report);
         assertThat(meterRegistry.counter("report.cache.writes", "outcome", "error").count()).isEqualTo(1.0);
+        assertThat(output)
+            .contains("event=report_cache_write_failed taskId=99")
+            .contains("exceptionType=org.springframework.data.redis.RedisConnectionFailureException")
+            .doesNotContain("secret-password")
+            .doesNotContain("internal-host");
     }
 }

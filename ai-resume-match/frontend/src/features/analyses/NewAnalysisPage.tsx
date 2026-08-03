@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router'
 
 import { analysisSummaryQueryKey } from '../dashboard/useAnalysisSummaryQuery'
 import { createAnalysisSubmission } from '../../shared/api/analyses'
+import { createRequestId } from '../../shared/api/client'
 import { Button } from '../../shared/components/Button'
 import {
   analysisFormSchema,
@@ -73,6 +74,7 @@ export function NewAnalysisPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragDepthRef = useRef(0)
   const submissionInFlightRef = useRef(false)
+  const submissionIdempotencyKeyRef = useRef<string | null>(null)
   const submissionAbortControllerRef = useRef<AbortController | null>(null)
   const isMountedRef = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -99,12 +101,12 @@ export function NewAnalysisPage() {
   const clearSubmissionError = () => {
     setSubmissionError(null)
   }
-  const jobTitleRegistration = register('jobTitle', {
-    onChange: clearSubmissionError,
-  })
-  const jobContentRegistration = register('jobContent', {
-    onChange: clearSubmissionError,
-  })
+  const resetSubmissionAttempt = () => {
+    submissionIdempotencyKeyRef.current = null
+    clearSubmissionError()
+  }
+  const jobTitleRegistration = register('jobTitle')
+  const jobContentRegistration = register('jobContent')
 
   useEffect(() => {
     isMountedRef.current = true
@@ -124,7 +126,7 @@ export function NewAnalysisPage() {
       return
     }
 
-    clearSubmissionError()
+    resetSubmissionAttempt()
     if (file === undefined) {
       resetField('file')
     } else {
@@ -192,13 +194,22 @@ export function NewAnalysisPage() {
     setIsDragging(false)
     const abortController = new AbortController()
     submissionAbortControllerRef.current = abortController
+    const idempotencyKey =
+      submissionIdempotencyKeyRef.current ?? createRequestId()
+    if (idempotencyKey !== undefined) {
+      submissionIdempotencyKeyRef.current = idempotencyKey
+    }
 
-    void createAnalysisSubmission(values, abortController.signal)
+    void createAnalysisSubmission(
+      idempotencyKey === undefined ? values : { ...values, idempotencyKey },
+      abortController.signal,
+    )
       .then(async ({ taskId }) => {
         if (abortController.signal.aborted || !isMountedRef.current) {
           return
         }
 
+        submissionIdempotencyKeyRef.current = null
         reset()
         if (fileInputRef.current !== null) {
           fileInputRef.current.value = ''
@@ -373,6 +384,10 @@ export function NewAnalysisPage() {
               autoComplete="off"
               disabled={isSubmitting}
               id={TITLE_INPUT_ID}
+              onChange={(event) => {
+                resetSubmissionAttempt()
+                void jobTitleRegistration.onChange(event)
+              }}
               type="text"
             />
             <p className="analysis-field-help" id={TITLE_HELP_ID}>
@@ -397,6 +412,10 @@ export function NewAnalysisPage() {
               aria-invalid={errors.jobContent ? true : undefined}
               disabled={isSubmitting}
               id={CONTENT_INPUT_ID}
+              onChange={(event) => {
+                resetSubmissionAttempt()
+                void jobContentRegistration.onChange(event)
+              }}
               rows={9}
             />
             <p className="analysis-field-help" id={CONTENT_HELP_ID}>

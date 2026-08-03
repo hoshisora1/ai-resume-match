@@ -1,11 +1,13 @@
 import { createBrowserRouter, type RouteObject } from 'react-router'
 
-import { AnalysesPage } from '../features/analyses/AnalysesPage'
-import { AnalysisDetailPage } from '../features/analyses/AnalysisDetailPage'
-import { NewAnalysisPage } from '../features/analyses/NewAnalysisPage'
-import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { AppShell } from './AppShell'
 import { ErrorBoundary } from './ErrorBoundary'
+import {
+  AnalysesRoutePage,
+  AnalysisDetailRoutePage,
+  DashboardRoutePage,
+  NewAnalysisRoutePage,
+} from './LazyRoutePages'
 
 export const appRoutes = [
   {
@@ -16,10 +18,10 @@ export const appRoutes = [
       </ErrorBoundary>
     ),
     children: [
-      { index: true, element: <DashboardPage /> },
-      { path: 'analyses', element: <AnalysesPage /> },
-      { path: 'analyses/new', element: <NewAnalysisPage /> },
-      { path: 'analyses/:taskId', element: <AnalysisDetailPage /> },
+      { index: true, element: <DashboardRoutePage /> },
+      { path: 'analyses', element: <AnalysesRoutePage /> },
+      { path: 'analyses/new', element: <NewAnalysisRoutePage /> },
+      { path: 'analyses/:taskId', element: <AnalysisDetailRoutePage /> },
     ],
   },
 ] satisfies RouteObject[]

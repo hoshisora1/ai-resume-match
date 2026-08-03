@@ -30,6 +30,7 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
             t.completedAt = null,
             t.updatedAt = :now
         where t.id = :taskId
+          and t.attemptCount < t.maxAttempts
           and (
             t.status = :pending
             or (t.status = :running and t.updatedAt < :staleBefore)
@@ -54,11 +55,13 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
             t.updatedAt = :now
         where t.id = :taskId
           and t.status = :running
+          and t.attemptCount = :expectedAttempt
         """)
     int markSuccess(
         @Param("taskId") Long taskId,
         @Param("status") AnalysisTask.Status status,
         @Param("running") AnalysisTask.Status running,
+        @Param("expectedAttempt") int expectedAttempt,
         @Param("now") LocalDateTime now
     );
 
@@ -73,11 +76,13 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
             t.updatedAt = :now
         where t.id = :taskId
           and t.status = :running
+          and t.attemptCount = :expectedAttempt
         """)
     int markFailure(
         @Param("taskId") Long taskId,
         @Param("status") AnalysisTask.Status status,
         @Param("running") AnalysisTask.Status running,
+        @Param("expectedAttempt") int expectedAttempt,
         @Param("failureCode") AnalysisFailureCode failureCode,
         @Param("failureMessage") String failureMessage,
         @Param("nextRetryAt") LocalDateTime nextRetryAt,
@@ -94,6 +99,87 @@ public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long
         @Param("status") AnalysisTask.Status status,
         @Param("now") LocalDateTime now,
         Pageable pageable
+    );
+
+    @Query("""
+        select t.id from AnalysisTask t
+        where t.status = :running
+          and t.updatedAt < :staleBefore
+        order by t.updatedAt asc, t.id asc
+        """)
+    List<Long> findStaleRunningTaskIds(
+        @Param("running") AnalysisTask.Status running,
+        @Param("staleBefore") LocalDateTime staleBefore,
+        Pageable pageable
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update AnalysisTask t
+        set t.status = :pending,
+            t.failureCode = null,
+            t.failureMessage = null,
+            t.nextRetryAt = null,
+            t.startedAt = null,
+            t.completedAt = null,
+            t.updatedAt = :now
+        where t.id = :taskId
+          and t.status = :running
+          and t.updatedAt < :staleBefore
+          and t.attemptCount < t.maxAttempts
+        """)
+    int markStaleRunningAsPending(
+        @Param("taskId") Long taskId,
+        @Param("pending") AnalysisTask.Status pending,
+        @Param("running") AnalysisTask.Status running,
+        @Param("staleBefore") LocalDateTime staleBefore,
+        @Param("now") LocalDateTime now
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update AnalysisTask t
+        set t.status = :retryable,
+            t.failureCode = :failureCode,
+            t.failureMessage = :failureMessage,
+            t.nextRetryAt = null,
+            t.startedAt = null,
+            t.completedAt = :now,
+            t.updatedAt = :now
+        where t.id = :taskId
+          and t.status = :pending
+        """)
+    int markDeliveryFailedIfPending(
+        @Param("taskId") Long taskId,
+        @Param("pending") AnalysisTask.Status pending,
+        @Param("retryable") AnalysisTask.Status retryable,
+        @Param("failureCode") AnalysisFailureCode failureCode,
+        @Param("failureMessage") String failureMessage,
+        @Param("now") LocalDateTime now
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update AnalysisTask t
+        set t.status = :failedFinal,
+            t.failureCode = :failureCode,
+            t.failureMessage = :failureMessage,
+            t.nextRetryAt = null,
+            t.completedAt = :now,
+            t.updatedAt = :now
+        where t.id = :taskId
+          and t.status = :running
+          and t.updatedAt < :staleBefore
+          and t.attemptCount >= t.maxAttempts
+        """)
+    int markExhaustedStaleRunningAsFailedFinal(
+        @Param("taskId") Long taskId,
+        @Param("failedFinal") AnalysisTask.Status failedFinal,
+        @Param("running") AnalysisTask.Status running,
+        @Param("failureCode") AnalysisFailureCode failureCode,
+        @Param("failureMessage") String failureMessage,
+        @Param("staleBefore") LocalDateTime staleBefore,
+        @Param("now") LocalDateTime now
     );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

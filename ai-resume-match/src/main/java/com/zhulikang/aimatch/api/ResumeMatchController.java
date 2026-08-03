@@ -4,6 +4,7 @@ import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.MatchReportView;
 import com.zhulikang.aimatch.api.validation.UnicodeNotBlank;
 import com.zhulikang.aimatch.application.analysis.AnalysisSubmission;
+import com.zhulikang.aimatch.application.analysis.AnalysisSubmissionIdempotencyKey;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisSubmissionUseCase;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisSummaryUseCase;
@@ -16,6 +17,8 @@ import com.zhulikang.aimatch.application.resume.UploadResumeUseCase;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.resume.Resume;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.hibernate.validator.constraints.CodePointLength;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -90,9 +94,15 @@ public class ResumeMatchController {
     public AnalysisTaskResponse createAnalysisSubmission(
         @RequestParam("file") MultipartFile file,
         @RequestParam("jobTitle") @UnicodeNotBlank @CodePointLength(max = TITLE_MAX_CODE_POINTS) String jobTitle,
-        @RequestParam("jobContent") @UnicodeNotBlank @CodePointLength(max = CONTENT_MAX_CODE_POINTS) String jobContent
+        @RequestParam("jobContent") @UnicodeNotBlank @CodePointLength(max = CONTENT_MAX_CODE_POINTS) String jobContent,
+        @RequestHeader(name = "Idempotency-Key", required = false)
+        @Size(max = AnalysisSubmissionIdempotencyKey.MAX_LENGTH)
+        @Pattern(regexp = AnalysisSubmissionIdempotencyKey.SAFE_PATTERN)
+        String idempotencyKey
     ) {
-        AnalysisSubmission submission = createAnalysisSubmissionUseCase.create(file, jobTitle, jobContent);
+        AnalysisSubmission submission = idempotencyKey == null
+            ? createAnalysisSubmissionUseCase.create(file, jobTitle, jobContent)
+            : createAnalysisSubmissionUseCase.create(file, jobTitle, jobContent, idempotencyKey);
         return AnalysisTaskResponse.from(submission);
     }
 

@@ -1,4 +1,14 @@
 target/
+**/node_modules/
+**/dist/
+**/coverage/
+**/.venv/
+**/.pytest_cache/
+**/__pycache__/
+**/*.egg-info/
+frontend/test-results/
+frontend/playwright-report/
+agent-service/eval-results/
 .git/
 .worktrees/
 .idea/

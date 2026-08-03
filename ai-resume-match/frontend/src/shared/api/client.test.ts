@@ -578,6 +578,7 @@ describe('analysis endpoints', () => {
           file,
           jobTitle: 'Backend Engineer',
           jobContent: 'Java and Redis',
+          idempotencyKey: 'submission-123',
         }),
       ).resolves.toEqual(submissionResponse)
     } finally {
@@ -589,6 +590,7 @@ describe('analysis endpoints', () => {
     const submittedHeaders = new Headers(observedInit?.headers)
     expect(submittedHeaders.has('Content-Type')).toBe(false)
     expect(submittedHeaders.get('Accept')).toBe('application/json')
+    expect(submittedHeaders.get('Idempotency-Key')).toBe('submission-123')
     const submittedBody = observedInit?.body
     expect(submittedBody).toBeInstanceOf(FormData)
     if (submittedBody instanceof FormData) {

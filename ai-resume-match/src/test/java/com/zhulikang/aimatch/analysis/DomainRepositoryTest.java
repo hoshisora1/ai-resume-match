@@ -15,9 +15,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 @DataJpaTest
 class DomainRepositoryTest {
@@ -198,6 +200,7 @@ class DomainRepositoryTest {
             task.getId(),
             AnalysisTask.Status.SUCCESS,
             AnalysisTask.Status.RUNNING,
+            task.getAttemptCount(),
             LocalDateTime.now()
         );
 
@@ -220,6 +223,7 @@ class DomainRepositoryTest {
             task.getId(),
             AnalysisTask.Status.FAILED_FINAL,
             AnalysisTask.Status.RUNNING,
+            task.getAttemptCount(),
             AnalysisFailureCode.UNEXPECTED_ERROR,
             "late failure",
             null,
@@ -230,6 +234,46 @@ class DomainRepositoryTest {
         AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
         assertThat(updatedTask.getStatus()).isEqualTo(AnalysisTask.Status.SUCCESS);
         assertThat(updatedTask.getFailureCode()).isNull();
+    }
+
+    @Test
+    void deliveryFailureOnlyUpdatesPendingTaskAndLeavesItForManualRetry() {
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        AnalysisTask pending = analysisTaskRepository.saveAndFlush(new AnalysisTask(1L, 2L));
+        AnalysisTask running = new AnalysisTask(1L, 2L);
+        running.markRunning();
+        running = analysisTaskRepository.saveAndFlush(running);
+        AnalysisTask success = new AnalysisTask(1L, 2L);
+        success.markRunning();
+        success.markSuccess();
+        success = analysisTaskRepository.saveAndFlush(success);
+
+        AnalysisTaskService service = new AnalysisTaskService(
+            analysisTaskRepository,
+            matchReportRepository,
+            Duration.ofMinutes(15)
+        );
+
+        assertThat(service.markDeliveryFailed(pending.getId(), now)).isTrue();
+        assertThat(service.markDeliveryFailed(running.getId(), now)).isFalse();
+        assertThat(service.markDeliveryFailed(success.getId(), now)).isFalse();
+
+        AnalysisTask failed = analysisTaskRepository.findById(pending.getId()).orElseThrow();
+        assertThat(failed.getStatus()).isEqualTo(AnalysisTask.Status.FAILED_RETRYABLE);
+        assertThat(failed.getFailureCode()).isEqualTo(AnalysisFailureCode.DELIVERY_FAILED);
+        assertThat(failed.getFailureMessage()).isEqualTo("Analysis task could not be delivered");
+        assertThat(failed.getNextRetryAt()).isNull();
+        assertThat(failed.getStartedAt()).isNull();
+        assertThat(failed.getCompletedAt()).isCloseTo(now, within(1, ChronoUnit.MICROS));
+        assertThat(analysisTaskRepository.findDueRetryableTasks(
+            AnalysisTask.Status.FAILED_RETRYABLE,
+            now.plusDays(1),
+            PageRequest.of(0, 20)
+        )).extracting(AnalysisTask::getId).doesNotContain(failed.getId());
+        assertThat(analysisTaskRepository.findById(running.getId()).orElseThrow().getStatus())
+            .isEqualTo(AnalysisTask.Status.RUNNING);
+        assertThat(analysisTaskRepository.findById(success.getId()).orElseThrow().getStatus())
+            .isEqualTo(AnalysisTask.Status.SUCCESS);
     }
 
     @Test
@@ -244,7 +288,7 @@ class DomainRepositoryTest {
             Duration.ofMinutes(15)
         );
 
-        assertThat(service.tryStart(task.getId(), true)).isFalse();
+        assertThat(service.tryStart(task.getId(), true)).isEmpty();
         AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
         assertThat(updatedTask.getStatus()).isEqualTo(AnalysisTask.Status.RUNNING);
         assertThat(updatedTask.getAttemptCount()).isEqualTo(1);
@@ -268,6 +312,150 @@ class DomainRepositoryTest {
         AnalysisTask updatedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
         assertThat(updatedTask.getStatus()).isEqualTo(AnalysisTask.Status.RUNNING);
         assertThat(updatedTask.getAttemptCount()).isEqualTo(1);
+    }
+
+    @Test
+    void staleAttemptCannotMarkSuccessAfterRecoveredTaskGetsNewLease() {
+        AnalysisTask currentTask = recoverAndClaimSecondAttempt();
+
+        int updated = analysisTaskRepository.markSuccess(
+            currentTask.getId(),
+            AnalysisTask.Status.SUCCESS,
+            AnalysisTask.Status.RUNNING,
+            1,
+            LocalDateTime.now()
+        );
+
+        assertThat(updated).isZero();
+        AnalysisTask unchanged = analysisTaskRepository.findById(currentTask.getId()).orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(AnalysisTask.Status.RUNNING);
+        assertThat(unchanged.getAttemptCount()).isEqualTo(2);
+    }
+
+    @Test
+    void staleAttemptCannotMarkFailureAfterRecoveredTaskGetsNewLease() {
+        AnalysisTask currentTask = recoverAndClaimSecondAttempt();
+
+        int updated = analysisTaskRepository.markFailure(
+            currentTask.getId(),
+            AnalysisTask.Status.FAILED_RETRYABLE,
+            AnalysisTask.Status.RUNNING,
+            1,
+            AnalysisFailureCode.AI_UNAVAILABLE,
+            "stale failure",
+            LocalDateTime.now().plusMinutes(1),
+            LocalDateTime.now()
+        );
+
+        assertThat(updated).isZero();
+        AnalysisTask unchanged = analysisTaskRepository.findById(currentTask.getId()).orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(AnalysisTask.Status.RUNNING);
+        assertThat(unchanged.getAttemptCount()).isEqualTo(2);
+        assertThat(unchanged.getFailureCode()).isNull();
+        assertThat(unchanged.getFailureMessage()).isNull();
+    }
+
+    @Test
+    void findsAndGuardedlyResetsStaleRunningTasks() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime staleBefore = now.minusMinutes(15);
+        AnalysisTask staleTask = new AnalysisTask(1L, 2L);
+        staleTask.markRunning();
+        ReflectionTestUtils.setField(staleTask, "updatedAt", staleBefore.minusSeconds(1));
+        staleTask = analysisTaskRepository.saveAndFlush(staleTask);
+        AnalysisTask freshTask = new AnalysisTask(1L, 2L);
+        freshTask.markRunning();
+        ReflectionTestUtils.setField(freshTask, "updatedAt", staleBefore.plusSeconds(1));
+        freshTask = analysisTaskRepository.saveAndFlush(freshTask);
+
+        assertThat(analysisTaskRepository.findStaleRunningTaskIds(
+            AnalysisTask.Status.RUNNING,
+            staleBefore,
+            PageRequest.of(0, 20)
+        )).containsExactly(staleTask.getId());
+
+        int firstUpdate = analysisTaskRepository.markStaleRunningAsPending(
+            staleTask.getId(),
+            AnalysisTask.Status.PENDING,
+            AnalysisTask.Status.RUNNING,
+            staleBefore,
+            now
+        );
+        int competingUpdate = analysisTaskRepository.markStaleRunningAsPending(
+            staleTask.getId(),
+            AnalysisTask.Status.PENDING,
+            AnalysisTask.Status.RUNNING,
+            staleBefore,
+            now
+        );
+
+        assertThat(firstUpdate).isEqualTo(1);
+        assertThat(competingUpdate).isZero();
+        AnalysisTask recoveredTask = analysisTaskRepository.findById(staleTask.getId()).orElseThrow();
+        assertThat(recoveredTask.getStatus()).isEqualTo(AnalysisTask.Status.PENDING);
+        assertThat(recoveredTask.getStartedAt()).isNull();
+        assertThat(recoveredTask.getAttemptCount()).isEqualTo(1);
+        assertThat(analysisTaskRepository.findById(freshTask.getId()).orElseThrow().getStatus())
+            .isEqualTo(AnalysisTask.Status.RUNNING);
+    }
+
+    @Test
+    void finalizesExhaustedStaleRunningTaskInsteadOfRequeuingIt() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime staleBefore = now.minusMinutes(15);
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        ReflectionTestUtils.setField(task, "attemptCount", task.getMaxAttempts());
+        ReflectionTestUtils.setField(task, "updatedAt", staleBefore.minusSeconds(1));
+        task = analysisTaskRepository.saveAndFlush(task);
+
+        int reset = analysisTaskRepository.markStaleRunningAsPending(
+            task.getId(),
+            AnalysisTask.Status.PENDING,
+            AnalysisTask.Status.RUNNING,
+            staleBefore,
+            now
+        );
+        int finalized = analysisTaskRepository.markExhaustedStaleRunningAsFailedFinal(
+            task.getId(),
+            AnalysisTask.Status.FAILED_FINAL,
+            AnalysisTask.Status.RUNNING,
+            AnalysisFailureCode.UNEXPECTED_ERROR,
+            "Analysis worker timed out and retry attempts are exhausted",
+            staleBefore,
+            now
+        );
+
+        assertThat(reset).isZero();
+        assertThat(finalized).isEqualTo(1);
+        AnalysisTask failedTask = analysisTaskRepository.findById(task.getId()).orElseThrow();
+        assertThat(failedTask.getStatus()).isEqualTo(AnalysisTask.Status.FAILED_FINAL);
+        assertThat(failedTask.getFailureCode()).isEqualTo(AnalysisFailureCode.UNEXPECTED_ERROR);
+        assertThat(failedTask.getFailureMessage())
+            .isEqualTo("Analysis worker timed out and retry attempts are exhausted");
+        assertThat(failedTask.getCompletedAt()).isCloseTo(now, within(1, ChronoUnit.MICROS));
+    }
+
+    @Test
+    void doesNotDirectlyReclaimExhaustedStaleRunningTask() {
+        LocalDateTime now = LocalDateTime.now();
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        ReflectionTestUtils.setField(task, "attemptCount", task.getMaxAttempts());
+        ReflectionTestUtils.setField(task, "updatedAt", now.minusMinutes(30));
+        task = analysisTaskRepository.saveAndFlush(task);
+
+        int updated = analysisTaskRepository.markRunningIfPendingOrStale(
+            task.getId(),
+            AnalysisTask.Status.RUNNING,
+            AnalysisTask.Status.PENDING,
+            now.minusMinutes(15),
+            now
+        );
+
+        assertThat(updated).isZero();
+        assertThat(analysisTaskRepository.findById(task.getId()).orElseThrow().getAttemptCount())
+            .isEqualTo(task.getMaxAttempts());
     }
 
     @Test
@@ -306,5 +494,34 @@ class DomainRepositoryTest {
         ReflectionTestUtils.setField(task, "createdAt", createdAt);
         ReflectionTestUtils.setField(task, "updatedAt", createdAt);
         return analysisTaskRepository.saveAndFlush(task);
+    }
+
+    private AnalysisTask recoverAndClaimSecondAttempt() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime staleBefore = now.minusMinutes(15);
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        ReflectionTestUtils.setField(task, "updatedAt", staleBefore.minusSeconds(1));
+        task = analysisTaskRepository.saveAndFlush(task);
+
+        assertThat(analysisTaskRepository.markStaleRunningAsPending(
+            task.getId(),
+            AnalysisTask.Status.PENDING,
+            AnalysisTask.Status.RUNNING,
+            staleBefore,
+            now
+        )).isEqualTo(1);
+        assertThat(analysisTaskRepository.markRunningIfPendingOrStale(
+            task.getId(),
+            AnalysisTask.Status.RUNNING,
+            AnalysisTask.Status.PENDING,
+            staleBefore,
+            now.plusSeconds(1)
+        )).isEqualTo(1);
+
+        AnalysisTask claimed = analysisTaskRepository.findById(task.getId()).orElseThrow();
+        assertThat(claimed.getStatus()).isEqualTo(AnalysisTask.Status.RUNNING);
+        assertThat(claimed.getAttemptCount()).isEqualTo(2);
+        return claimed;
     }
 }

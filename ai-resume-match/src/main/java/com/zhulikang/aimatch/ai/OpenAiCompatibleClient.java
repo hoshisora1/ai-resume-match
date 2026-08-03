@@ -4,6 +4,7 @@ import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@ConditionalOnProperty(name = "analysis.engine", havingValue = "legacy", matchIfMissing = true)
 public class OpenAiCompatibleClient implements AiClient {
     private final RestTemplate restTemplate;
     private final String endpoint;

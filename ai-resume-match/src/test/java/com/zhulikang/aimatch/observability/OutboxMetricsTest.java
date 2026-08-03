@@ -16,6 +16,7 @@ class OutboxMetricsTest {
         when(repository.countByStatus(AnalysisOutboxStatus.PENDING)).thenReturn(3L);
         when(repository.countByStatus(AnalysisOutboxStatus.FAILED)).thenReturn(2L);
         when(repository.countByStatus(AnalysisOutboxStatus.PROCESSING)).thenReturn(1L);
+        when(repository.countByStatus(AnalysisOutboxStatus.DEAD)).thenReturn(4L);
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
         new OutboxMetrics(repository, registry);
@@ -26,5 +27,7 @@ class OutboxMetricsTest {
             .isEqualTo(2.0);
         assertThat(registry.get("analysis.outbox.backlog").tag("status", "processing").gauge().value())
             .isEqualTo(1.0);
+        assertThat(registry.get("analysis.outbox.backlog").tag("status", "dead").gauge().value())
+            .isEqualTo(4.0);
     }
 }

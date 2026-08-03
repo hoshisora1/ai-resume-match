@@ -16,12 +16,26 @@ public interface AnalysisOutboxRepository extends JpaRepository<AnalysisOutboxEv
     @Query("""
         select e.id from AnalysisOutboxEvent e
         where e.status in :statuses
+          and e.attemptCount < :maxAttempts
           and (e.nextAttemptAt is null or e.nextAttemptAt <= :now)
         order by e.createdAt asc, e.id asc
         """)
     List<Long> findDueForPublishIds(
         @Param("statuses") Collection<AnalysisOutboxStatus> statuses,
         @Param("now") LocalDateTime now,
+        @Param("maxAttempts") int maxAttempts,
+        Pageable pageable
+    );
+
+    @Query("""
+        select e.id from AnalysisOutboxEvent e
+        where e.status in :statuses
+          and e.attemptCount >= :maxAttempts
+        order by e.createdAt asc, e.id asc
+        """)
+    List<Long> findExhaustedNonTerminalIds(
+        @Param("statuses") Collection<AnalysisOutboxStatus> statuses,
+        @Param("maxAttempts") int maxAttempts,
         Pageable pageable
     );
 
@@ -32,13 +46,32 @@ public interface AnalysisOutboxRepository extends JpaRepository<AnalysisOutboxEv
             e.nextAttemptAt = :nextAttemptAt
         where e.id = :eventId
           and e.status in :statuses
+          and e.attemptCount < :maxAttempts
           and (e.nextAttemptAt is null or e.nextAttemptAt <= :now)
         """)
     int markProcessingIfDue(
         @Param("eventId") Long eventId,
         @Param("statuses") Collection<AnalysisOutboxStatus> statuses,
         @Param("now") LocalDateTime now,
+        @Param("maxAttempts") int maxAttempts,
         @Param("processing") AnalysisOutboxStatus processing,
         @Param("nextAttemptAt") LocalDateTime nextAttemptAt
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        update AnalysisOutboxEvent e
+        set e.status = :dead,
+            e.nextAttemptAt = null,
+            e.publishedAt = null
+        where e.id = :eventId
+          and e.status in :statuses
+          and e.attemptCount >= :maxAttempts
+        """)
+    int markDeadIfExhausted(
+        @Param("eventId") Long eventId,
+        @Param("statuses") Collection<AnalysisOutboxStatus> statuses,
+        @Param("maxAttempts") int maxAttempts,
+        @Param("dead") AnalysisOutboxStatus dead
     );
 }

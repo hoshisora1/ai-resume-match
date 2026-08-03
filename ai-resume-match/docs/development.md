@@ -2,7 +2,8 @@
 
 本文档是 `ai-resume-match` 的日常开发入口。后端工程化设计见
 `docs/superpowers/specs/2026-07-04-engineering-hardening-design.md`，前端产品设计见
-`docs/superpowers/specs/2026-07-10-frontend-product-experience-design.md`；阶段改动以 `docs/superpowers/plans/` 下对应计划为准。
+`docs/superpowers/specs/2026-07-10-frontend-product-experience-design.md`，当前 Agent 边界见
+`docs/agent-engineering-evidence.md`；阶段改动以 `docs/superpowers/plans/` 下对应计划为准。
 
 ## 1. 基本原则
 
@@ -38,6 +39,9 @@
 
    ```powershell
    mvn test
+   Set-Location agent-service
+   .\.venv\Scripts\python.exe -m pytest
+   Set-Location ..
    ```
 
 5. 按计划逐项执行。
@@ -53,6 +57,9 @@
 
    ```powershell
    mvn test
+   Set-Location agent-service
+   .\.venv\Scripts\python.exe -m pytest
+   Set-Location ..
    ```
 
 7. 回到主分支合并。
@@ -73,6 +80,9 @@
 mvn test
 mvn "-Dtest=ResumeMatchControllerTest" test
 mvn "-Dtest=RunAnalysisUseCaseTest,AnalysisWorkerTest" test
+Set-Location agent-service
+.\.venv\Scripts\python.exe -m pytest
+Set-Location ..
 ```
 
 PowerShell 中 `-Dtest=A,B` 推荐整体加引号，避免参数解析问题。
@@ -100,7 +110,7 @@ npm --prefix frontend run build
 # 同源 API 使用确定性 mock，覆盖主流程、错误分支和桌面/移动布局
 npm --prefix frontend run test:e2e
 
-# 构建独立 Compose 项目，覆盖真实 Spring/outbox/RabbitMQ/Redis/AI mock 链路
+# 构建独立 Compose 项目，覆盖真实 Spring/outbox/RabbitMQ/Redis/Agent/AI mock 链路
 npm --prefix frontend run test:e2e:full-stack
 ```
 
@@ -128,12 +138,16 @@ API 层：
 - MySQL 是任务状态和报告结果的事实来源，Redis 只做 report cache-aside。
 - `AnalysisWorker` 只负责监听 RabbitMQ 并委托 `RunAnalysisUseCase`。
 - 分析任务编排、失败分类、状态转换和手动 retry 入口优先落在 application/domain 组件中。
+- `RunAnalysisUseCase` 只依赖 `AnalysisEngine`；Agent 与 legacy RAG 的选择由配置和条件 bean 完成。
 
-报告解析：
+Agent runtime：
 
-- AI 输出解析放在独立组件中，例如 `ReportParser`。
-- 分数边界、缺失字段、非法输出都应有聚焦测试。
-- 后续结构化 JSON 输出落地后，应优先解析 JSON，再保留文本 fallback。
+- 初始模型上下文只放 task ID；简历、JD、标题和标签必须通过工具作为 untrusted data 返回。
+- 新工具必须加入白名单、Pydantic schema、调用前置条件、预算和确定性测试，不能只写进 prompt。
+- 普通模型文本不能作为最终报告；最终结果只能由 `submit_match_report` 的有效结构化参数产生。
+- evidence ID 必须来自当前分析的检索结果；未知引用和越界报告字段必须拒绝。
+- 模型/工具循环必须有 step、tool call、protocol error 和 HTTP timeout 上限。
+- 原有 `ReportParser` 只服务 `legacy` 引擎，不应重新进入 Agent 主链路。
 
 配置：
 
@@ -205,7 +219,8 @@ mvn test
 - Phase 5：已完成。request/correlation ID、结构化任务日志、Micrometer 指标、运行手册补强。
 - Phase 6：已完成。端到端验证、mock AI HTTP server、PDF/DOCX fixtures、Redis Testcontainers、`mvn verify`。
 - 前端产品化：已完成。原子提交、历史/汇总 API、React 工作台、状态轮询与重试、安全报告、Nginx/Compose 交付、Playwright 和真实全栈验收。
+- Agent 化：已完成代码实现。Python/FastAPI sidecar、三工具有界循环、结构化终止、证据校验、Java 双引擎适配、内部鉴权、指标、合成 eval 和 Compose/E2E mock 接线。
 
-当前工程化验收闭环是：`mvn test`、Docker-backed `mvn verify`、前端 lint/typecheck/unit/build、`test:e2e`、`test:e2e:full-stack`、`docker compose --env-file .env.example config --quiet` 全部通过。
+当前提交前 fast gate 是：`mvn test`、Agent `pytest`、前端 lint/typecheck/unit/build 和 Compose config。Docker-backed `mvn verify` 与 `test:e2e:full-stack` 仍是完整验收 gate；不能在 Docker daemon 未运行时把它们记为本次已通过。
 
 `docs/superpowers/plans/2026-05-12-rag-resume-job-match.md` 保留为历史实现上下文，不作为当前工程化重构的执行计划。

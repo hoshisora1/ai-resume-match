@@ -475,7 +475,11 @@ test('counts the title and JD limits by Unicode code point and submits multipart
   expect(queryClient.getMutationCache().getAll()).toEqual(mutationBaseline)
   expect(submittedInput).toBe('/api/analysis-submissions')
   expect(submittedInit?.method).toBe('POST')
-  expect(new Headers(submittedInit?.headers).has('Content-Type')).toBe(false)
+  const submittedHeaders = new Headers(submittedInit?.headers)
+  expect(submittedHeaders.has('Content-Type')).toBe(false)
+  expect(submittedHeaders.get('Idempotency-Key')).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  )
   expect(submittedInit?.body).toBeInstanceOf(FormData)
   const submittedFormData = submittedInit?.body as FormData
   expect(submittedFormData.get('jobTitle')).toBe(exactTitle)
@@ -498,6 +502,9 @@ test('counts the title and JD limits by Unicode code point and submits multipart
   })
 
   await router.navigate('/analyses/new')
+  expect(
+    await screen.findByRole('heading', { name: '新建分析' }),
+  ).toBeVisible()
   const resetFileInput = await screen.findByLabelText('选择简历文件')
   expect(resetFileInput).toHaveValue('')
   expect((resetFileInput as HTMLInputElement).files).toHaveLength(0)
@@ -560,9 +567,11 @@ test('rejects a JD above 20,000 Unicode code points without submitting', async (
 test('preserves all values after a structured server error, shows only a safe message and retries once requested', async () => {
   const rawServerMessage = 'SECRET_RAW_PAYLOAD: rejected resume body'
   let requestCount = 0
+  const idempotencyKeys: Array<string | null> = []
   server.use(
-    http.post('/api/analysis-submissions', () => {
+    http.post('/api/analysis-submissions', ({ request }) => {
       requestCount += 1
+      idempotencyKeys.push(request.headers.get('Idempotency-Key'))
       return requestCount === 1
         ? HttpResponse.json(
             {
@@ -615,7 +624,48 @@ test('preserves all values after a structured server error, shows only a safe me
     expect(router.state.location.pathname).toBe('/analyses/42')
   })
   expect(requestCount).toBe(2)
+  expect(idempotencyKeys[0]).toBeTruthy()
+  expect(idempotencyKeys[1]).toBe(idempotencyKeys[0])
   expect(queryClient.getMutationCache().getAll()).toEqual(mutationBaseline)
+})
+
+test('rotates the idempotency key when submission data changes after an error', async () => {
+  const idempotencyKeys: Array<string | null> = []
+  server.use(
+    http.post('/api/analysis-submissions', ({ request }) => {
+      idempotencyKeys.push(request.headers.get('Idempotency-Key'))
+      return idempotencyKeys.length === 1
+        ? HttpResponse.json(
+            { code: 'TEMPORARY_ERROR', message: 'unsafe detail' },
+            { status: 503 },
+          )
+        : HttpResponse.json(createSubmissionResponse('高级后端工程师（平台）'))
+    }),
+  )
+  const user = userEvent.setup()
+  const { router } = renderNewAnalysis()
+  await user.upload(
+    screen.getByLabelText('选择简历文件'),
+    new File(['resume'], 'candidate.pdf'),
+  )
+  setTextValues()
+
+  await user.click(screen.getByRole('button', { name: '提交分析' }))
+  expect(await screen.findByRole('alert')).toBeVisible()
+
+  await user.type(
+    screen.getByRole('textbox', { name: '岗位名称' }),
+    '（平台）',
+  )
+  await user.click(screen.getByRole('button', { name: '提交分析' }))
+
+  await waitFor(() => {
+    expect(router.state.location.pathname).toBe('/analyses/42')
+  })
+  expect(idempotencyKeys).toHaveLength(2)
+  expect(idempotencyKeys[0]).toBeTruthy()
+  expect(idempotencyKeys[1]).toBeTruthy()
+  expect(idempotencyKeys[1]).not.toBe(idempotencyKeys[0])
 })
 
 test('clears a stale request error when an edited title makes the retry invalid', async () => {

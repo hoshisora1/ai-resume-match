@@ -39,6 +39,7 @@ class FlywayMigrationTest {
             assertThat(tableExists(connection, "analysis_task")).isTrue();
             assertThat(tableExists(connection, "match_report")).isTrue();
             assertThat(tableExists(connection, "analysis_outbox")).isTrue();
+            assertThat(tableExists(connection, "analysis_submission_idempotency")).isTrue();
             assertThat(indexExists(connection, "analysis_outbox", "idx_analysis_outbox_due")).isTrue();
             assertThat(indexExists(connection, "analysis_task", "idx_analysis_task_created_id")).isTrue();
             assertThat(indexExists(
@@ -53,6 +54,21 @@ class FlywayMigrationTest {
             assertThat(titleColumn.nullability()).isEqualTo(DatabaseMetaData.columnNoNulls);
             assertThatThrownBy(() -> insertJobWithNullTitle(connection))
                 .isInstanceOf(SQLException.class);
+
+            ColumnMetadata keyHashColumn = columnMetadata(
+                connection,
+                "analysis_submission_idempotency",
+                "idempotency_key_hash"
+            );
+            assertThat(keyHashColumn.length()).isEqualTo(64);
+            assertThat(keyHashColumn.nullability()).isEqualTo(DatabaseMetaData.columnNoNulls);
+
+            insertIdempotencyRecord(connection, "a".repeat(64), "b".repeat(64));
+            assertThatThrownBy(() -> insertIdempotencyRecord(
+                connection,
+                "a".repeat(64),
+                "c".repeat(64)
+            )).isInstanceOf(SQLException.class);
         }
     }
 
@@ -97,6 +113,21 @@ class FlywayMigrationTest {
             statement.setNull(1, java.sql.Types.VARCHAR);
             statement.setString(2, "Invalid role");
             statement.setString(3, "Java");
+            statement.executeUpdate();
+        }
+    }
+
+    private void insertIdempotencyRecord(
+        Connection connection,
+        String keyHash,
+        String requestFingerprint
+    ) throws SQLException {
+        String sql = "insert into analysis_submission_idempotency "
+            + "(idempotency_key_hash, request_fingerprint, created_at) "
+            + "values (?, ?, current_timestamp)";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, keyHash);
+            statement.setString(2, requestFingerprint);
             statement.executeUpdate();
         }
     }

@@ -37,6 +37,27 @@ class RetryAnalysisTaskUseCaseTest {
     }
 
     @Test
+    void manuallyRetriesDeliveryFailureAndWritesANewOutboxEvent() {
+        AnalysisTaskRepository repository = mock(AnalysisTaskRepository.class);
+        AnalysisTaskPublisher publisher = mock(AnalysisTaskPublisher.class);
+        RetryAnalysisTaskUseCase useCase = new RetryAnalysisTaskUseCase(repository, publisher);
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        ReflectionTestUtils.setField(task, "id", 99L);
+        ReflectionTestUtils.setField(task, "status", AnalysisTask.Status.FAILED_RETRYABLE);
+        ReflectionTestUtils.setField(task, "failureCode", AnalysisFailureCode.DELIVERY_FAILED);
+        ReflectionTestUtils.setField(task, "failureMessage", "Analysis task could not be delivered");
+        when(repository.findById(99L)).thenReturn(Optional.of(task));
+        when(repository.save(task)).thenReturn(task);
+
+        AnalysisTask retried = useCase.retry(99L);
+
+        assertThat(retried.getStatus()).isEqualTo(AnalysisTask.Status.PENDING);
+        assertThat(retried.getFailureCode()).isNull();
+        verify(repository).save(task);
+        verify(publisher).publishAfterCommit(99L);
+    }
+
+    @Test
     void rejectsMissingTask() {
         AnalysisTaskRepository repository = mock(AnalysisTaskRepository.class);
         AnalysisTaskPublisher publisher = mock(AnalysisTaskPublisher.class);

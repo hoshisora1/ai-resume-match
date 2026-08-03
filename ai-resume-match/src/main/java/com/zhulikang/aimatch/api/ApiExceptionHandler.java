@@ -1,5 +1,6 @@
 package com.zhulikang.aimatch.api;
 
+import com.zhulikang.aimatch.application.analysis.IdempotencyConflictException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -38,5 +39,10 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(ResourceNotFoundException ex) {
         return ResponseEntity.status(404).body(new ApiErrorResponse("NOT_FOUND", ex.getMessage()));
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleIdempotencyConflict(IdempotencyConflictException ex) {
+        return ResponseEntity.status(409).body(new ApiErrorResponse("IDEMPOTENCY_CONFLICT", ex.getMessage()));
     }
 }

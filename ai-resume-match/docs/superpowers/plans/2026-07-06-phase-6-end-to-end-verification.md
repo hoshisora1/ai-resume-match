@@ -374,16 +374,16 @@ Review locally or with a subagent when available:
 After all checks pass:
 
 ```powershell
-cd C:\Users\chen\Documents\New project 2
+cd <repository-root>
 git merge --ff-only codex/phase-6-end-to-end-verification
-cd C:\Users\chen\Documents\New project 2\ai-resume-match
+cd <repository-root>\ai-resume-match
 mvn test
 ```
 
 If master verification passes, remove the worktree and branch:
 
 ```powershell
-cd C:\Users\chen\Documents\New project 2
+cd <repository-root>
 git worktree remove .worktrees\phase-6-end-to-end-verification
 git branch -d codex/phase-6-end-to-end-verification
 ```

@@ -8,6 +8,7 @@ import com.zhulikang.aimatch.application.analysis.AnalysisSummary;
 import com.zhulikang.aimatch.application.analysis.AnalysisSubmission;
 import com.zhulikang.aimatch.application.analysis.AnalysisTaskDetails;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisSubmissionUseCase;
+import com.zhulikang.aimatch.application.analysis.IdempotencyConflictException;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisSummaryUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -233,6 +235,69 @@ class ResumeMatchControllerTest {
             .andExpect(jsonPath("$.updatedAt").exists());
 
         verify(createAnalysisSubmissionUseCase).create(file, "Backend Engineer", "Java Redis");
+    }
+
+    @Test
+    void acceptsSafeIdempotencyKey() throws Exception {
+        MockMultipartFile file = resumeFile("resume.docx");
+        AnalysisSubmission submission = submission("Backend Engineer", "resume.docx");
+        when(createAnalysisSubmissionUseCase.create(
+            file,
+            "Backend Engineer",
+            "Java Redis",
+            "client-request_123:v1"
+        )).thenReturn(submission);
+
+        mockMvc.perform(analysisSubmissionRequest(file, "Backend Engineer", "Java Redis")
+                .header("Idempotency-Key", "client-request_123:v1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.taskId").value(30));
+
+        verify(createAnalysisSubmissionUseCase).create(
+            file,
+            "Backend Engineer",
+            "Java Redis",
+            "client-request_123:v1"
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "contains space", "非ASCII", "-leading", "two,keys"})
+    void rejectsUnsafeIdempotencyKey(String key) throws Exception {
+        mockMvc.perform(analysisSubmissionRequest(resumeFile("resume.pdf"), "Backend Engineer", "Java Redis")
+                .header("Idempotency-Key", key))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Invalid request"));
+
+        verifyNoInteractions(createAnalysisSubmissionUseCase);
+    }
+
+    @Test
+    void rejectsIdempotencyKeyAboveLengthLimit() throws Exception {
+        mockMvc.perform(analysisSubmissionRequest(resumeFile("resume.pdf"), "Backend Engineer", "Java Redis")
+                .header("Idempotency-Key", "a".repeat(129)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        verifyNoInteractions(createAnalysisSubmissionUseCase);
+    }
+
+    @Test
+    void returnsConflictWhenIdempotencyKeyIsReusedForDifferentRequest() throws Exception {
+        MockMultipartFile file = resumeFile("resume.pdf");
+        when(createAnalysisSubmissionUseCase.create(
+            file,
+            "Backend Engineer",
+            "Java Redis",
+            "request-123"
+        )).thenThrow(new IdempotencyConflictException());
+
+        mockMvc.perform(analysisSubmissionRequest(file, "Backend Engineer", "Java Redis")
+                .header("Idempotency-Key", "request-123"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"))
+            .andExpect(jsonPath("$.message").value(IdempotencyConflictException.MESSAGE));
     }
 
     @Test

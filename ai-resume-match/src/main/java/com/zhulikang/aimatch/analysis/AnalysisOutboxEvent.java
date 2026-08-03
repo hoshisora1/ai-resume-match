@@ -10,11 +10,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
+import java.util.regex.Pattern;
 
 @Entity
 @Table(name = "analysis_outbox")
 public class AnalysisOutboxEvent {
     private static final int MAX_ERROR_LENGTH = 1024;
+    private static final String GENERIC_PUBLISH_ERROR = "Outbox publish failed";
+    private static final Pattern CONTROL_CHARACTERS = Pattern.compile("[\\p{Cc}\\p{Cf}]");
+    private static final Pattern REPEATED_WHITESPACE = Pattern.compile("\\s+");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -96,19 +100,61 @@ public class AnalysisOutboxEvent {
         this.publishedAt = now;
     }
 
-    public void markPublishFailed(String lastError, LocalDateTime nextAttemptAt) {
-        this.status = AnalysisOutboxStatus.FAILED;
+    public boolean markPublishFailed(
+        String lastError,
+        LocalDateTime nextAttemptAt,
+        int maxAttempts
+    ) {
+        if (maxAttempts < 1) {
+            throw new IllegalArgumentException("maxAttempts must be positive");
+        }
+        if (status == AnalysisOutboxStatus.PUBLISHED || status == AnalysisOutboxStatus.DEAD) {
+            throw new IllegalStateException("Terminal outbox event cannot be failed again");
+        }
         this.attemptCount++;
-        this.lastError = truncate(lastError);
+        this.lastError = sanitizeError(lastError);
+        this.publishedAt = null;
+        if (attemptCount >= maxAttempts) {
+            this.status = AnalysisOutboxStatus.DEAD;
+            this.nextAttemptAt = null;
+            return true;
+        }
+        this.status = AnalysisOutboxStatus.FAILED;
         this.nextAttemptAt = nextAttemptAt;
+        return false;
+    }
+
+    public void releaseAfterInterrupted(LocalDateTime now) {
+        if (status != AnalysisOutboxStatus.PROCESSING) {
+            throw new IllegalStateException("Only processing outbox events can be released");
+        }
+        this.status = AnalysisOutboxStatus.FAILED;
+        this.lastError = sanitizeError("Outbox publish interrupted");
+        this.nextAttemptAt = now;
         this.publishedAt = null;
     }
 
-    private String truncate(String value) {
-        if (value == null || value.length() <= MAX_ERROR_LENGTH) {
-            return value;
+    public void sanitizeLastError() {
+        this.lastError = sanitizeError(lastError);
+    }
+
+    static String sanitizeError(String value) {
+        String candidate = value == null ? GENERIC_PUBLISH_ERROR : value;
+        String cleaned = REPEATED_WHITESPACE.matcher(
+            CONTROL_CHARACTERS.matcher(candidate).replaceAll(" ")
+        ).replaceAll(" ").trim();
+        if (cleaned.isEmpty()) {
+            cleaned = GENERIC_PUBLISH_ERROR;
         }
-        return value.substring(0, MAX_ERROR_LENGTH);
+        if (cleaned.length() <= MAX_ERROR_LENGTH) {
+            return cleaned;
+        }
+
+        int end = MAX_ERROR_LENGTH;
+        if (Character.isHighSurrogate(cleaned.charAt(end - 1))) {
+            end--;
+        }
+        return cleaned.substring(0, end).stripTrailing();
     }
 
     public Long getId() {

@@ -1,6 +1,10 @@
 package com.zhulikang.aimatch.analysis;
 
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
+import com.zhulikang.aimatch.job.JobDescription;
+import com.zhulikang.aimatch.job.JobDescriptionRepository;
+import com.zhulikang.aimatch.resume.Resume;
+import com.zhulikang.aimatch.resume.ResumeRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +51,14 @@ class AnalysisOutboxPublisherIT {
     @Autowired
     AnalysisOutboxRepository outboxRepository;
     @Autowired
+    AnalysisTaskRepository taskRepository;
+    @Autowired
+    MatchReportRepository reportRepository;
+    @Autowired
+    ResumeRepository resumeRepository;
+    @Autowired
+    JobDescriptionRepository jobRepository;
+    @Autowired
     RabbitTemplate rabbitTemplate;
     @Autowired
     CachingConnectionFactory connectionFactory;
@@ -75,15 +87,7 @@ class AnalysisOutboxPublisherIT {
         admin.deleteQueue(RabbitConfig.ANALYSIS_DLQ);
         admin.deleteExchange(RabbitConfig.ANALYSIS_EXCHANGE);
         admin.deleteExchange(RabbitConfig.ANALYSIS_DLX);
-        publisher = new AnalysisOutboxPublisher(
-            outboxRepository,
-            rabbitTemplate,
-            20,
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(5),
-            Clock.systemDefaultZone(),
-            new AnalysisMetrics(new SimpleMeterRegistry())
-        );
+        publisher = publisher(10);
     }
 
     @Test
@@ -115,6 +119,31 @@ class AnalysisOutboxPublisherIT {
         assertThat(updated.getLastError()).contains("returned");
     }
 
+    @Test
+    void movesExhaustedPublishToDeadAndDoesNotClaimItAgain() {
+        declareExchangeOnly();
+        publisher = publisher(1);
+        Resume resume = resumeRepository.saveAndFlush(new Resume("resume.pdf", "Java", "Java"));
+        JobDescription job = jobRepository.saveAndFlush(new JobDescription("Java", "Java", "Java"));
+        AnalysisTask task = taskRepository.saveAndFlush(new AnalysisTask(resume.getId(), job.getId()));
+        AnalysisOutboxEvent event = outboxRepository.saveAndFlush(
+            AnalysisOutboxEvent.analysisRequested(task.getId())
+        );
+
+        publishPending();
+        publishPending();
+
+        AnalysisOutboxEvent updated = outboxRepository.findById(event.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(AnalysisOutboxStatus.DEAD);
+        assertThat(updated.getAttemptCount()).isEqualTo(1);
+        assertThat(updated.getNextAttemptAt()).isNull();
+        assertThat(updated.getLastError()).contains("returned");
+        AnalysisTask failedTask = taskRepository.findById(task.getId()).orElseThrow();
+        assertThat(failedTask.getStatus()).isEqualTo(AnalysisTask.Status.FAILED_RETRYABLE);
+        assertThat(failedTask.getFailureCode()).isEqualTo(AnalysisFailureCode.DELIVERY_FAILED);
+        assertThat(failedTask.getNextRetryAt()).isNull();
+    }
+
     private void declareAnalysisTopology() {
         RabbitAdmin admin = new RabbitAdmin(connectionFactory);
         DirectExchange exchange = new DirectExchange(RabbitConfig.ANALYSIS_EXCHANGE, true, false);
@@ -136,6 +165,24 @@ class AnalysisOutboxPublisherIT {
 
     private void publishPending() {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> publisher.publishPending());
+    }
+
+    private AnalysisOutboxPublisher publisher(int maxAttempts) {
+        return new AnalysisOutboxPublisher(
+            outboxRepository,
+            new AnalysisTaskService(
+                taskRepository,
+                reportRepository,
+                Duration.ofMinutes(15)
+            ),
+            rabbitTemplate,
+            20,
+            maxAttempts,
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(5),
+            Clock.systemDefaultZone(),
+            new AnalysisMetrics(new SimpleMeterRegistry())
+        );
     }
 
     @TestConfiguration

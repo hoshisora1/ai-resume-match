@@ -12,6 +12,7 @@ public class OutboxMetrics {
         register(repository, meterRegistry, AnalysisOutboxStatus.PENDING, "pending");
         register(repository, meterRegistry, AnalysisOutboxStatus.FAILED, "failed");
         register(repository, meterRegistry, AnalysisOutboxStatus.PROCESSING, "processing");
+        register(repository, meterRegistry, AnalysisOutboxStatus.DEAD, "dead");
     }
 
     private void register(

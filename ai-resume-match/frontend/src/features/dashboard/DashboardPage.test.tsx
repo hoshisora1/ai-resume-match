@@ -132,7 +132,9 @@ test('loads summary and recent analyses independently in parallel with stable qu
   try {
     const { queryClient } = renderDashboard()
 
-    expect(screen.getByTestId('dashboard-metrics-skeleton')).toBeVisible()
+    expect(
+      await screen.findByTestId('dashboard-metrics-skeleton'),
+    ).toBeVisible()
     expect(screen.getAllByTestId('analysis-row-skeleton')).toHaveLength(5)
 
     await waitFor(() => {

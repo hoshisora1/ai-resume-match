@@ -36,6 +36,13 @@ public class AnalysisMetrics {
         stopWorker(sample, "failure", code);
     }
 
+    public void taskLeaseLost(Timer.Sample sample) {
+        Counter.builder("analysis.tasks.stale_leases")
+            .register(meterRegistry)
+            .increment();
+        stopWorker(sample, "stale_lease", "none");
+    }
+
     public void outboxPublished() {
         Counter.builder("analysis.outbox.events")
             .tag("outcome", "published")
@@ -46,6 +53,13 @@ public class AnalysisMetrics {
     public void outboxFailed() {
         Counter.builder("analysis.outbox.events")
             .tag("outcome", "failed")
+            .register(meterRegistry)
+            .increment();
+    }
+
+    public void outboxDead() {
+        Counter.builder("analysis.outbox.events")
+            .tag("outcome", "dead")
             .register(meterRegistry)
             .increment();
     }
@@ -74,6 +88,20 @@ public class AnalysisMetrics {
             .register(meterRegistry)
             .increment();
         sample.stop(Timer.builder("ai.call.duration")
+            .tag("outcome", outcome)
+            .register(meterRegistry));
+    }
+
+    public Timer.Sample startAgentCall() {
+        return Timer.start(meterRegistry);
+    }
+
+    public void agentCallFinished(Timer.Sample sample, String outcome) {
+        Counter.builder("agent.calls")
+            .tag("outcome", outcome)
+            .register(meterRegistry)
+            .increment();
+        sample.stop(Timer.builder("agent.call.duration")
             .tag("outcome", outcome)
             .register(meterRegistry));
     }

@@ -25,6 +25,12 @@ ai:
   api-key: ${AI_API_KEY}
   model: ${AI_MODEL:gpt-4o-mini}
 
+agent:
+  base-url: ${AGENT_SERVICE_URL:http://localhost:8000}
+  token: ${AGENT_SERVICE_TOKEN:dev-agent-token}
+  connect-timeout: ${AGENT_CONNECT_TIMEOUT:3s}
+  read-timeout: ${AGENT_READ_TIMEOUT:60s}
+
 api:
   token: ${API_TOKEN}
 
@@ -36,10 +42,15 @@ logging:
     level: "%5p requestId=%X{requestId} correlationId=%X{correlationId}"
 
 analysis:
+  engine: ${ANALYSIS_ENGINE:legacy}
   running-timeout: ${ANALYSIS_RUNNING_TIMEOUT:15m}
+  running-recovery:
+    scheduler-fixed-delay-ms: ${ANALYSIS_RUNNING_RECOVERY_FIXED_DELAY_MS:30000}
+    batch-size: ${ANALYSIS_RUNNING_RECOVERY_BATCH_SIZE:20}
   outbox:
     fixed-delay-ms: ${ANALYSIS_OUTBOX_FIXED_DELAY_MS:5000}
     batch-size: ${ANALYSIS_OUTBOX_BATCH_SIZE:20}
+    max-attempts: ${ANALYSIS_OUTBOX_MAX_ATTEMPTS:10}
     retry-delay: ${ANALYSIS_OUTBOX_RETRY_DELAY:30s}
     confirm-timeout: ${ANALYSIS_OUTBOX_CONFIRM_TIMEOUT:5s}
   retry:

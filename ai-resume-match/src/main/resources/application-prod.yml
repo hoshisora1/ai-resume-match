@@ -19,3 +19,6 @@ api:
 
 ai:
   api-key: ${AI_API_KEY}
+
+agent:
+  token: ${AGENT_SERVICE_TOKEN}

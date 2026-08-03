@@ -14,8 +14,8 @@
 
 ## Starting Context
 
-- Worktree: `C:\Users\chen\Documents\New project 2\.worktrees\frontend-product-experience`
-- Project: `C:\Users\chen\Documents\New project 2\.worktrees\frontend-product-experience\ai-resume-match`
+- Worktree: `<repository-root>\.worktrees\frontend-product-experience`
+- Project: `<repository-root>\.worktrees\frontend-product-experience\ai-resume-match`
 - Branch: `codex/frontend-product-experience`
 - Approved design: `docs/superpowers/specs/2026-07-10-frontend-product-experience-design.md`
 - Baseline: `mvn test` passes with 107 tests and 0 failures.

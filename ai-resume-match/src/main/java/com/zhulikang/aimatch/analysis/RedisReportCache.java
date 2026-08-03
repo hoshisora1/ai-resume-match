@@ -47,7 +47,11 @@ public class RedisReportCache implements ReportCache {
             return Optional.of(report);
         } catch (RuntimeException | JsonProcessingException ex) {
             metrics.cacheRequest("error");
-            log.warn("Failed to read match report cache for task {}: {}", taskId, ex.getMessage());
+            log.warn(
+                "event=report_cache_read_failed taskId={} exceptionType={}",
+                taskId,
+                ex.getClass().getName()
+            );
             return Optional.empty();
         }
     }
@@ -59,7 +63,11 @@ public class RedisReportCache implements ReportCache {
             metrics.cacheWrite("success");
         } catch (RuntimeException | JsonProcessingException ex) {
             metrics.cacheWrite("error");
-            log.warn("Failed to write match report cache for task {}: {}", report.taskId(), ex.getMessage());
+            log.warn(
+                "event=report_cache_write_failed taskId={} exceptionType={}",
+                report.taskId(),
+                ex.getClass().getName()
+            );
         }
     }
 

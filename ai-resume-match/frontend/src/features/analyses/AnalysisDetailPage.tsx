@@ -69,6 +69,8 @@ function failureSummary(task: AnalysisTask) {
   switch (task.failureCode) {
     case 'AI_UNAVAILABLE':
       return '分析服务暂时不可用。'
+    case 'DELIVERY_FAILED':
+      return '任务投递失败，请在消息服务恢复后重新分析。'
     case 'REPORT_PARSE_FAILED':
       return '生成的报告无法验证。'
     case 'SOURCE_DATA_MISSING':

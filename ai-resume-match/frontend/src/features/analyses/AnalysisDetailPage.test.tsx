@@ -158,7 +158,9 @@ test.each([
 
   renderDetail(`/analyses/${rawId}`)
 
-  expect(await screen.findByText('任务 ID 无效')).toBeVisible()
+  expect(
+    await screen.findByText('任务 ID 无效', {}, { timeout: 3_000 }),
+  ).toBeVisible()
   expect(screen.getByRole('link', { name: '返回分析历史' })).toHaveAttribute(
     'href',
     '/analyses',
@@ -208,6 +210,31 @@ test('shows compact task metadata with stable nullable and local date formatting
   expect(metadataValue('开始时间')).toHaveTextContent('2026-07-10 09:01')
   expect(metadataValue('完成时间')).toHaveTextContent('2026-07-10 09:05')
   expect(metadataValue('下次重试')).toHaveTextContent('2026-07-10 09:10')
+})
+
+test('shows a safe actionable summary for delivery failure without scheduling automatic retry', async () => {
+  server.use(
+    http.get(`/api/analysis/${TASK_ID}`, () =>
+      HttpResponse.json(
+        createTask('FAILED_RETRYABLE', {
+          failureCode: 'DELIVERY_FAILED',
+          failureMessage: 'SECRET_BROKER_FAILURE_DETAIL',
+          nextRetryAt: null,
+          startedAt: null,
+        }),
+      ),
+    ),
+  )
+
+  renderDetail()
+
+  expect(await screen.findByText('可重试失败')).toBeVisible()
+  expect(
+    screen.getByText('任务投递失败，请在消息服务恢复后重新分析。'),
+  ).toBeVisible()
+  expect(screen.queryByText('SECRET_BROKER_FAILURE_DETAIL')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '重新分析' })).toBeVisible()
+  expect(metadataValue('下次重试')).toHaveTextContent('—')
 })
 
 test('announces business status changes in one stable live region and keeps transport errors in an alert', async () => {
