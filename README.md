@@ -1,5 +1,7 @@
 # AI Resume Match
 
+[![CI](https://github.com/hoshisora1/ai-resume-match/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hoshisora1/ai-resume-match/actions/workflows/ci.yml)
+
 AI Resume Match is a full-stack AI application for uploading a PDF/DOCX resume, matching it against a job description, tracking an asynchronous analysis task, and reviewing a grounded Markdown report.
 
 The implementation combines a React product UI, a Spring Boot reliability boundary, and a bounded FastAPI Tool Calling Agent. MySQL remains the source of truth; a transactional outbox and RabbitMQ drive background work; Redis is used only as a report cache.

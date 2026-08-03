@@ -1,5 +1,7 @@
 # 基于 Tool Calling Agent 的智能简历与岗位匹配系统
 
+[![CI](https://github.com/hoshisora1/ai-resume-match/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hoshisora1/ai-resume-match/actions/workflows/ci.yml)
+
 这是一个可直接运行的全栈 AI Agent 应用。用户可在浏览器中上传 PDF/DOCX 简历、填写岗位信息、跟踪异步分析状态，并查看历史记录和 Markdown 匹配报告。Java 主系统负责事务、outbox、任务状态机和报告持久化；Python/FastAPI Agent 通过受限工具读取 JD、按需检索简历证据并提交结构化报告。原有单次 RAG 链路作为可配置回退保留。
 
 ## 30 秒导览

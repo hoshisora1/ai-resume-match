@@ -422,7 +422,7 @@ FAILED_RETRYABLE -> CANCELLED
 - 前端产品化阶段加入原子提交、列表/汇总接口、React 工作台、路由级 lazy loading、稳定重试幂等 key、Nginx 同源代理、确定性 Playwright 场景和真实 Compose 浏览器验收。
 - 可靠性收口加入提交 key hash/request fingerprint、409 冲突语义、陈旧 `RUNNING` 恢复、attempt completion fence、outbox 最大尝试/`DEAD`、失败消息清理及相关指标。
 - Agent 化阶段加入 Python/FastAPI sidecar、`AnalysisEngine` 可替换端口、三工具白名单、有界循环、completion/total/context 预算、逐条 claim 引用、检索空结果、内部 token、Agent 指标、确定性单测和 5-case 合成评测集。
-- Git 仓库根目录已配置 push/pull request GitHub Actions，覆盖 Java fast/集成、Python、前端质量/构建和浏览器 E2E；配置存在不等于远程运行结果已验证全绿。
+- Git 仓库根目录已配置 push/pull request GitHub Actions，覆盖 Java fast/集成、Python、前端质量/构建和浏览器 E2E；发布前远程运行已验证 5 个 jobs 全绿，浏览器 job 包含确定性 Playwright 与真实 Compose 全栈流程。
 
 待实现：
 

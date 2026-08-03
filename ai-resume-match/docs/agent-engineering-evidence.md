@@ -72,7 +72,7 @@ Agent 具备模型驱动的动作选择：模型可以决定检索 query、top-K
 - React：ESLint、TypeScript typecheck、Vitest 与生产构建可作为门禁执行，覆盖运行时契约、提交幂等 key 和页面交互；精确数量待目标 commit 统一复跑，不在本节固化。
 - Java：fast 与 Testcontainers 范围覆盖领域/用例/API、Flyway/MySQL、outbox、RabbitMQ、Redis 和后端 E2E；精确数量待目标 commit 统一复跑，不在本节固化旧数字。
 - Playwright 同时保留确定性浏览器场景和 Compose full-stack 场景；主 Compose 与 E2E overlay 可做配置校验。
-- Git 仓库根目录已提交 push/pull request CI 配置，含 Java fast/集成、Python、前端质量/构建和浏览器 E2E jobs；配置存在不能替代远程运行记录，当前不声称“CI 全绿”。
+- Git 仓库根目录已提交 push/pull request CI 配置，含 Java fast/集成、Python、前端质量/构建和浏览器 E2E jobs；发布前已在 GitHub Actions 远程运行中验证 5 个 jobs 全绿，其中浏览器 job 同时执行确定性 Playwright 与真实 Compose 全栈流程。
 - 真实模型 eval runner 与 5 个合成 case 已就绪，但未提交 provider 运行结果或 pass rate。
 
 ## 6. 可直接用于简历的项目表述
