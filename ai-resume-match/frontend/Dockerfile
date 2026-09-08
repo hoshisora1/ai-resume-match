@@ -9,7 +9,9 @@ RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6
 
+USER root
 COPY --chmod=755 nginx/frontend-entrypoint.sh /usr/local/bin/frontend-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/frontend-entrypoint.sh
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /workspace/dist /usr/share/nginx/html
 

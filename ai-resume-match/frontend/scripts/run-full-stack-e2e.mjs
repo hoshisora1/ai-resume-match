@@ -27,14 +27,13 @@ const testEnvironment = {
   ANALYSIS_ENGINE: 'agent',
   AI_API_KEY: 'e2e-mock-key',
   FULL_STACK_E2E: 'true',
-  PLAYWRIGHT_BASE_URL: 'http://127.0.0.1:18080',
 }
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd ?? projectDirectory,
-      env: testEnvironment,
+      env: options.env ?? testEnvironment,
       stdio: 'inherit',
       windowsHide: true,
     })
@@ -48,6 +47,42 @@ function run(command, args, options = {}) {
 
       const reason = signal ? `signal ${signal}` : `exit code ${code ?? 1}`
       reject(new Error(`${command} failed with ${reason}`))
+    })
+  })
+}
+
+function runCaptured(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: projectDirectory,
+      env: testEnvironment,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk
+    })
+    child.once('error', reject)
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolve(stdout.trim())
+        return
+      }
+
+      const reason = signal ? `signal ${signal}` : `exit code ${code ?? 1}`
+      reject(
+        new Error(
+          `${command} failed with ${reason}${stderr ? `: ${stderr.trim()}` : ''}`,
+        ),
+      )
     })
   })
 }
@@ -73,6 +108,15 @@ try {
     '--wait-timeout',
     '300',
   ])
+  const frontendAddress = await runCaptured(docker, [
+    ...composeArgs,
+    'port',
+    'frontend',
+    '8080',
+  ])
+  if (!/^127\.0\.0\.1:\d+$/.test(frontendAddress)) {
+    throw new Error(`Unexpected frontend address: ${frontendAddress}`)
+  }
   await run(
     process.execPath,
     [
@@ -81,11 +125,39 @@ try {
       'e2e/full-stack.spec.ts',
       '--project=chromium',
     ],
-    { cwd: frontendDirectory },
+    {
+      cwd: frontendDirectory,
+      env: {
+        ...testEnvironment,
+        PLAYWRIGHT_BASE_URL: `http://${frontendAddress}`,
+      },
+    },
   )
 } catch (error) {
   exitCode = 1
   console.error(error instanceof Error ? error.message : String(error))
+  try {
+    await run(docker, [...composeArgs, 'ps', '-a'])
+    await run(docker, [
+      ...composeArgs,
+      'logs',
+      '--no-color',
+      '--tail',
+      '200',
+      'frontend',
+      'app',
+      'agent',
+      'mock-ai',
+    ])
+  } catch (diagnosticError) {
+    console.error(
+      `Full-stack E2E diagnostics failed: ${
+        diagnosticError instanceof Error
+          ? diagnosticError.message
+          : String(diagnosticError)
+      }`,
+    )
+  }
 } finally {
   try {
     await run(docker, [...composeArgs, 'down', '-v', '--remove-orphans'])

@@ -3,7 +3,9 @@ package com.zhulikang.aimatch.application.analysis;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
+import com.zhulikang.aimatch.support.RequestOwnerExtension;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -13,6 +15,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(RequestOwnerExtension.class)
 class AnalysisTaskCreatorTest {
     @Test
     void savesTaskPublishesOutboxEventAndRecordsMetric() {

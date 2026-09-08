@@ -11,9 +11,9 @@ import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import com.zhulikang.aimatch.observability.RequestCorrelation;
 import com.zhulikang.aimatch.resume.Resume;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
@@ -29,6 +29,7 @@ public class RunAnalysisUseCase {
     private final JobDescriptionRepository jobRepository;
     private final AnalysisEngine analysisEngine;
     private final AnalysisMetrics metrics;
+    private final ModelInputPrivacySanitizer privacySanitizer;
 
     public RunAnalysisUseCase(
         AnalysisTaskService taskService,
@@ -36,7 +37,8 @@ public class RunAnalysisUseCase {
         ResumeRepository resumeRepository,
         JobDescriptionRepository jobRepository,
         AnalysisEngine analysisEngine,
-        AnalysisMetrics metrics
+        AnalysisMetrics metrics,
+        ModelInputPrivacySanitizer privacySanitizer
     ) {
         this.taskService = taskService;
         this.taskRepository = taskRepository;
@@ -44,6 +46,7 @@ public class RunAnalysisUseCase {
         this.jobRepository = jobRepository;
         this.analysisEngine = analysisEngine;
         this.metrics = metrics;
+        this.privacySanitizer = privacySanitizer;
     }
 
     public void run(Long taskId, boolean redelivered) {
@@ -70,16 +73,37 @@ public class RunAnalysisUseCase {
             JobDescription job = jobRepository.findById(task.getJobDescriptionId())
                 .orElseThrow(SourceDataMissingException::new);
 
-            AnalysisResult result = analysisEngine.analyze(new AnalysisInput(
+            AnalysisInput modelInput = new AnalysisInput(
                 task.getId(),
                 resume.getRawText(),
                 job.getTitle(),
                 job.getContent(),
                 Arrays.stream(job.getSkillTags().split(",")).filter(tag -> !tag.isBlank()).toList(),
                 correlationId
-            ));
+            );
+            ModelInputPrivacySanitizer.SanitizationResult sanitization = privacySanitizer.sanitize(modelInput);
+            sanitization.redactionCounts().forEach((type, count) ->
+                metrics.modelInputRedacted(type.name().toLowerCase(), count)
+            );
+            int redactionCount = sanitization.redactionCounts().values().stream().mapToInt(Integer::intValue).sum();
+            if (redactionCount > 0) {
+                log.info(
+                    "event=model_input_redacted taskId={} attempt={} redactionCount={}",
+                    taskId,
+                    expectedAttempt,
+                    redactionCount
+                );
+            }
+            AnalysisResult result = analysisEngine.analyze(sanitization.input());
             boolean completed = taskService.completeSuccess(
-                new MatchReport(task.getId(), result.matchScore(), result.reportContent()),
+                new MatchReport(
+                    task.getId(),
+                    result.matchScore(),
+                    result.reportContent(),
+                    result.reportSchemaVersion(),
+                    result.structuredReportJson(),
+                    result.provenanceJson()
+                ),
                 expectedAttempt
             );
             if (!completed) {
@@ -133,11 +157,21 @@ public class RunAnalysisUseCase {
             metrics.taskFailed(AnalysisFailureCode.REPORT_PARSE_FAILED, sample);
             logFailure(taskId, expectedAttempt, AnalysisFailureCode.REPORT_PARSE_FAILED, false, ex, correlationId);
         } catch (RuntimeException ex) {
-            boolean marked = taskService.markRetryableFailure(
-                taskId,
-                expectedAttempt,
-                AnalysisFailureCode.AI_UNAVAILABLE
-            );
+            Integer retryAfterSeconds = ex instanceof AnalysisEngineUnavailableException unavailable
+                ? unavailable.retryAfterSeconds()
+                : null;
+            boolean marked = retryAfterSeconds == null
+                ? taskService.markRetryableFailure(
+                    taskId,
+                    expectedAttempt,
+                    AnalysisFailureCode.AI_UNAVAILABLE
+                )
+                : taskService.markRetryableFailure(
+                    taskId,
+                    expectedAttempt,
+                    AnalysisFailureCode.AI_UNAVAILABLE,
+                    retryAfterSeconds
+                );
             if (!marked) {
                 logStaleLease(
                     taskId,

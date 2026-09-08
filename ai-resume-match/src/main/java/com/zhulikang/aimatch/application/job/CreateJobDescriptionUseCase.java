@@ -3,6 +3,7 @@ package com.zhulikang.aimatch.application.job;
 import com.zhulikang.aimatch.job.JdTagExtractor;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
+import com.zhulikang.aimatch.security.RequestIdentity;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -24,6 +25,6 @@ public class CreateJobDescriptionUseCase {
     public JobDescription create(String title, String content) {
         String normalizedTitle = jobTitleNormalizer.normalize(title, content);
         String tags = jdTagExtractor.toStorageValue(jdTagExtractor.extractTags(content));
-        return jobRepository.save(new JobDescription(normalizedTitle, content, tags));
+        return jobRepository.save(new JobDescription(RequestIdentity.currentOwnerId(), normalizedTitle, content, tags));
     }
 }

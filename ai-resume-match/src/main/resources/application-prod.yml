@@ -14,11 +14,21 @@ spring:
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
 
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_DOCS_ENABLED:false}
+
 api:
   token: ${API_TOKEN}
+  session-signing-key: ${SESSION_SIGNING_KEY}
+  session-cookie-secure: ${SESSION_COOKIE_SECURE:true}
 
 ai:
   api-key: ${AI_API_KEY}
 
 agent:
+  base-url: ${AGENT_SERVICE_URL}
   token: ${AGENT_SERVICE_TOKEN}
+
+analysis:
+  engine: ${ANALYSIS_ENGINE}

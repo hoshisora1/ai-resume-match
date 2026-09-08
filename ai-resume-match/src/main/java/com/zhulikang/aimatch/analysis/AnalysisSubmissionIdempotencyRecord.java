@@ -1,5 +1,6 @@
 package com.zhulikang.aimatch.analysis;
 
+import com.zhulikang.aimatch.security.OwnerId;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -17,6 +18,9 @@ public class AnalysisSubmissionIdempotencyRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, length = 64, columnDefinition = "char(64)")
+    private String ownerId;
+
     @Column(nullable = false, length = 64, unique = true, columnDefinition = "char(64)")
     private String idempotencyKeyHash;
 
@@ -33,6 +37,15 @@ public class AnalysisSubmissionIdempotencyRecord {
     }
 
     public AnalysisSubmissionIdempotencyRecord(String idempotencyKeyHash, String requestFingerprint) {
+        this(OwnerId.LEGACY, idempotencyKeyHash, requestFingerprint);
+    }
+
+    public AnalysisSubmissionIdempotencyRecord(
+        String ownerId,
+        String idempotencyKeyHash,
+        String requestFingerprint
+    ) {
+        this.ownerId = OwnerId.requireValid(ownerId);
         this.idempotencyKeyHash = requireSha256(idempotencyKeyHash, "idempotencyKeyHash");
         this.requestFingerprint = requireSha256(requestFingerprint, "requestFingerprint");
     }
@@ -53,6 +66,10 @@ public class AnalysisSubmissionIdempotencyRecord {
 
     public Long getId() {
         return id;
+    }
+
+    public String getOwnerId() {
+        return ownerId;
     }
 
     public String getIdempotencyKeyHash() {

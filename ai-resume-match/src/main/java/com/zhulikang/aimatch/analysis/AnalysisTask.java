@@ -1,5 +1,6 @@
 package com.zhulikang.aimatch.analysis;
 
+import com.zhulikang.aimatch.security.OwnerId;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -15,6 +16,9 @@ public class AnalysisTask {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, length = 64, columnDefinition = "char(64)")
+    private String ownerId;
 
     @Column(nullable = false)
     private Long resumeId;
@@ -63,6 +67,11 @@ public class AnalysisTask {
     }
 
     public AnalysisTask(Long resumeId, Long jobDescriptionId) {
+        this(OwnerId.LEGACY, resumeId, jobDescriptionId);
+    }
+
+    public AnalysisTask(String ownerId, Long resumeId, Long jobDescriptionId) {
+        this.ownerId = OwnerId.requireValid(ownerId);
         this.resumeId = resumeId;
         this.jobDescriptionId = jobDescriptionId;
     }
@@ -143,6 +152,10 @@ public class AnalysisTask {
 
     public Long getId() {
         return id;
+    }
+
+    public String getOwnerId() {
+        return ownerId;
     }
 
     public Long getResumeId() {

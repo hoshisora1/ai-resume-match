@@ -40,6 +40,12 @@ export function DashboardPage() {
     <div className="dashboard-page">
       <header className="dashboard-page__header">
         <h1>分析总览</h1>
+        <Link
+          className="button button--secondary dashboard-page__demo-action"
+          to="/analyses/new?demo=1"
+        >
+          <span className="button__content">体验合成演示</span>
+        </Link>
       </header>
 
       <section

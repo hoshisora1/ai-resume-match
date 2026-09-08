@@ -9,6 +9,7 @@ import com.zhulikang.aimatch.job.JobDescriptionDisplayView;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.resume.ResumeDisplayView;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import com.zhulikang.aimatch.security.RequestIdentity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,13 +36,15 @@ public class GetAnalysisTaskUseCase {
 
     @Transactional(readOnly = true)
     public Optional<AnalysisTaskDetails> find(Long taskId) {
-        return taskRepository.findById(taskId).map(this::toDetails);
+        String ownerId = RequestIdentity.currentOwnerId();
+        return taskRepository.findByIdAndOwnerId(taskId, ownerId)
+            .map(foundTask -> toDetails(foundTask, ownerId));
     }
 
-    private AnalysisTaskDetails toDetails(AnalysisTask task) {
-        ResumeDisplayView resume = resumeRepository.findDisplayViewById(task.getResumeId())
+    private AnalysisTaskDetails toDetails(AnalysisTask task, String ownerId) {
+        ResumeDisplayView resume = resumeRepository.findDisplayViewByIdAndOwnerId(task.getResumeId(), ownerId)
             .orElseThrow(() -> new ResourceNotFoundException("Resume not found"));
-        JobDescriptionDisplayView job = jobRepository.findDisplayViewById(task.getJobDescriptionId())
+        JobDescriptionDisplayView job = jobRepository.findDisplayViewByIdAndOwnerId(task.getJobDescriptionId(), ownerId)
             .orElseThrow(() -> new ResourceNotFoundException("Job description not found"));
         Integer matchScore = reportRepository.findScoreViewByTaskId(task.getId())
             .map(MatchScoreView::matchScore)

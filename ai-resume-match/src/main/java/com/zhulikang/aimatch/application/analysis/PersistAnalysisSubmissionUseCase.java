@@ -6,6 +6,7 @@ import com.zhulikang.aimatch.application.resume.PreparedResume;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.resume.Resume;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import com.zhulikang.aimatch.security.RequestIdentity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +32,7 @@ public class PersistAnalysisSubmissionUseCase {
         String jobTitle,
         String jobContent
     ) {
-        Resume resume = resumeRepository.save(preparedResume.toEntity());
+        Resume resume = resumeRepository.save(preparedResume.toEntity(RequestIdentity.currentOwnerId()));
         JobDescription job = createJobDescriptionUseCase.create(jobTitle, jobContent);
         AnalysisTask task = taskCreator.create(resume.getId(), job.getId());
         return new AnalysisSubmission(task, job.getTitle(), resume.getFileName());

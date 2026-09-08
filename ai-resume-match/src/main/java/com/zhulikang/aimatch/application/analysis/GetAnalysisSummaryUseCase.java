@@ -3,6 +3,7 @@ package com.zhulikang.aimatch.application.analysis;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
 import com.zhulikang.aimatch.analysis.MatchReportRepository;
+import com.zhulikang.aimatch.security.RequestIdentity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,14 +27,16 @@ public class GetAnalysisSummaryUseCase {
 
     @Transactional(readOnly = true)
     public AnalysisSummary get() {
-        long total = taskRepository.count();
-        long success = taskRepository.countByStatus(AnalysisTask.Status.SUCCESS);
-        long inProgress = taskRepository.countByStatusIn(List.of(
+        String ownerId = RequestIdentity.currentOwnerId();
+        long total = taskRepository.countByOwnerId(ownerId);
+        long success = taskRepository.countByOwnerIdAndStatus(ownerId, AnalysisTask.Status.SUCCESS);
+        long inProgress = taskRepository.countByOwnerIdAndStatusIn(ownerId, List.of(
             AnalysisTask.Status.PENDING,
             AnalysisTask.Status.RUNNING
         ));
-        long retryableFailure = taskRepository.countByStatus(AnalysisTask.Status.FAILED_RETRYABLE);
-        BigDecimal average = Optional.ofNullable(reportRepository.averageMatchScore())
+        long retryableFailure = taskRepository.countByOwnerIdAndStatus(ownerId, AnalysisTask.Status.FAILED_RETRYABLE);
+        Double averageValue = reportRepository.averageMatchScoreByOwnerId(ownerId);
+        BigDecimal average = Optional.ofNullable(averageValue)
             .map(BigDecimal::valueOf)
             .map(value -> value.setScale(1, RoundingMode.HALF_UP))
             .orElse(null);

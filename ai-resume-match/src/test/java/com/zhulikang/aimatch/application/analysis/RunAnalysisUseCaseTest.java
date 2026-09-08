@@ -48,15 +48,20 @@ class RunAnalysisUseCaseTest {
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
         when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume(
             "resume.docx",
-            "Java Redis Kafka MySQL",
-            "summary"
+            "Java Redis Kafka MySQL"
         )));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription(
             "Backend Engineer",
             "Java backend, Redis and Kafka",
             "Java,Redis,Kafka"
         )));
-        when(analysisEngine.analyze(any())).thenReturn(new AnalysisResult(88, "report with Redis Kafka"));
+        when(analysisEngine.analyze(any())).thenReturn(new AnalysisResult(
+            88,
+            "report with Redis Kafka",
+            "match-report-v2",
+            "{\"schemaVersion\":\"match-report-v2\"}",
+            "{\"schemaVersion\":\"analysis-run-v1\"}"
+        ));
         when(taskService.completeSuccess(any(), eq(1))).thenReturn(true);
 
         useCase().run(99L, false);
@@ -66,6 +71,9 @@ class RunAnalysisUseCaseTest {
         assertThat(reportCaptor.getValue().getTaskId()).isEqualTo(99L);
         assertThat(reportCaptor.getValue().getMatchScore()).isEqualTo(88);
         assertThat(reportCaptor.getValue().getReportContent()).contains("Redis Kafka");
+        assertThat(reportCaptor.getValue().getReportSchemaVersion()).isEqualTo("match-report-v2");
+        assertThat(reportCaptor.getValue().getStructuredReportJson()).contains("match-report-v2");
+        assertThat(reportCaptor.getValue().getProvenanceJson()).contains("analysis-run-v1");
         ArgumentCaptor<AnalysisInput> inputCaptor = ArgumentCaptor.forClass(AnalysisInput.class);
         verify(analysisEngine).analyze(inputCaptor.capture());
         assertThat(inputCaptor.getValue().taskId()).isEqualTo(99L);
@@ -84,7 +92,7 @@ class RunAnalysisUseCaseTest {
         AnalysisTask task = task(99L);
         when(taskService.tryStart(99L, false)).thenReturn(OptionalInt.of(1));
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis", "summary")));
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis")));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis Engineer", "Redis", "Redis")));
         when(analysisEngine.analyze(any())).thenThrow(new IllegalStateException(
             "provider body: secret-upstream-payload"
@@ -118,7 +126,7 @@ class RunAnalysisUseCaseTest {
         AnalysisTask task = task(99L);
         when(taskService.tryStart(99L, false)).thenReturn(OptionalInt.of(1));
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java", "summary")));
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java")));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Engineer", "Java", "Java")));
         when(analysisEngine.analyze(any())).thenThrow(new NoSuchElementException(
             "provider returned empty choices: private-response"
@@ -134,6 +142,24 @@ class RunAnalysisUseCaseTest {
             .contains("exceptionType=java.util.NoSuchElementException")
             .doesNotContain("private-response")
             .doesNotContain("empty choices");
+    }
+
+    @Test
+    void propagatesProviderRetryAfterToTheTaskRetryPolicy() {
+        AnalysisTask task = task(99L);
+        when(taskService.tryStart(99L, false)).thenReturn(OptionalInt.of(1));
+        when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java")));
+        when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Engineer", "Java", "Java")));
+        when(analysisEngine.analyze(any()))
+            .thenThrow(new AnalysisEngineUnavailableException("RATE_LIMITED", 17));
+        when(taskService.markRetryableFailure(99L, 1, AnalysisFailureCode.AI_UNAVAILABLE, 17))
+            .thenReturn(true);
+
+        useCase().run(99L, false);
+
+        verify(taskService).markRetryableFailure(99L, 1, AnalysisFailureCode.AI_UNAVAILABLE, 17);
+        verify(taskService, never()).markRetryableFailure(99L, 1, AnalysisFailureCode.AI_UNAVAILABLE);
     }
 
     @Test
@@ -158,7 +184,7 @@ class RunAnalysisUseCaseTest {
         AnalysisTask task = task(99L);
         when(taskService.tryStart(99L, false)).thenReturn(OptionalInt.of(1));
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis", "summary")));
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis")));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Redis Engineer", "Redis", "Redis")));
         when(analysisEngine.analyze(any()))
             .thenThrow(new IllegalArgumentException("invalid report: private-model-output"));
@@ -202,7 +228,7 @@ class RunAnalysisUseCaseTest {
         AnalysisTask task = task(99L);
         when(taskService.tryStart(99L, true)).thenReturn(OptionalInt.of(1));
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis Kafka", "summary")));
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java Redis Kafka")));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription(
             "Platform Engineer",
             "Redis Kafka",
@@ -218,11 +244,53 @@ class RunAnalysisUseCaseTest {
     }
 
     @Test
+    void redactsPiiBeforeCallingAnalysisEngineAndRecordsOnlyAggregateMetrics(CapturedOutput output) {
+        AnalysisTask task = task(99L);
+        when(taskService.tryStart(99L, false)).thenReturn(OptionalInt.of(1));
+        when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume(
+            "resume.docx",
+            "姓名：张三\nEmail: private@example.com\nJava Spring Boot SECRET_RESUME_BODY_CANARY"
+        )));
+        when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription(
+            "Backend Engineer",
+            "Contact hiring@example.org\nJava required SECRET_JD_BODY_CANARY",
+            "Java"
+        )));
+        when(analysisEngine.analyze(any())).thenReturn(new AnalysisResult(80, "safe report"));
+        when(taskService.completeSuccess(any(), eq(1))).thenReturn(true);
+
+        useCase().run(99L, false);
+
+        ArgumentCaptor<AnalysisInput> inputCaptor = ArgumentCaptor.forClass(AnalysisInput.class);
+        verify(analysisEngine).analyze(inputCaptor.capture());
+        assertThat(inputCaptor.getValue().resumeText())
+            .doesNotContain("张三", "private@example.com")
+            .contains("[REDACTED_NAME]", "[REDACTED_EMAIL]", "Java Spring Boot");
+        assertThat(inputCaptor.getValue().jobDescription())
+            .doesNotContain("hiring@example.org")
+            .contains("[REDACTED_EMAIL]", "Java required");
+        assertThat(meterRegistry.counter("analysis.model.input.redactions", "type", "email").count())
+            .isEqualTo(2.0);
+        assertThat(meterRegistry.counter("analysis.model.input.redactions", "type", "name").count())
+            .isEqualTo(1.0);
+        assertThat(output)
+            .contains("event=model_input_redacted taskId=99 attempt=1 redactionCount=3")
+            .doesNotContain(
+                "private@example.com",
+                "hiring@example.org",
+                "张三",
+                "SECRET_RESUME_BODY_CANARY",
+                "SECRET_JD_BODY_CANARY"
+            );
+    }
+
+    @Test
     void discardsSuccessWhenExecutionLeaseIsStale(CapturedOutput output) {
         AnalysisTask task = task(99L);
         when(taskService.tryStart(99L, false)).thenReturn(OptionalInt.of(1));
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java", "summary")));
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java")));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Engineer", "Java", "Java")));
         when(analysisEngine.analyze(any())).thenReturn(new AnalysisResult(90, "stale report"));
         when(taskService.completeSuccess(any(), eq(1))).thenReturn(false);
@@ -252,7 +320,7 @@ class RunAnalysisUseCaseTest {
         AnalysisTask task = task(99L);
         when(taskService.tryStart(99L, false)).thenReturn(OptionalInt.of(1));
         when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java", "summary")));
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(new Resume("resume.docx", "Java")));
         when(jobRepository.findById(2L)).thenReturn(Optional.of(new JobDescription("Engineer", "Java", "Java")));
         when(analysisEngine.analyze(any())).thenThrow(new IllegalStateException("provider body: stale-secret"));
         when(taskService.markRetryableFailure(99L, 1, AnalysisFailureCode.AI_UNAVAILABLE)).thenReturn(false);
@@ -284,7 +352,8 @@ class RunAnalysisUseCaseTest {
             resumeRepository,
             jobRepository,
             analysisEngine,
-            new AnalysisMetrics(meterRegistry)
+            new AnalysisMetrics(meterRegistry),
+            new ModelInputPrivacySanitizer()
         );
     }
 

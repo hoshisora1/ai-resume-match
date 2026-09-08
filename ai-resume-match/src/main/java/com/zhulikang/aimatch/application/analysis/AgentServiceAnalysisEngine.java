@@ -1,11 +1,16 @@
 package com.zhulikang.aimatch.application.analysis;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhulikang.aimatch.application.analysis.AgentProtocol.AgentAnalysisRequest;
+import com.zhulikang.aimatch.application.analysis.AgentProtocol.AgentAnalysisResponse;
+import com.zhulikang.aimatch.application.analysis.AgentProtocol.AgentErrorResponse;
+import com.zhulikang.aimatch.config.AgentProperties;
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -13,14 +18,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
-import java.util.List;
 
 @Component
-@ConditionalOnProperty(name = "analysis.engine", havingValue = "agent")
+@ConditionalOnProperty(name = "analysis.engine", havingValue = "agent", matchIfMissing = true)
 public class AgentServiceAnalysisEngine implements AnalysisEngine {
     static final String TOKEN_HEADER = "X-Agent-Token";
     private static final Logger log = LoggerFactory.getLogger(AgentServiceAnalysisEngine.class);
@@ -29,21 +33,43 @@ public class AgentServiceAnalysisEngine implements AnalysisEngine {
     private final String endpoint;
     private final String serviceToken;
     private final AnalysisMetrics metrics;
+    private final ObjectMapper objectMapper;
+    private final AgentReportMapper reportMapper;
 
     @Autowired
     public AgentServiceAnalysisEngine(
         RestTemplateBuilder builder,
-        @Value("${agent.base-url}") String baseUrl,
-        @Value("${agent.token}") String serviceToken,
-        @Value("${agent.connect-timeout:3s}") Duration connectTimeout,
-        @Value("${agent.read-timeout:60s}") Duration readTimeout,
-        AnalysisMetrics metrics
+        AgentProperties properties,
+        AnalysisMetrics metrics,
+        ObjectMapper objectMapper
+    ) {
+        this(
+            builder
+                .setConnectTimeout(properties.connectTimeout())
+                .setReadTimeout(properties.readTimeout())
+                .build(),
+            properties.baseUrl(),
+            properties.token(),
+            metrics,
+            objectMapper
+        );
+    }
+
+    public AgentServiceAnalysisEngine(
+        RestTemplateBuilder builder,
+        String baseUrl,
+        String serviceToken,
+        Duration connectTimeout,
+        Duration readTimeout,
+        AnalysisMetrics metrics,
+        ObjectMapper objectMapper
     ) {
         this(
             builder.setConnectTimeout(connectTimeout).setReadTimeout(readTimeout).build(),
             baseUrl,
             serviceToken,
-            metrics
+            metrics,
+            objectMapper
         );
     }
 
@@ -51,7 +77,8 @@ public class AgentServiceAnalysisEngine implements AnalysisEngine {
         RestTemplate restTemplate,
         String baseUrl,
         String serviceToken,
-        AnalysisMetrics metrics
+        AnalysisMetrics metrics,
+        ObjectMapper objectMapper
     ) {
         if (baseUrl == null || baseUrl.isBlank()) {
             throw new IllegalArgumentException("Agent service base URL must not be blank");
@@ -63,6 +90,8 @@ public class AgentServiceAnalysisEngine implements AnalysisEngine {
         this.endpoint = baseUrl.replaceAll("/+$", "") + "/v1/agent/analyze";
         this.serviceToken = serviceToken;
         this.metrics = metrics;
+        this.objectMapper = objectMapper;
+        this.reportMapper = new AgentReportMapper(objectMapper);
     }
 
     @Override
@@ -88,13 +117,7 @@ public class AgentServiceAnalysisEngine implements AnalysisEngine {
                 AgentAnalysisResponse.class
             );
             AgentAnalysisResponse body = response.getBody();
-            if (body == null || body.taskId() == null || !input.taskId().equals(body.taskId())) {
-                throw new IllegalArgumentException("Agent service returned a mismatched task response");
-            }
-            if (body.matchScore() == null) {
-                throw new IllegalArgumentException("Agent service response did not contain a match score");
-            }
-            AnalysisResult result = new AnalysisResult(body.matchScore(), body.reportMarkdown());
+            AnalysisResult result = reportMapper.map(body, input);
             metrics.agentCallFinished(sample, "success");
             log.info(
                 "event=agent_service_succeeded taskId={} steps={} toolCalls={} model={}",
@@ -104,15 +127,25 @@ public class AgentServiceAnalysisEngine implements AnalysisEngine {
                 body.model()
             );
             return result;
-        } catch (HttpClientErrorException ex) {
+        } catch (HttpStatusCodeException ex) {
             int status = ex.getStatusCode().value();
-            if (status == 408 || status == 429) {
+            AgentErrorResponse error = readError(ex.getResponseBodyAsString());
+            boolean retryable = error != null && error.retryable() != null
+                ? error.retryable()
+                : status == 408 || status == 429 || status >= 500;
+            String code = error == null || error.code() == null || error.code().isBlank()
+                ? "HTTP_" + status
+                : error.code();
+            if (retryable) {
                 metrics.agentCallFinished(sample, "retryable_rejection");
-                throw ex;
+                throw new AnalysisEngineUnavailableException(
+                    code,
+                    error == null ? null : error.retryAfterSeconds()
+                );
             }
             metrics.agentCallFinished(sample, "rejected");
             throw new IllegalArgumentException(
-                "Agent service rejected the analysis request with status " + status
+                "Agent service rejected the analysis request with code " + code + " and status " + status
             );
         } catch (IllegalArgumentException ex) {
             metrics.agentCallFinished(sample, "invalid_response");
@@ -123,26 +156,15 @@ public class AgentServiceAnalysisEngine implements AnalysisEngine {
         }
     }
 
-    record AgentAnalysisRequest(
-        Long taskId,
-        String resumeText,
-        String jobTitle,
-        String jobDescription,
-        List<String> skillTags,
-        String correlationId
-    ) {
+    private AgentErrorResponse readError(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(responseBody, AgentErrorResponse.class);
+        } catch (JsonProcessingException ignored) {
+            return null;
+        }
     }
 
-    record AgentAnalysisResponse(
-        Long taskId,
-        Integer matchScore,
-        String reportMarkdown,
-        int steps,
-        String model,
-        List<ToolTrace> toolTrace
-    ) {
-    }
-
-    record ToolTrace(String name, String outcome, long durationMs) {
-    }
 }

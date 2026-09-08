@@ -2,10 +2,11 @@ package com.zhulikang.aimatch.analysis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhulikang.aimatch.config.ReportProperties;
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -22,10 +23,20 @@ public class RedisReportCache implements ReportCache {
     private final Duration ttl;
     private final AnalysisMetrics metrics;
 
+    @Autowired
     public RedisReportCache(
         StringRedisTemplate redisTemplate,
         ObjectMapper objectMapper,
-        @Value("${report.cache-ttl:10m}") Duration ttl,
+        ReportProperties properties,
+        AnalysisMetrics metrics
+    ) {
+        this(redisTemplate, objectMapper, properties.cacheTtl(), metrics);
+    }
+
+    RedisReportCache(
+        StringRedisTemplate redisTemplate,
+        ObjectMapper objectMapper,
+        Duration ttl,
         AnalysisMetrics metrics
     ) {
         this.redisTemplate = redisTemplate;
@@ -66,6 +77,21 @@ public class RedisReportCache implements ReportCache {
             log.warn(
                 "event=report_cache_write_failed taskId={} exceptionType={}",
                 report.taskId(),
+                ex.getClass().getName()
+            );
+        }
+    }
+
+    @Override
+    public void evict(Long taskId) {
+        try {
+            redisTemplate.delete(key(taskId));
+            metrics.cacheEviction("success");
+        } catch (RuntimeException ex) {
+            metrics.cacheEviction("error");
+            log.warn(
+                "event=report_cache_evict_failed taskId={} exceptionType={}",
+                taskId,
                 ex.getClass().getName()
             );
         }

@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 
+import {
+  DEMO_JOB_TITLE,
+  DEMO_RESUME_FILE_NAME,
+} from '../src/features/analyses/demoAnalysisFixture'
 import { installMockApi, trackExternalRequests } from './mockApi'
 
 test('用户可从总览提交分析、查看报告并返回历史', async ({ page }) => {
@@ -12,16 +17,11 @@ test('用户可从总览提交分析、查看报告并返回历史', async ({ pa
   ).toBeVisible()
   await expect(page.getByRole('table', { name: '最近五条分析' })).toBeVisible()
 
-  await page.getByRole('link', { name: '新建分析' }).first().click()
-  await page.getByLabel('选择简历文件').setInputFiles({
-    name: 'resume.pdf',
-    mimeType: 'application/pdf',
-    buffer: Buffer.from('%PDF-1.4\nsynthetic browser fixture\n%%EOF'),
-  })
-  await page.getByLabel('岗位名称').fill('高级 Java AI 应用工程师')
-  await page
-    .getByLabel('岗位 JD')
-    .fill('负责 Java、Spring Boot、Redis、RabbitMQ 与 AI 应用工程化交付。')
+  await page.getByRole('link', { name: '体验合成演示' }).click()
+  await expect(page).toHaveURL(/\/analyses\/new\?demo=1$/)
+  await expect(
+    page.getByRole('status', { name: '合成演示数据已填入' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: '提交分析' }).click()
 
   await expect(page).toHaveURL(/\/analyses\/42$/)
@@ -34,18 +34,66 @@ test('用户可从总览提交分析、查看报告并返回历史', async ({ pa
     page.getByRole('heading', { name: '核心结论' }),
   ).toBeVisible()
 
+  const jsonDownloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: '下载 JSON' }).click()
+  const jsonDownload = await jsonDownloadPromise
+  expect(jsonDownload.suggestedFilename()).toBe(
+    'analysis-42-match-report.json',
+  )
+  const jsonPath = await jsonDownload.path()
+  expect(jsonPath).not.toBeNull()
+  const exportedReport = JSON.parse(
+    await readFile(jsonPath as string, 'utf8'),
+  ) as Record<string, unknown>
+  expect(exportedReport).toMatchObject({
+    schemaVersion: 'match-report-export-v1',
+    sourceDocumentsIncluded: false,
+    taskId: 42,
+    matchScore: 88,
+    reportSchemaVersion: 'match-report-v2',
+  })
+  expect(exportedReport).not.toHaveProperty('resumeText')
+  expect(exportedReport).not.toHaveProperty('jobDescription')
+
+  const markdownDownloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: '下载 Markdown' }).click()
+  const markdownDownload = await markdownDownloadPromise
+  expect(markdownDownload.suggestedFilename()).toBe(
+    'analysis-42-match-report.md',
+  )
+  const markdownPath = await markdownDownload.path()
+  expect(markdownPath).not.toBeNull()
+  expect(await readFile(markdownPath as string, 'utf8')).toContain(
+    '# 匹配报告',
+  )
+
+  await page.getByRole('button', { name: '查看核心结论证据 resume:0' }).click()
+  await expect(
+    page.getByRole('complementary', { name: '证据详情 resume:0' }),
+  ).toContainText('Java、Spring Boot 与 RabbitMQ')
+  await page.getByRole('button', { name: '关闭' }).click()
+
   expect(controls.state.submissionContentType).toContain('multipart/form-data')
   expect(controls.state.submissionBody).toContain('name="file"')
+  expect(controls.state.submissionBody).toContain(DEMO_RESUME_FILE_NAME)
   expect(controls.state.submissionBody).toContain('name="jobTitle"')
-  expect(controls.state.submissionBody).toContain('高级 Java AI 应用工程师')
+  expect(controls.state.submissionBody).toContain(DEMO_JOB_TITLE)
   expect(controls.state.submissionBody).toContain('name="jobContent"')
+  expect(controls.state.submissionBody).toContain('完全合成')
+
+  await page.getByRole('link', { name: '再次分析' }).click()
+  await expect(page).toHaveURL(/\/analyses\/new$/)
+  await expect(
+    page.getByRole('status', { name: '合成演示数据已填入' }),
+  ).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: '岗位名称' })).toHaveValue('')
 
   await page.getByRole('link', { name: '分析记录' }).click()
   await expect(page.getByRole('table', { name: '分析历史' })).toBeVisible()
   await expect(
-    page.getByRole('link', { name: '高级 Java AI 应用工程师' }),
+    page.getByRole('link', { name: DEMO_JOB_TITLE }),
   ).toBeVisible()
-  await expect(page.getByText('resume.pdf')).toBeVisible()
+  await expect(page.getByText(DEMO_RESUME_FILE_NAME)).toBeVisible()
   expect(externalRequests).toEqual([])
 })
 

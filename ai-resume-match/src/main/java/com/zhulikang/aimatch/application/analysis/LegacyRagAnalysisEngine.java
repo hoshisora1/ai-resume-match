@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-@ConditionalOnProperty(name = "analysis.engine", havingValue = "legacy", matchIfMissing = true)
+@ConditionalOnProperty(name = "analysis.engine", havingValue = "legacy")
 public class LegacyRagAnalysisEngine implements AnalysisEngine {
     private final TextChunker textChunker;
     private final EmbeddingClient embeddingClient;

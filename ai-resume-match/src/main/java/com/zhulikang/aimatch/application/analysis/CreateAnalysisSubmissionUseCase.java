@@ -5,6 +5,8 @@ import com.zhulikang.aimatch.application.resume.PreparedResume;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import com.zhulikang.aimatch.security.OwnerId;
+import com.zhulikang.aimatch.security.RequestIdentity;
 
 @Service
 public class CreateAnalysisSubmissionUseCase {
@@ -32,16 +34,18 @@ public class CreateAnalysisSubmissionUseCase {
         String jobContent,
         String idempotencyKey
     ) {
-        String keyHash = idempotencyKey == null
+        String ownerId = RequestIdentity.currentOwnerId();
+        String rawKeyHash = idempotencyKey == null
             ? null
             : AnalysisSubmissionIdempotencyKey.hash(idempotencyKey);
-        if (keyHash == null) {
+        if (rawKeyHash == null) {
             PreparedResume preparedResume = prepareResumeUseCase.prepare(file);
             return persistUseCase.persist(preparedResume, jobTitle, jobContent);
         }
 
         AnalysisSubmissionIdempotencyContext context = new AnalysisSubmissionIdempotencyContext(
-            keyHash,
+            ownerId,
+            OwnerId.scopeHash(ownerId, rawKeyHash),
             AnalysisSubmissionRequestFingerprint.create(file, jobTitle, jobContent)
         );
         var existing = idempotentPersistUseCase.findExisting(context);

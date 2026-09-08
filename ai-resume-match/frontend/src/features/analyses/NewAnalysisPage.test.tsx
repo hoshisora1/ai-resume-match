@@ -15,6 +15,11 @@ import { appRoutes, type AppRouter } from '../../app/router'
 import { ApiError } from '../../shared/api/client'
 import { server } from '../../test/server'
 import { analysisFormSchema } from './analysisFormSchema'
+import {
+  DEMO_JOB_CONTENT,
+  DEMO_JOB_TITLE,
+  DEMO_RESUME_FILE_NAME,
+} from './demoAnalysisFixture'
 import { summarizeSubmissionError } from './submissionError'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -150,6 +155,12 @@ test('renders a compact accessible workflow with an exact file accept contract',
   expect(fileInput).toHaveAttribute('type', 'file')
   expect(fileInput).toHaveAttribute('accept', '.pdf,.docx')
   expect(screen.getByText('支持 PDF、DOCX，文件不超过 5 MB')).toBeVisible()
+  const privacyNotice = screen.getByRole('complementary', {
+    name: '数据与隐私说明',
+  })
+  expect(privacyNotice).toHaveTextContent('脱敏后发送给配置的模型服务')
+  expect(privacyNotice).toHaveTextContent('原始提取文本默认保留 30 天')
+  expect(privacyNotice).toHaveTextContent('提前永久删除')
   expect(titleInput).toBeVisible()
   expect(jobContentInput).toBeVisible()
 
@@ -441,8 +452,8 @@ test('counts the title and JD limits by Unicode code point and submits multipart
       return originalInvalidateQueries(...args)
     })
 
-  const fileInput = screen.getByLabelText('选择简历文件')
-  const uploadZone = screen.getByTestId('analysis-upload-zone')
+  const fileInput = await screen.findByLabelText('选择简历文件')
+  const uploadZone = await screen.findByTestId('analysis-upload-zone')
   await user.upload(fileInput, submittedResume)
   setTextValues(exactTitle, exactJobContent)
   fireEvent.dragEnter(uploadZone, {
@@ -500,11 +511,18 @@ test('counts the title and JD limits by Unicode code point and submits multipart
   await waitFor(() => {
     expect(router.state.location.pathname).toBe('/analyses/999')
   })
+  await waitFor(() => {
+    expect(
+      screen.queryByRole('heading', { name: '新建分析' }),
+    ).not.toBeInTheDocument()
+  })
 
   await router.navigate('/analyses/new')
-  expect(
-    await screen.findByRole('heading', { name: '新建分析' }),
-  ).toBeVisible()
+  await waitFor(() => {
+    expect(
+      screen.getByRole('heading', { name: '新建分析' }),
+    ).toBeVisible()
+  })
   const resetFileInput = await screen.findByLabelText('选择简历文件')
   expect(resetFileInput).toHaveValue('')
   expect((resetFileInput as HTMLInputElement).files).toHaveLength(0)
@@ -627,6 +645,66 @@ test('preserves all values after a structured server error, shows only a safe me
   expect(idempotencyKeys[0]).toBeTruthy()
   expect(idempotencyKeys[1]).toBe(idempotencyKeys[0])
   expect(queryClient.getMutationCache().getAll()).toEqual(mutationBaseline)
+})
+
+test('fills a clearly labelled synthetic resume and JD without reading a local file', async () => {
+  const user = userEvent.setup()
+  renderNewAnalysis()
+
+  await user.click(
+    await screen.findByRole('button', { name: '一键填入合成示例' }),
+  )
+
+  expect(
+    screen.getByRole('status', { name: '合成演示数据已填入' }),
+  ).toHaveTextContent('可直接提交分析')
+  expect(
+    within(screen.getByRole('status', { name: '已选择简历' })).getByText(
+      DEMO_RESUME_FILE_NAME,
+    ),
+  ).toBeVisible()
+  expect(screen.getByRole('textbox', { name: '岗位名称' })).toHaveValue(
+    DEMO_JOB_TITLE,
+  )
+  expect(screen.getByRole('textbox', { name: '岗位 JD' })).toHaveValue(
+    DEMO_JOB_CONTENT,
+  )
+
+  await user.type(screen.getByRole('textbox', { name: '岗位名称' }), ' 调整版')
+
+  expect(
+    screen.queryByRole('status', { name: '合成演示数据已填入' }),
+  ).not.toBeInTheDocument()
+  expect(
+    within(screen.getByRole('status', { name: '已选择简历' })).getByText(
+      DEMO_RESUME_FILE_NAME,
+    ),
+  ).toBeVisible()
+})
+
+test('auto-fills the synthetic fixture once when opened from the demo deep link', async () => {
+  const user = userEvent.setup()
+  const { router } = renderNewAnalysis(['/analyses/new?demo=1'])
+
+  expect(
+    await screen.findByRole('status', { name: '合成演示数据已填入' }),
+  ).toHaveTextContent('可直接提交分析')
+  expect(screen.getByRole('textbox', { name: '岗位名称' })).toHaveValue(
+    DEMO_JOB_TITLE,
+  )
+  expect(screen.getByRole('textbox', { name: '岗位 JD' })).toHaveValue(
+    DEMO_JOB_CONTENT,
+  )
+  expect(router.state.location.search).toBe('?demo=1')
+
+  await user.type(screen.getByRole('textbox', { name: '岗位名称' }), ' 调整版')
+
+  expect(screen.getByRole('textbox', { name: '岗位名称' })).toHaveValue(
+    `${DEMO_JOB_TITLE} 调整版`,
+  )
+  expect(
+    screen.queryByRole('status', { name: '合成演示数据已填入' }),
+  ).not.toBeInTheDocument()
 })
 
 test('rotates the idempotency key when submission data changes after an error', async () => {

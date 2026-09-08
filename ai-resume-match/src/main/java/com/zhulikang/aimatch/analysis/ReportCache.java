@@ -6,4 +6,6 @@ public interface ReportCache {
     Optional<MatchReportView> get(Long taskId);
 
     void put(MatchReportView report);
+
+    void evict(Long taskId);
 }

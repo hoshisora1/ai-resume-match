@@ -1,0 +1,97 @@
+groups:
+  - name: ai-resume-match-runtime
+    rules:
+      - alert: AiResumeMatchTargetDown
+        expr: up{job="ai-resume-match-app"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: AI Resume Match metrics target is unavailable
+          description: Prometheus has been unable to scrape the Java application for two minutes.
+
+      - alert: AiResumeMatchAgentTargetDown
+        expr: up{job="ai-resume-match-agent"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: AI Resume Match Agent metrics target is unavailable
+          description: Prometheus has been unable to scrape the Python Agent for two minutes.
+
+      - alert: AnalysisOutboxOldestEventTooOld
+        expr: analysis_outbox_oldest_age_seconds > 120
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Analysis outbox delivery is delayed
+          description: The oldest non-terminal outbox event has been waiting for more than two minutes.
+
+      - alert: AnalysisOutboxDeadLetterPresent
+        expr: analysis_outbox_backlog{status="dead"} > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Analysis outbox contains dead events
+          description: At least one event exhausted its delivery attempts and requires operator review.
+
+      - alert: AnalysisTaskFailureRatioHigh
+        expr: |
+          (
+            sum(rate(analysis_tasks_failed_total[10m]))
+            /
+            clamp_min(sum(rate(analysis_tasks_created_total[10m])), 0.001)
+          ) > 0.20
+          and sum(increase(analysis_tasks_created_total[10m])) >= 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Analysis task failure ratio is elevated
+          description: More than 20 percent of recently created analyses are failing with sufficient sample volume.
+
+      - alert: AgentProviderFailureRatioHigh
+        expr: |
+          (
+            sum(rate(agent_service_provider_calls_total{outcome!="success"}[10m]))
+            /
+            clamp_min(sum(rate(agent_service_provider_calls_total[10m])), 0.001)
+          ) > 0.20
+          and sum(increase(agent_service_provider_calls_total[10m])) >= 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Agent chat provider failure ratio is elevated
+          description: More than 20 percent of recent Agent chat calls are failing with sufficient sample volume.
+
+      - alert: AgentProtocolErrorsHigh
+        expr: sum(increase(agent_service_protocol_errors_total[10m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Agent protocol errors are recurring
+          description: The bounded Agent rejected at least three model or tool protocol operations in ten minutes.
+
+      - alert: AgentCostUsageMissing
+        expr: |
+          agent_service_cost_estimation_enabled == 1
+          and sum(increase(agent_service_cost_estimation_skipped_total{reason="usage_not_reported"}[10m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Configured Agent cost estimation lacks provider usage
+          description: Versioned pricing is enabled but at least three recent chat calls omitted complete token usage.
+
+      - alert: AgentAnalysisCapacityExhausted
+        expr: sum(increase(agent_service_analysis_capacity_rejections_total[10m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Agent analysis capacity is repeatedly exhausted
+          description: At least three authorized analyses were rejected before provider access in ten minutes.

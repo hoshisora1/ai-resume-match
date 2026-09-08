@@ -1,0 +1,1361 @@
+{
+  "components" : {
+    "schemas" : {
+      "AnalysisListItemResponse" : {
+        "properties" : {
+          "attemptCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "completedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failureCode" : {
+            "type" : "string"
+          },
+          "jobTitle" : {
+            "type" : "string"
+          },
+          "matchScore" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxAttempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "resumeFileName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "taskId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AnalysisPageResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AnalysisListItemResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AnalysisProvenance" : {
+        "nullable" : true,
+        "properties" : {
+          "correlationId" : {
+            "maxLength" : 128,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "model" : {
+            "maxLength" : 2147483647,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "modelUsage" : {
+            "$ref" : "#/components/schemas/ModelUsage"
+          },
+          "promptVersion" : {
+            "maxLength" : 120,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "retrieverVersion" : {
+            "maxLength" : 120,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "runMetadata" : {
+            "$ref" : "#/components/schemas/RunMetadata"
+          },
+          "schemaVersion" : {
+            "enum" : [ "analysis-run-v1" ],
+            "type" : "string"
+          },
+          "steps" : {
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "toolTrace" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ToolTrace"
+            },
+            "type" : "array"
+          },
+          "traceId" : {
+            "nullable" : true,
+            "pattern" : "^[0-9a-f]{32}$",
+            "type" : "string"
+          },
+          "verifierVersion" : {
+            "maxLength" : 120,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "correlationId", "model", "modelUsage", "promptVersion", "retrieverVersion", "runMetadata", "schemaVersion", "steps", "toolTrace", "traceId", "verifierVersion" ],
+        "type" : "object"
+      },
+      "AnalysisSummaryResponse" : {
+        "properties" : {
+          "averageMatchScore" : {
+            "type" : "number"
+          },
+          "inProgressCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "retryableFailureCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "successCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AnalysisTaskResponse" : {
+        "properties" : {
+          "attemptCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "completedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failureCode" : {
+            "type" : "string"
+          },
+          "failureMessage" : {
+            "type" : "string"
+          },
+          "jobDescriptionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "jobTitle" : {
+            "type" : "string"
+          },
+          "matchScore" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxAttempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextRetryAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "resumeFileName" : {
+            "type" : "string"
+          },
+          "resumeId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "taskId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiProblemDetail" : {
+        "description" : "RFC 9457 problem details with stable application error code and request ID",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "instance" : {
+            "format" : "uri",
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "nullable" : true,
+            "type" : "string"
+          },
+          "status" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "format" : "uri",
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "detail", "instance", "message", "requestId", "status", "title", "type" ],
+        "type" : "object"
+      },
+      "CreateAnalysisRequest" : {
+        "properties" : {
+          "jobDescriptionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "resumeId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "jobDescriptionId", "resumeId" ],
+        "type" : "object"
+      },
+      "CreateJobRequest" : {
+        "properties" : {
+          "content" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "EvidenceVerification" : {
+        "properties" : {
+          "evidenceIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 5,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "reason" : {
+            "maxLength" : 120,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "supported", "partial", "not_found" ],
+            "type" : "string"
+          },
+          "termCoverage" : {
+            "exclusiveMaximum" : false,
+            "exclusiveMinimum" : false,
+            "format" : "double",
+            "maximum" : 1,
+            "minimum" : 0,
+            "type" : "number"
+          },
+          "verifierVersion" : {
+            "maxLength" : 120,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "evidenceIds", "reason", "status", "termCoverage", "verifierVersion" ],
+        "type" : "object"
+      },
+      "GroundedClaim" : {
+        "properties" : {
+          "claim" : {
+            "maxLength" : 500,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "evidenceIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 5,
+            "minItems" : 1,
+            "type" : "array"
+          }
+        },
+        "required" : [ "claim", "evidenceIds" ],
+        "type" : "object"
+      },
+      "JobDescriptionResponse" : {
+        "properties" : {
+          "jobDescriptionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MatchReportResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "matchScore" : {
+            "format" : "int32",
+            "maximum" : 100,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "provenance" : {
+            "$ref" : "#/components/schemas/AnalysisProvenance"
+          },
+          "reportContent" : {
+            "type" : "string"
+          },
+          "reportSchemaVersion" : {
+            "enum" : [ "markdown-v1", "match-report-v2" ],
+            "type" : "string"
+          },
+          "structuredReport" : {
+            "$ref" : "#/components/schemas/StructuredMatchReport"
+          },
+          "taskId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "createdAt", "matchScore", "provenance", "reportContent", "reportSchemaVersion", "structuredReport", "taskId" ],
+        "type" : "object"
+      },
+      "ModelUsage" : {
+        "properties" : {
+          "completionTokens" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "estimatedCostUsd" : {
+            "nullable" : true,
+            "pattern" : "^(0|[1-9][0-9]*)(\\.[0-9]{1,8})?$",
+            "type" : "string"
+          },
+          "pricingVersion" : {
+            "maxLength" : 120,
+            "minLength" : 1,
+            "nullable" : true,
+            "type" : "string"
+          },
+          "promptTokens" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "providerReported" : {
+            "type" : "boolean"
+          },
+          "totalTokens" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "completionTokens", "estimatedCostUsd", "pricingVersion", "promptTokens", "providerReported", "totalTokens" ],
+        "type" : "object"
+      },
+      "RequirementResult" : {
+        "properties" : {
+          "evidenceIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 5,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "explanation" : {
+            "maxLength" : 500,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "modelStatus" : {
+            "enum" : [ "supported", "partial", "not_found" ],
+            "type" : "string"
+          },
+          "mustHave" : {
+            "type" : "boolean"
+          },
+          "requirementId" : {
+            "pattern" : "^requirement:[0-9]+$",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "supported", "partial", "not_found" ],
+            "type" : "string"
+          },
+          "text" : {
+            "maxLength" : 500,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "verification" : {
+            "$ref" : "#/components/schemas/EvidenceVerification"
+          },
+          "weight" : {
+            "format" : "int32",
+            "maximum" : 5,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "evidenceIds", "explanation", "modelStatus", "mustHave", "requirementId", "status", "text", "verification", "weight" ],
+        "type" : "object"
+      },
+      "ResumeUploadResponse" : {
+        "properties" : {
+          "resumeId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RunMetadata" : {
+        "nullable" : true,
+        "properties" : {
+          "agentRuntimeVersion" : {
+            "enum" : [ "bounded-tool-agent-v1" ],
+            "type" : "string"
+          },
+          "chatProviderCalls" : {
+            "format" : "int32",
+            "maximum" : 12,
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "chatProviderDurationMs" : {
+            "format" : "int64",
+            "maximum" : 3600000,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "contextCharsSent" : {
+            "format" : "int64",
+            "maximum" : 100000000,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "inputFingerprint" : {
+            "pattern" : "^[0-9a-f]{64}$",
+            "type" : "string"
+          },
+          "inputFingerprintVersion" : {
+            "enum" : [ "sha256-task-scoped-length-prefixed-v1" ],
+            "type" : "string"
+          },
+          "requestSchemaVersion" : {
+            "enum" : [ "agent-analysis-request-v1" ],
+            "type" : "string"
+          },
+          "schemaVersion" : {
+            "enum" : [ "agent-run-v1" ],
+            "type" : "string"
+          },
+          "toolDurationMs" : {
+            "format" : "int64",
+            "maximum" : 3600000,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "totalDurationMs" : {
+            "format" : "int64",
+            "maximum" : 3600000,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "agentRuntimeVersion", "chatProviderCalls", "chatProviderDurationMs", "contextCharsSent", "inputFingerprint", "inputFingerprintVersion", "requestSchemaVersion", "schemaVersion", "toolDurationMs", "totalDurationMs" ],
+        "type" : "object"
+      },
+      "ScoreBreakdown" : {
+        "properties" : {
+          "finalScore" : {
+            "format" : "int32",
+            "maximum" : 100,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "missingWeight" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "mustHaveCapApplied" : {
+            "type" : "boolean"
+          },
+          "partialWeight" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "rawScore" : {
+            "format" : "int32",
+            "maximum" : 100,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "supportedWeight" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "totalWeight" : {
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "finalScore", "missingWeight", "mustHaveCapApplied", "partialWeight", "rawScore", "supportedWeight", "totalWeight" ],
+        "type" : "object"
+      },
+      "StructuredEvidence" : {
+        "properties" : {
+          "evidenceId" : {
+            "pattern" : "^resume:[0-9]+$",
+            "type" : "string"
+          },
+          "excerpt" : {
+            "maxLength" : 900,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "score" : {
+            "exclusiveMaximum" : false,
+            "exclusiveMinimum" : false,
+            "format" : "double",
+            "maximum" : 1,
+            "minimum" : -1,
+            "type" : "number"
+          },
+          "sourceEnd" : {
+            "format" : "int32",
+            "minimum" : 1,
+            "nullable" : true,
+            "type" : "integer"
+          },
+          "sourceStart" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "nullable" : true,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "evidenceId", "excerpt", "score", "sourceEnd", "sourceStart" ],
+        "type" : "object"
+      },
+      "StructuredMatchReport" : {
+        "nullable" : true,
+        "properties" : {
+          "coreClaims" : {
+            "items" : {
+              "$ref" : "#/components/schemas/GroundedClaim"
+            },
+            "maxItems" : 12,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "evidence" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StructuredEvidence"
+            },
+            "maxItems" : 12,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "interviewQuestions" : {
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 8,
+            "minItems" : 3,
+            "type" : "array"
+          },
+          "matchScore" : {
+            "format" : "int32",
+            "maximum" : 100,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "matchedSkills" : {
+            "items" : {
+              "$ref" : "#/components/schemas/GroundedClaim"
+            },
+            "maxItems" : 20,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "recommendations" : {
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 5,
+            "minItems" : 3,
+            "type" : "array"
+          },
+          "requirements" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RequirementResult"
+            },
+            "maxItems" : 5,
+            "minItems" : 1,
+            "type" : "array"
+          },
+          "schemaVersion" : {
+            "enum" : [ "match-report-v2" ],
+            "type" : "string"
+          },
+          "scoreBreakdown" : {
+            "$ref" : "#/components/schemas/ScoreBreakdown"
+          },
+          "skillGaps" : {
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 20,
+            "minItems" : 1,
+            "type" : "array"
+          }
+        },
+        "required" : [ "coreClaims", "evidence", "interviewQuestions", "matchScore", "matchedSkills", "recommendations", "requirements", "schemaVersion", "scoreBreakdown", "skillGaps" ],
+        "type" : "object"
+      },
+      "ToolTrace" : {
+        "properties" : {
+          "durationMs" : {
+            "format" : "int64",
+            "maximum" : 3600000,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "name" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "outcome" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "durationMs", "name", "outcome" ],
+        "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "apiToken" : {
+        "description" : "Application API token",
+        "in" : "header",
+        "name" : "X-API-Token",
+        "type" : "apiKey"
+      }
+    }
+  },
+  "info" : {
+    "description" : "Asynchronous resume and job matching API",
+    "title" : "AI Resume Match API",
+    "version" : "v1"
+  },
+  "openapi" : "3.0.1",
+  "paths" : {
+    "/api/analysis" : {
+      "get" : {
+        "operationId" : "analyses",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "PENDING", "RUNNING", "SUCCESS", "FAILED_RETRYABLE", "FAILED_FINAL", "CANCELLED", "FAILED" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AnalysisPageResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "tags" : [ "resume-match-controller" ]
+      },
+      "post" : {
+        "operationId" : "createAnalysis",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateAnalysisRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AnalysisTaskResponse"
+                }
+              }
+            },
+            "description" : "Analysis accepted",
+            "headers" : {
+              "Location" : {
+                "description" : "Canonical task status resource",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Anonymous session analysis quota exceeded; see Retry-After"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Analysis quota enforcement is temporarily unavailable"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "summary" : "Create an asynchronous analysis task from existing resources",
+        "tags" : [ "resume-match-controller" ]
+      }
+    },
+    "/api/analysis-submissions" : {
+      "post" : {
+        "operationId" : "createAnalysisSubmission",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "jobTitle",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "jobContent",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 128,
+            "minLength" : 0,
+            "pattern" : "[A-Za-z0-9][A-Za-z0-9._:-]{0,127}",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "202" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AnalysisTaskResponse"
+                }
+              }
+            },
+            "description" : "Analysis accepted",
+            "headers" : {
+              "Location" : {
+                "description" : "Canonical task status resource",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Idempotency key conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Anonymous session analysis quota exceeded; see Retry-After"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Analysis quota enforcement is temporarily unavailable"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "summary" : "Atomically upload a resume, create a job and accept an analysis task",
+        "tags" : [ "resume-match-controller" ]
+      }
+    },
+    "/api/analysis/summary" : {
+      "get" : {
+        "operationId" : "analysisSummary",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AnalysisSummaryResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "tags" : [ "resume-match-controller" ]
+      }
+    },
+    "/api/analysis/{taskId}" : {
+      "delete" : {
+        "operationId" : "deleteAnalysis",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "taskId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Analysis data deleted"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Analysis does not exist or belongs to another session"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "summary" : "Delete an owned analysis and its source data",
+        "tags" : [ "resume-match-controller" ]
+      },
+      "get" : {
+        "operationId" : "analysisTask",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "taskId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AnalysisTaskResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "tags" : [ "resume-match-controller" ]
+      }
+    },
+    "/api/analysis/{taskId}/report" : {
+      "get" : {
+        "operationId" : "report",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "taskId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MatchReportResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "tags" : [ "resume-match-controller" ]
+      }
+    },
+    "/api/analysis/{taskId}/retry" : {
+      "post" : {
+        "operationId" : "retryAnalysis",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "taskId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AnalysisTaskResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Anonymous session analysis quota exceeded; see Retry-After"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Analysis quota enforcement is temporarily unavailable"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "tags" : [ "resume-match-controller" ]
+      }
+    },
+    "/api/jobs" : {
+      "post" : {
+        "operationId" : "createJob",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateJobRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobDescriptionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "tags" : [ "resume-match-controller" ]
+      }
+    },
+    "/api/resumes" : {
+      "post" : {
+        "operationId" : "uploadResume",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResumeUploadResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Invalid request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblemDetail"
+                }
+              }
+            },
+            "description" : "Missing or invalid API token"
+          }
+        },
+        "security" : [ {
+          "apiToken" : [ ]
+        } ],
+        "tags" : [ "resume-match-controller" ]
+      }
+    }
+  }
+}

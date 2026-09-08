@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { FileText, FileUp, Send } from 'lucide-react'
+import { FileText, FileUp, Send, ShieldCheck, Sparkles } from 'lucide-react'
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -10,7 +11,7 @@ import {
   type FormEvent,
 } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 
 import { analysisSummaryQueryKey } from '../dashboard/useAnalysisSummaryQuery'
 import { createAnalysisSubmission } from '../../shared/api/analyses'
@@ -25,6 +26,11 @@ import {
   summarizeSubmissionError,
   type SubmissionError,
 } from './submissionError'
+import {
+  createDemoResumeFile,
+  DEMO_JOB_CONTENT,
+  DEMO_JOB_TITLE,
+} from './demoAnalysisFixture'
 import './analysis-form.css'
 
 const FILE_INPUT_ID = 'analysis-resume-file'
@@ -70,6 +76,7 @@ function formatFileSize(bytes: number) {
 
 export function NewAnalysisPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragDepthRef = useRef(0)
@@ -77,8 +84,10 @@ export function NewAnalysisPage() {
   const submissionIdempotencyKeyRef = useRef<string | null>(null)
   const submissionAbortControllerRef = useRef<AbortController | null>(null)
   const isMountedRef = useRef(false)
+  const demoAutoFillAppliedRef = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDemoFixture, setIsDemoFixture] = useState(false)
   const [submissionError, setSubmissionError] =
     useState<SubmissionError | null>(null)
   const {
@@ -126,6 +135,7 @@ export function NewAnalysisPage() {
       return
     }
 
+    setIsDemoFixture(false)
     resetSubmissionAttempt()
     if (file === undefined) {
       resetField('file')
@@ -182,6 +192,46 @@ export function NewAnalysisPage() {
     selectFile(event.dataTransfer.files[0])
   }
 
+  const fillDemoFixture = useCallback(() => {
+    if (submissionInFlightRef.current) {
+      return
+    }
+
+    submissionIdempotencyKeyRef.current = null
+    setSubmissionError(null)
+    setValue('file', createDemoResumeFile(), {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    })
+    setValue('jobTitle', DEMO_JOB_TITLE, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    })
+    setValue('jobContent', DEMO_JOB_CONTENT, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    })
+    if (fileInputRef.current !== null) {
+      fileInputRef.current.value = ''
+    }
+    setIsDemoFixture(true)
+  }, [setValue])
+
+  useEffect(() => {
+    if (
+      searchParams.get('demo') !== '1' ||
+      demoAutoFillAppliedRef.current
+    ) {
+      return
+    }
+
+    demoAutoFillAppliedRef.current = true
+    fillDemoFixture()
+  }, [fillDemoFixture, searchParams])
+
   const submitForm = (values: AnalysisFormValues) => {
     if (!isMountedRef.current || submissionInFlightRef.current) {
       return
@@ -211,6 +261,7 @@ export function NewAnalysisPage() {
 
         submissionIdempotencyKeyRef.current = null
         reset()
+        setIsDemoFixture(false)
         if (fileInputRef.current !== null) {
           fileInputRef.current.value = ''
         }
@@ -258,6 +309,49 @@ export function NewAnalysisPage() {
       <header className="new-analysis-page__header">
         <h1 id="new-analysis-heading">新建分析</h1>
       </header>
+
+      <section
+        aria-labelledby="analysis-demo-heading"
+        className="analysis-demo"
+      >
+        <div className="analysis-demo__copy">
+          <div className="analysis-demo__eyebrow">
+            <Sparkles aria-hidden="true" size={15} />
+            <span>合成数据演示</span>
+          </div>
+          <h2 id="analysis-demo-heading">没有可用简历？直接体验完整流程</h2>
+          <p id="analysis-demo-description">
+            自动生成一份结构有效的合成 PDF，并填入不包含真实个人或公司信息的岗位描述。
+          </p>
+          {isDemoFixture ? (
+            <p
+              aria-label="合成演示数据已填入"
+              className="analysis-demo__status"
+              role="status"
+            >
+              合成示例已填入，可直接提交分析。
+            </p>
+          ) : null}
+        </div>
+        <Button
+          aria-describedby="analysis-demo-description"
+          className="analysis-demo__action"
+          disabled={isSubmitting}
+          onClick={fillDemoFixture}
+          variant="secondary"
+        >
+          <Sparkles aria-hidden="true" size={16} />
+          <span>一键填入合成示例</span>
+        </Button>
+      </section>
+
+      <aside aria-label="数据与隐私说明" className="analysis-privacy-notice">
+        <ShieldCheck aria-hidden="true" size={20} />
+        <p>
+          岗位文本和简历检索片段会在常见联系信息与带标签敏感属性脱敏后发送给配置的模型服务。
+          原始提取文本默认保留 30 天，可在分析详情中提前永久删除；公开演示请优先使用上方合成数据。
+        </p>
+      </aside>
 
       <form
         aria-label="新建分析表单"
@@ -385,6 +479,7 @@ export function NewAnalysisPage() {
               disabled={isSubmitting}
               id={TITLE_INPUT_ID}
               onChange={(event) => {
+                setIsDemoFixture(false)
                 resetSubmissionAttempt()
                 void jobTitleRegistration.onChange(event)
               }}
@@ -413,6 +508,7 @@ export function NewAnalysisPage() {
               disabled={isSubmitting}
               id={CONTENT_INPUT_ID}
               onChange={(event) => {
+                setIsDemoFixture(false)
                 resetSubmissionAttempt()
                 void jobContentRegistration.onChange(event)
               }}

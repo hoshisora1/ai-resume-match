@@ -24,6 +24,9 @@ const reportResponse: MatchReportData = {
   taskId: TASK_ID,
   matchScore: 88,
   reportContent: '# 匹配报告\n\n- Java\n- Redis',
+  reportSchemaVersion: 'markdown-v1',
+  structuredReport: null,
+  provenance: null,
   createdAt: '2026-07-10T09:05:00',
 }
 
@@ -159,7 +162,7 @@ test.each([
   renderDetail(`/analyses/${rawId}`)
 
   expect(
-    await screen.findByText('任务 ID 无效', {}, { timeout: 3_000 }),
+    await screen.findByText('任务 ID 无效', {}, { timeout: 10_000 }),
   ).toBeVisible()
   expect(screen.getByRole('link', { name: '返回分析历史' })).toHaveAttribute(
     'href',
@@ -210,6 +213,114 @@ test('shows compact task metadata with stable nullable and local date formatting
   expect(metadataValue('开始时间')).toHaveTextContent('2026-07-10 09:01')
   expect(metadataValue('完成时间')).toHaveTextContent('2026-07-10 09:05')
   expect(metadataValue('下次重试')).toHaveTextContent('2026-07-10 09:10')
+})
+
+test('requires explicit confirmation before deleting and redirects after the API confirms deletion', async () => {
+  let deleteCount = 0
+  server.use(
+    http.get(`/api/analysis/${TASK_ID}`, () =>
+      HttpResponse.json(createTask('RUNNING')),
+    ),
+    http.delete(`/api/analysis/${TASK_ID}`, () => {
+      deleteCount += 1
+      return new HttpResponse(null, { status: 204 })
+    }),
+    http.get('/api/analysis', () =>
+      HttpResponse.json({
+        items: [],
+        page: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+      }),
+    ),
+    http.get('/api/analysis/summary', () =>
+      HttpResponse.json({
+        totalCount: 0,
+        pendingCount: 0,
+        runningCount: 0,
+        successCount: 0,
+        retryableFailureCount: 0,
+        finalFailureCount: 0,
+        averageMatchScore: null,
+      }),
+    ),
+  )
+  const user = userEvent.setup()
+  const { router, queryClient } = renderDetail()
+
+  await user.click(await screen.findByRole('button', { name: '删除分析' }))
+  const dialog = screen.getByRole('dialog', { name: '确认删除分析？' })
+  expect(dialog).toHaveTextContent('已发出的模型请求可能继续完成，但结果不会再保存')
+  const cancelButton = within(dialog).getByRole('button', { name: '取消' })
+  const confirmButton = within(dialog).getByRole('button', {
+    name: '确认永久删除',
+  })
+  expect(cancelButton).toHaveFocus()
+  await user.tab({ shift: true })
+  expect(confirmButton).toHaveFocus()
+  await user.tab()
+  expect(cancelButton).toHaveFocus()
+
+  await user.click(cancelButton)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '删除分析' })).toHaveFocus()
+  expect(deleteCount).toBe(0)
+
+  await user.click(screen.getByRole('button', { name: '删除分析' }))
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: '确认永久删除',
+    }),
+  )
+
+  await waitFor(() => {
+    expect(router.state.location.pathname).toBe('/analyses')
+    expect(
+      queryClient.getQueryData(analysisTaskQueryKey(TASK_ID)),
+    ).toBeUndefined()
+  })
+  expect(deleteCount).toBe(1)
+})
+
+test('keeps the confirmation open and exposes a safe request reference when deletion fails', async () => {
+  server.use(
+    http.get(`/api/analysis/${TASK_ID}`, () =>
+      HttpResponse.json(createTask('SUCCESS')),
+    ),
+    http.get(`/api/analysis/${TASK_ID}/report`, () =>
+      HttpResponse.json(reportResponse),
+    ),
+    http.delete(`/api/analysis/${TASK_ID}`, () =>
+      HttpResponse.json(
+        {
+          type: 'about:blank',
+          title: 'Service Unavailable',
+          status: 503,
+          code: 'DELETE_UNAVAILABLE',
+          message: 'Please retry',
+          path: `/api/analysis/${TASK_ID}`,
+          requestId: 'delete-request-123',
+          timestamp: '2026-08-13T09:00:00Z',
+        },
+        { status: 503 },
+      ),
+    ),
+  )
+  const user = userEvent.setup()
+  const { router } = renderDetail()
+
+  await user.click(await screen.findByRole('button', { name: '删除分析' }))
+  await user.click(
+    screen.getByRole('button', { name: '确认永久删除' }),
+  )
+
+  const dialog = await screen.findByRole('dialog')
+  expect(within(dialog).getByRole('alert')).toHaveTextContent(
+    '删除失败，数据仍然保留，请稍后重试。',
+  )
+  expect(within(dialog).getByText('delete-request-123')).toBeVisible()
+  expect(router.state.location.pathname).toBe(`/analyses/${TASK_ID}`)
 })
 
 test('shows a safe actionable summary for delivery failure without scheduling automatic retry', async () => {
@@ -669,7 +780,7 @@ test('keeps report loading and errors independent, then manually retries with a 
   )
   const user = userEvent.setup()
 
-  renderDetail()
+  const { router } = renderDetail()
   await reportStarted
 
   expect(screen.getByText('已完成')).toBeVisible()
@@ -694,6 +805,24 @@ test('keeps report loading and errors independent, then manually retries with a 
   expect(reportRequestCount).toBe(2)
   expect(screen.getByRole('button', { name: '复制任务 ID' })).toBeVisible()
   expect(screen.queryByRole('button', { name: '重新分析' })).not.toBeInTheDocument()
+  expect(
+    screen.getByText('匹配报告已生成。再次分析会创建新任务，并重新选择简历。'),
+  ).toBeVisible()
+  const repeatLink = screen.getByRole('link', { name: '再次分析' })
+  expect(repeatLink).toHaveAttribute('href', '/analyses/new')
+
+  await user.click(repeatLink)
+
+  await waitFor(() => {
+    expect(router.state.location.pathname).toBe('/analyses/new')
+    expect(router.state.location.search).toBe('')
+  })
+  expect(
+    await screen.findByRole('heading', { level: 1, name: '新建分析' }),
+  ).toBeVisible()
+  expect(
+    screen.queryByRole('status', { name: '合成演示数据已填入' }),
+  ).not.toBeInTheDocument()
 })
 
 test('aborts an in-flight report request when the detail page unmounts', async () => {

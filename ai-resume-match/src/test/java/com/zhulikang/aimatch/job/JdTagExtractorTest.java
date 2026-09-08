@@ -16,6 +16,14 @@ class JdTagExtractorTest {
     }
 
     @Test
+    void doesNotInventJavaOrRagTagsFromUnrelatedWords() {
+        assertThat(extractor.extractTags("Build JavaScript frontend and storage services."))
+            .isEmpty();
+        assertThat(extractor.extractTags("熟悉Java，使用Java-based服务和RAG检索。"))
+            .containsExactly("Java", "RAG");
+    }
+
+    @Test
     void joinsTagsForStorage() {
         assertThat(extractor.toStorageValue(java.util.List.of("Java", "Redis")))
             .isEqualTo("Java,Redis");

@@ -38,8 +38,7 @@ class DomainRepositoryTest {
     void persistsResumeJobTaskAndReport() {
         Resume resume = resumeRepository.save(new Resume(
             "resume.docx",
-            "Java Spring Boot Redis",
-            "skills: Java, Redis"
+            "Java Spring Boot Redis"
         ));
         JobDescription job = jobDescriptionRepository.save(new JobDescription(
             "高级后端工程师",
@@ -57,8 +56,26 @@ class DomainRepositoryTest {
     }
 
     @Test
+    void persistsVersionedStructuredReportAndProvenance() {
+        MatchReport report = matchReportRepository.save(new MatchReport(
+            777L,
+            91,
+            "markdown",
+            "match-report-v2",
+            "{\"schemaVersion\":\"match-report-v2\"}",
+            "{\"schemaVersion\":\"analysis-run-v1\"}"
+        ));
+
+        MatchReport reloaded = matchReportRepository.findById(report.getId()).orElseThrow();
+
+        assertThat(reloaded.getReportSchemaVersion()).isEqualTo("match-report-v2");
+        assertThat(reloaded.getStructuredReportJson()).contains("match-report-v2");
+        assertThat(reloaded.getProvenanceJson()).contains("analysis-run-v1");
+    }
+
+    @Test
     void readsResumeDisplayProjections() {
-        Resume resume = resumeRepository.save(new Resume("resume.pdf", "fixture", "fixture"));
+        Resume resume = resumeRepository.save(new Resume("resume.pdf", "fixture"));
 
         assertThat(resumeRepository.findDisplayViewsByIdIn(List.of(resume.getId())))
             .containsExactly(new ResumeDisplayView(resume.getId(), "resume.pdf"));

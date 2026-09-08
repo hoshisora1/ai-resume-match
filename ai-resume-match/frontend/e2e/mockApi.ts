@@ -1,5 +1,10 @@
 import type { Page, Route } from '@playwright/test'
 
+import {
+  DEMO_JOB_TITLE,
+  DEMO_RESUME_FILE_NAME,
+} from '../src/features/analyses/demoAnalysisFixture'
+
 export type MockTaskStatus =
   | 'PENDING'
   | 'RUNNING'
@@ -38,9 +43,9 @@ function task(
     taskId,
     resumeId: taskId + 100,
     jobDescriptionId: taskId + 200,
-    jobTitle:
-      taskId === 42 ? '高级 Java AI 应用工程师' : '平台工程师',
-    resumeFileName: taskId === 42 ? 'resume.pdf' : 'candidate.pdf',
+    jobTitle: taskId === 42 ? DEMO_JOB_TITLE : '平台工程师',
+    resumeFileName:
+      taskId === 42 ? DEMO_RESUME_FILE_NAME : 'candidate.pdf',
     matchScore: status === 'SUCCESS' ? 88 : null,
     status,
     attemptCount: status === 'PENDING' ? 0 : 1,
@@ -74,8 +79,13 @@ function listItem(taskId: number, status: MockTaskStatus) {
   }
 }
 
-function json(route: Route, body: unknown, status = 200) {
-  return route.fulfill({ json: body, status })
+function json(
+  route: Route,
+  body: unknown,
+  status = 200,
+  headers?: Record<string, string>,
+) {
+  return route.fulfill({ headers, json: body, status })
 }
 
 function pageResponse(items: unknown[], requestedSize: number) {
@@ -133,7 +143,9 @@ export async function installMockApi(page: Page): Promise<MockApiControls> {
       state.submissionBody = request.postDataBuffer()?.toString('utf8') ?? ''
       state.submitted = true
       state.task42FetchCount = 0
-      return json(route, task(42, 'PENDING'))
+      return json(route, task(42, 'PENDING'), 202, {
+        Location: '/api/analysis/42',
+      })
     }
 
     const reportMatch = url.pathname.match(/^\/api\/analysis\/(\d+)\/report$/)
@@ -141,6 +153,120 @@ export async function installMockApi(page: Page): Promise<MockApiControls> {
       return json(route, {
         taskId: Number(reportMatch[1]),
         matchScore: 88,
+        reportSchemaVersion: 'match-report-v2',
+        structuredReport: {
+          schemaVersion: 'match-report-v2',
+          matchScore: 88,
+          requirements: [
+            {
+              requirementId: 'requirement:0',
+              text: 'Java 与 Spring Boot 工程经验',
+              mustHave: true,
+              weight: 3,
+              modelStatus: 'supported',
+              status: 'supported',
+              explanation: '简历片段覆盖 Java 与 Spring Boot 项目经验。',
+              evidenceIds: ['resume:0'],
+              verification: {
+                verifierVersion: 'conservative-lexical-negation-v1',
+                status: 'supported',
+                termCoverage: 1,
+                reason: 'required_terms_supported',
+                evidenceIds: ['resume:0'],
+              },
+            },
+            {
+              requirementId: 'requirement:1',
+              text: 'AI 应用工程化',
+              mustHave: false,
+              weight: 1,
+              modelStatus: 'partial',
+              status: 'partial',
+              explanation: '检索到 Agent 工具调用经验，但缺少线上效果指标。',
+              evidenceIds: ['resume:1'],
+              verification: {
+                verifierVersion: 'conservative-lexical-negation-v1',
+                status: 'partial',
+                termCoverage: 0.5,
+                reason: 'partial_term_support',
+                evidenceIds: ['resume:1'],
+              },
+            },
+          ],
+          coreClaims: [
+            {
+              claim: '具备 Java 与 Spring Boot 后端项目经验。',
+              evidenceIds: ['resume:0'],
+            },
+          ],
+          matchedSkills: [
+            {
+              claim: '具备受限 Tool Calling Agent 开发经验。',
+              evidenceIds: ['resume:1'],
+            },
+          ],
+          skillGaps: ['尚未提供线上模型质量与成本指标。'],
+          recommendations: ['补充真实评测结果', '展示检索对比', '记录端到端成本'],
+          interviewQuestions: ['如何防止伪造引用？', '如何控制 Agent 预算？', '如何评测检索质量？'],
+          evidence: [
+            {
+              evidenceId: 'resume:0',
+              excerpt: '使用 Java、Spring Boot 与 RabbitMQ 构建异步分析服务。',
+              score: 0.94,
+              sourceStart: 12,
+              sourceEnd: 53,
+            },
+            {
+              evidenceId: 'resume:1',
+              excerpt: '实现三个白名单工具和逐项证据引用校验。',
+              score: 0.82,
+              sourceStart: 54,
+              sourceEnd: 76,
+            },
+          ],
+          scoreBreakdown: {
+            rawScore: 88,
+            finalScore: 88,
+            totalWeight: 4,
+            supportedWeight: 3,
+            partialWeight: 1,
+            missingWeight: 0,
+            mustHaveCapApplied: false,
+          },
+        },
+        provenance: {
+          schemaVersion: 'analysis-run-v1',
+          correlationId: 'browser-e2e-42',
+          model: 'deterministic-e2e-model',
+          promptVersion: 'requirement-verified-agent-v3',
+          retrieverVersion: 'hashing-256-v1',
+          verifierVersion: 'conservative-lexical-negation-v1',
+          steps: 4,
+          runMetadata: {
+            schemaVersion: 'agent-run-v1',
+            requestSchemaVersion: 'agent-analysis-request-v1',
+            agentRuntimeVersion: 'bounded-tool-agent-v1',
+            inputFingerprintVersion: 'sha256-task-scoped-length-prefixed-v1',
+            inputFingerprint:
+              '9c4fd485fd3f2d1af7f1d7174eeb0c68aa812d309277f4e05d49af178ad6c935',
+            chatProviderCalls: 4,
+            chatProviderDurationMs: 840,
+            toolDurationMs: 4,
+            totalDurationMs: 1_120,
+            contextCharsSent: 9_842,
+          },
+          modelUsage: {
+            promptTokens: 240,
+            completionTokens: 90,
+            totalTokens: 330,
+            providerReported: true,
+          },
+          toolTrace: [
+            { name: 'get_job_requirements', outcome: 'success', durationMs: 1 },
+            { name: 'search_resume_evidence', outcome: 'success', durationMs: 2 },
+            { name: 'submit_match_report', outcome: 'success', durationMs: 1 },
+          ],
+        },
         reportContent:
           '# 匹配报告\n\n## 核心结论\n候选人的 Java、Spring Boot 与消息队列经验匹配岗位要求。',
         createdAt: updatedAt,

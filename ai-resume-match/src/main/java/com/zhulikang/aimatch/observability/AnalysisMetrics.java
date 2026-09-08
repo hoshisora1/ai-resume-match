@@ -64,6 +64,16 @@ public class AnalysisMetrics {
             .increment();
     }
 
+    public void retentionDeleted(String resource, int count) {
+        if (count < 1) {
+            return;
+        }
+        Counter.builder("analysis.retention.deleted")
+            .tag("resource", resource)
+            .register(meterRegistry)
+            .increment(count);
+    }
+
     public void cacheRequest(String result) {
         Counter.builder("report.cache.requests")
             .tag("result", result)
@@ -76,6 +86,23 @@ public class AnalysisMetrics {
             .tag("outcome", outcome)
             .register(meterRegistry)
             .increment();
+    }
+
+    public void cacheEviction(String outcome) {
+        Counter.builder("report.cache.evictions")
+            .tag("outcome", outcome)
+            .register(meterRegistry)
+            .increment();
+    }
+
+    public void modelInputRedacted(String type, int count) {
+        if (count < 1) {
+            return;
+        }
+        Counter.builder("analysis.model.input.redactions")
+            .tag("type", type)
+            .register(meterRegistry)
+            .increment(count);
     }
 
     public Timer.Sample startAiCall() {

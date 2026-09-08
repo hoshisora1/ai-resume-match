@@ -1,17 +1,59 @@
 package com.zhulikang.aimatch.analysis;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface AnalysisTaskRepository extends JpaRepository<AnalysisTask, Long> {
+    Optional<AnalysisTask> findByIdAndOwnerId(Long id, String ownerId);
+
+    boolean existsByIdAndOwnerId(Long id, String ownerId);
+
+    Page<AnalysisTask> findByOwnerId(String ownerId, Pageable pageable);
+
+    Page<AnalysisTask> findByOwnerIdAndStatus(String ownerId, AnalysisTask.Status status, Pageable pageable);
+
+    long countByOwnerId(String ownerId);
+
+    long countByOwnerIdAndStatus(String ownerId, AnalysisTask.Status status);
+
+    long countByOwnerIdAndStatusIn(String ownerId, Collection<AnalysisTask.Status> statuses);
+
+    boolean existsByResumeId(Long resumeId);
+
+    boolean existsByJobDescriptionId(Long jobDescriptionId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from AnalysisTask t where t.id = :taskId and t.ownerId = :ownerId")
+    Optional<AnalysisTask> findOwnedForDeletion(
+        @Param("taskId") Long taskId,
+        @Param("ownerId") String ownerId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from AnalysisTask t where t.id = :taskId")
+    Optional<AnalysisTask> findForDeletion(@Param("taskId") Long taskId);
+
+    @Query("""
+        select t.id from AnalysisTask t
+        where t.createdAt <= :cutoff
+        order by t.createdAt asc, t.id asc
+        """)
+    List<Long> findIdsCreatedBefore(
+        @Param("cutoff") LocalDateTime cutoff,
+        Pageable pageable
+    );
+
     Page<AnalysisTask> findByStatus(AnalysisTask.Status status, Pageable pageable);
 
     long countByStatus(AnalysisTask.Status status);

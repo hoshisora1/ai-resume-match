@@ -1,9 +1,9 @@
 package com.zhulikang.aimatch.ai;
 
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
+import com.zhulikang.aimatch.config.AiProperties;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@ConditionalOnProperty(name = "analysis.engine", havingValue = "legacy", matchIfMissing = true)
+@ConditionalOnProperty(name = "analysis.engine", havingValue = "legacy")
 public class OpenAiCompatibleClient implements AiClient {
     private final RestTemplate restTemplate;
     private final String endpoint;
@@ -28,9 +28,7 @@ public class OpenAiCompatibleClient implements AiClient {
     @Autowired
     public OpenAiCompatibleClient(
         RestTemplateBuilder restTemplateBuilder,
-        @Value("${ai.endpoint}") String endpoint,
-        @Value("${ai.api-key}") String apiKey,
-        @Value("${ai.model}") String model,
+        AiProperties properties,
         AnalysisMetrics metrics
     ) {
         this(
@@ -38,9 +36,9 @@ public class OpenAiCompatibleClient implements AiClient {
                 .setConnectTimeout(Duration.ofSeconds(3))
                 .setReadTimeout(Duration.ofSeconds(30))
                 .build(),
-            endpoint,
-            apiKey,
-            model,
+            properties.endpoint(),
+            properties.apiKey(),
+            properties.model(),
             metrics
         );
     }

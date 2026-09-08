@@ -32,12 +32,10 @@ class PrepareResumeUseCaseTest {
 
         assertThat(prepared.fileName()).isEqualTo("resume.pdf");
         assertThat(prepared.rawText()).isEqualTo("Java Redis");
-        assertThat(prepared.structuredSummary()).isEqualTo("Java Redis");
         Resume entity = prepared.toEntity();
         assertThat(entity.getId()).isNull();
         assertThat(entity.getFileName()).isEqualTo("resume.pdf");
         assertThat(entity.getRawText()).isEqualTo("Java Redis");
-        assertThat(entity.getStructuredSummary()).isEqualTo("Java Redis");
         InOrder order = inOrder(validator, extractor);
         order.verify(validator).validate(file);
         order.verify(extractor).extract(file);

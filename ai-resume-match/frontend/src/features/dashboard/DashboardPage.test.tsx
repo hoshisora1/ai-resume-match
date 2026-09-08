@@ -195,6 +195,30 @@ test('renders summary metrics and a semantic recent-analysis table', async () =>
   expect(within(pendingRow!).getAllByText('—')).toHaveLength(3)
 })
 
+test('opens a prefilled synthetic demo from the permanent dashboard action', async () => {
+  server.use(
+    http.get('/api/analysis/summary', () => HttpResponse.json(summaryResponse)),
+    http.get('/api/analysis', () => HttpResponse.json(recentResponse)),
+  )
+  const user = userEvent.setup()
+  const { router } = renderDashboard()
+
+  const demoLink = await screen.findByRole('link', {
+    name: '体验合成演示',
+  })
+  expect(demoLink).toHaveAttribute('href', '/analyses/new?demo=1')
+
+  await user.click(demoLink)
+
+  await waitFor(() => {
+    expect(router.state.location.pathname).toBe('/analyses/new')
+    expect(router.state.location.search).toBe('?demo=1')
+  })
+  expect(
+    await screen.findByRole('status', { name: '合成演示数据已填入' }),
+  ).toBeVisible()
+})
+
 test('exhausts the production summary retry once before a manual retry succeeds', async () => {
   let summaryRequests = 0
   server.use(

@@ -15,37 +15,45 @@ def test_openai_http_adapter_drives_full_agent_api_flow() -> None:
         body = json.loads(request.content)
         model_requests.append(body)
         tool_messages = [message for message in body["messages"] if message["role"] == "tool"]
+        requirements = (
+            json.loads(tool_messages[0]["content"])["untrustedData"]["requirements"]
+            if tool_messages else []
+        )
 
         if not tool_messages:
             name = "get_job_requirements"
             arguments = {}
-        elif len(tool_messages) == 1:
+        elif len(tool_messages) <= len(requirements):
+            requirement = requirements[len(tool_messages) - 1]
             name = "search_resume_evidence"
-            arguments = {"query": "Java RabbitMQ tool calling", "topK": 2}
+            arguments = {
+                "requirementId": requirement["requirementId"],
+                "query": requirement["text"],
+                "topK": 2,
+            }
         else:
-            evidence_ids = []
+            evidence_by_requirement = {}
             for message in tool_messages:
                 content = json.loads(message["content"])
-                evidence_ids.extend(
+                untrusted = content.get("untrustedData", {})
+                requirement_id = untrusted.get("requirementId")
+                evidence_ids = [
                     item["evidenceId"]
-                    for item in content.get("untrustedData", {}).get("evidence", [])
-                )
+                    for item in untrusted.get("evidence", [])
+                ]
+                if requirement_id:
+                    evidence_by_requirement[requirement_id] = evidence_ids
             name = "submit_match_report"
-            cited = sorted(set(evidence_ids))
             arguments = {
-                "matchScore": 84,
-                "coreClaims": [
+                "requirementAssessments": [
                     {
-                        "claim": "The candidate has grounded backend and tool-calling implementation evidence.",
-                        "evidenceIds": cited,
+                        "requirementId": requirement_id,
+                        "status": "supported" if evidence_ids else "not_found",
+                        "explanation": f"Grounded evidence supports {requirement_id}.",
+                        "evidenceIds": sorted(set(evidence_ids)),
                     }
+                    for requirement_id, evidence_ids in sorted(evidence_by_requirement.items())
                 ],
-                "matchedSkills": [
-                    {"claim": "Java", "evidenceIds": cited},
-                    {"claim": "RabbitMQ", "evidenceIds": cited},
-                    {"claim": "Tool Calling", "evidenceIds": cited},
-                ],
-                "skillGaps": ["Production-scale evaluation data"],
                 "recommendations": ["Run live evals", "Track cost", "Add red-team cases"],
                 "interviewQuestions": ["Why tools?", "How retry?", "How evaluate?"],
             }
@@ -113,14 +121,24 @@ def test_openai_http_adapter_drives_full_agent_api_flow() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["matchScore"] == 84
-    assert payload["steps"] == 3
-    assert payload["modelUsage"]["totalTokens"] == 90
+    assert payload["matchScore"] == 50
+    assert payload["steps"] == 6
+    assert payload["promptVersion"] == "requirement-verified-agent-v3"
+    assert payload["retrieverVersion"] == "hashing-blake2b-256-v1"
+    assert payload["verifierVersion"] == "conservative-lexical-negation-v2"
+    assert payload["modelUsage"]["totalTokens"] == 180
     assert payload["modelUsage"]["providerReported"] is True
     assert [item["name"] for item in payload["toolTrace"]] == [
         "get_job_requirements",
         "search_resume_evidence",
+        "search_resume_evidence",
+        "search_resume_evidence",
+        "search_resume_evidence",
         "submit_match_report",
+    ]
+    assert len(payload["requirementResults"]) == 4
+    assert [item["text"] for item in payload["requirementResults"]] == [
+        "Java", "reliable workflows", "Tool Calling", "evaluation"
     ]
     assert "## 证据引用与原文映射" in payload["reportMarkdown"]
     assert "excerpt: Implemented Java RabbitMQ outbox" in payload["reportMarkdown"]
@@ -175,5 +193,63 @@ def test_maps_provider_auth_rejection_to_final_dependency_error() -> None:
     assert response.json() == {
         "code": "MODEL_PROVIDER_REJECTED",
         "message": "model provider request failed",
+        "retryable": False,
+        "retryAfterSeconds": None,
     }
     assert "do-not-forward-provider-body" not in response.text
+
+
+def test_maps_provider_rate_limit_to_retryable_dependency_error() -> None:
+    def model_handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            429,
+            headers={"Retry-After": "17"},
+            json={"error": "provider-rate-limit-detail"},
+        )
+
+    async def scenario() -> httpx.Response:
+        model = OpenAICompatibleChatModel(
+            endpoint="https://model.test/v1/chat/completions",
+            api_key="test-key",
+            model="component-model",
+            timeout_seconds=5,
+            transport=httpx.MockTransport(model_handler),
+        )
+        app = create_app(
+            Settings(
+                ai_endpoint="https://model.test/v1/chat/completions",
+                ai_api_key="test-key",
+                ai_model="component-model",
+                service_token="component-token",
+            ),
+            model,
+        )
+        try:
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://agent.test",
+            ) as client:
+                return await client.post(
+                    "/v1/agent/analyze",
+                    headers={"X-Agent-Token": "component-token"},
+                    json={
+                        "taskId": 703,
+                        "resumeText": "Java project",
+                        "jobTitle": "Agent Engineer",
+                        "jobDescription": "Need tool calling",
+                        "skillTags": ["Java"],
+                    },
+                )
+        finally:
+            await model.aclose()
+
+    response = asyncio.run(scenario())
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "code": "MODEL_PROVIDER_UNAVAILABLE",
+        "message": "model provider request failed",
+        "retryable": True,
+        "retryAfterSeconds": 17,
+    }
+    assert "provider-rate-limit-detail" not in response.text

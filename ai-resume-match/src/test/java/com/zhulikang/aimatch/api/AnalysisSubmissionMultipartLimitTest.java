@@ -109,7 +109,9 @@ class AnalysisSubmissionMultipartLimitTest {
             HttpResponse.BodyHandlers.ofString()
         );
 
-        assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(202);
+        assertThat(response.headers().firstValue(HttpHeaders.LOCATION))
+            .contains("/api/analysis/30");
         JsonNode json = objectMapper.readTree(response.body());
         assertThat(json.required("taskId").asLong()).isEqualTo(30L);
         verify(createAnalysisSubmissionUseCase).create(any(MultipartFile.class), eq(jobTitle), eq(jobContent));

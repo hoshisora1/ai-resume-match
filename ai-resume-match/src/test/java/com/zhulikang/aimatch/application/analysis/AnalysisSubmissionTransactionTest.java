@@ -6,20 +6,23 @@ import com.zhulikang.aimatch.application.resume.PreparedResume;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import com.zhulikang.aimatch.support.RequestOwnerExtension;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.aop.support.AopUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
+@ExtendWith(RequestOwnerExtension.class)
 class AnalysisSubmissionTransactionTest {
     @Autowired
     PersistAnalysisSubmissionUseCase persistUseCase;
@@ -53,7 +56,7 @@ class AnalysisSubmissionTransactionTest {
             .when(metrics).taskCreated();
 
         assertThatThrownBy(() -> persistUseCase.persist(
-            new PreparedResume("resume.pdf", "Java", "Java"),
+            new PreparedResume("resume.pdf", "Java"),
             "Backend Engineer",
             "Java"
         ))

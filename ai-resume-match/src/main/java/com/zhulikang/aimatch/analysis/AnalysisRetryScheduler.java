@@ -1,8 +1,8 @@
 package com.zhulikang.aimatch.analysis;
 
 import com.zhulikang.aimatch.application.analysis.AnalysisTaskPublisher;
+import com.zhulikang.aimatch.config.AnalysisProperties;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,9 +23,14 @@ public class AnalysisRetryScheduler {
     public AnalysisRetryScheduler(
         AnalysisTaskRepository taskRepository,
         AnalysisTaskPublisher publisher,
-        @Value("${analysis.retry.batch-size:20}") int batchSize
+        AnalysisProperties properties
     ) {
-        this(taskRepository, publisher, batchSize, Clock.systemDefaultZone());
+        this(
+            taskRepository,
+            publisher,
+            properties.retry().batchSize(),
+            Clock.systemDefaultZone()
+        );
     }
 
     AnalysisRetryScheduler(

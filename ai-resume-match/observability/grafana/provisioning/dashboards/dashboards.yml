@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: AI Resume Match
+    orgId: 1
+    folder: AI Resume Match
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

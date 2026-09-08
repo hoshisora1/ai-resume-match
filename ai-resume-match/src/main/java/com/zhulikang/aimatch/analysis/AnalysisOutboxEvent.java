@@ -46,6 +46,11 @@ public class AnalysisOutboxEvent {
 
     private LocalDateTime nextAttemptAt;
 
+    @Column(length = 36)
+    private String leaseToken;
+
+    private LocalDateTime leaseUntil;
+
     @Column(length = MAX_ERROR_LENGTH)
     private String lastError;
 
@@ -53,6 +58,8 @@ public class AnalysisOutboxEvent {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime publishedAt;
+
+    private LocalDateTime terminalAt;
 
     protected AnalysisOutboxEvent() {
     }
@@ -74,19 +81,35 @@ public class AnalysisOutboxEvent {
     }
 
     public static AnalysisOutboxEvent analysisRequested(Long taskId, String correlationId) {
+        return analysisRequested(taskId, correlationId, null);
+    }
+
+    public static AnalysisOutboxEvent analysisRequested(
+        Long taskId,
+        String correlationId,
+        String traceParent
+    ) {
         return new AnalysisOutboxEvent(
             AnalysisOutboxEventType.ANALYSIS_REQUESTED,
             "analysis_task",
             taskId,
-            payload(taskId, correlationId)
+            payload(taskId, correlationId, traceParent)
         );
     }
 
-    private static String payload(Long taskId, String correlationId) {
-        if (correlationId == null || correlationId.isBlank()) {
-            return "{\"taskId\":" + taskId + "}";
+    private static String payload(Long taskId, String correlationId, String traceParent) {
+        StringBuilder payload = new StringBuilder("{\"taskId\":").append(taskId);
+        if (correlationId != null && !correlationId.isBlank()) {
+            payload.append(",\"correlationId\":\"")
+                .append(escapeJson(correlationId))
+                .append('"');
         }
-        return "{\"taskId\":" + taskId + ",\"correlationId\":\"" + escapeJson(correlationId) + "\"}";
+        if (traceParent != null && !traceParent.isBlank()) {
+            payload.append(",\"traceparent\":\"")
+                .append(escapeJson(traceParent))
+                .append('"');
+        }
+        return payload.append('}').toString();
     }
 
     private static String escapeJson(String value) {
@@ -97,11 +120,14 @@ public class AnalysisOutboxEvent {
         this.status = AnalysisOutboxStatus.PUBLISHED;
         this.lastError = null;
         this.nextAttemptAt = null;
+        clearLease();
         this.publishedAt = now;
+        this.terminalAt = now;
     }
 
     public boolean markPublishFailed(
         String lastError,
+        LocalDateTime failedAt,
         LocalDateTime nextAttemptAt,
         int maxAttempts
     ) {
@@ -114,13 +140,16 @@ public class AnalysisOutboxEvent {
         this.attemptCount++;
         this.lastError = sanitizeError(lastError);
         this.publishedAt = null;
+        clearLease();
         if (attemptCount >= maxAttempts) {
             this.status = AnalysisOutboxStatus.DEAD;
             this.nextAttemptAt = null;
+            this.terminalAt = failedAt;
             return true;
         }
         this.status = AnalysisOutboxStatus.FAILED;
         this.nextAttemptAt = nextAttemptAt;
+        this.terminalAt = null;
         return false;
     }
 
@@ -131,7 +160,14 @@ public class AnalysisOutboxEvent {
         this.status = AnalysisOutboxStatus.FAILED;
         this.lastError = sanitizeError("Outbox publish interrupted");
         this.nextAttemptAt = now;
+        clearLease();
         this.publishedAt = null;
+        this.terminalAt = null;
+    }
+
+    private void clearLease() {
+        this.leaseToken = null;
+        this.leaseUntil = null;
     }
 
     public void sanitizeLastError() {
@@ -193,11 +229,23 @@ public class AnalysisOutboxEvent {
         return lastError;
     }
 
+    public String getLeaseToken() {
+        return leaseToken;
+    }
+
+    public LocalDateTime getLeaseUntil() {
+        return leaseUntil;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public LocalDateTime getPublishedAt() {
         return publishedAt;
+    }
+
+    public LocalDateTime getTerminalAt() {
+        return terminalAt;
     }
 }

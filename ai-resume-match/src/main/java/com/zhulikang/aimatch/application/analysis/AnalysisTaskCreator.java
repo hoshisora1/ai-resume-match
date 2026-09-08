@@ -3,6 +3,7 @@ package com.zhulikang.aimatch.application.analysis;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
+import com.zhulikang.aimatch.security.RequestIdentity;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,7 +23,9 @@ public class AnalysisTaskCreator {
     }
 
     public AnalysisTask create(Long resumeId, Long jobDescriptionId) {
-        AnalysisTask task = taskRepository.save(new AnalysisTask(resumeId, jobDescriptionId));
+        AnalysisTask task = taskRepository.save(
+            new AnalysisTask(RequestIdentity.currentOwnerId(), resumeId, jobDescriptionId)
+        );
         publisher.publishAfterCommit(task.getId());
         metrics.taskCreated();
         return task;

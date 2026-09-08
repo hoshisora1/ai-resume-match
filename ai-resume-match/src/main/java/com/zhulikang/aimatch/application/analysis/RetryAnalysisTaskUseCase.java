@@ -3,6 +3,7 @@ package com.zhulikang.aimatch.application.analysis;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.analysis.AnalysisTaskRepository;
 import com.zhulikang.aimatch.api.ResourceNotFoundException;
+import com.zhulikang.aimatch.security.RequestIdentity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +19,8 @@ public class RetryAnalysisTaskUseCase {
 
     @Transactional
     public AnalysisTask retry(Long taskId) {
-        AnalysisTask task = taskRepository.findById(taskId)
+        String ownerId = RequestIdentity.currentOwnerId();
+        AnalysisTask task = taskRepository.findByIdAndOwnerId(taskId, ownerId)
             .orElseThrow(() -> new ResourceNotFoundException("Analysis task not found"));
         try {
             task.retry();

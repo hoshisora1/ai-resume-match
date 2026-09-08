@@ -12,7 +12,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(properties = {
-    "analysis.engine=agent",
     "agent.base-url=http://agent.test:8000",
     "agent.token=test-agent-token"
 })
@@ -30,7 +29,7 @@ class AnalysisEngineConfigurationTest {
     private StringRedisTemplate redisTemplate;
 
     @Test
-    void agentModeLoadsOnlyAgentAnalysisImplementation() {
+    void defaultModeLoadsOnlyAgentAnalysisImplementation() {
         assertThat(analysisEngine).isInstanceOf(AgentServiceAnalysisEngine.class);
         assertThat(context.getBeansOfType(AnalysisEngine.class))
             .containsOnlyKeys("agentServiceAnalysisEngine");

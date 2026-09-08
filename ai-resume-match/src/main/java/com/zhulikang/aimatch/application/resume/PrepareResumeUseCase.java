@@ -26,6 +26,6 @@ public class PrepareResumeUseCase {
         if (rawText.codePointCount(0, rawText.length()) > MAX_TEXT_CODE_POINTS) {
             throw new IllegalArgumentException("Extracted resume text exceeds the supported length");
         }
-        return new PreparedResume(file.getOriginalFilename(), rawText, rawText);
+        return new PreparedResume(file.getOriginalFilename(), rawText);
     }
 }

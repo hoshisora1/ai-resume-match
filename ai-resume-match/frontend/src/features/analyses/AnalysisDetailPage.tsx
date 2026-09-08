@@ -1,9 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ArrowLeft, RefreshCw, RotateCcw } from 'lucide-react'
-import { useEffect, useRef } from 'react'
-import { Link, useParams } from 'react-router'
+import { AlertTriangle, ArrowLeft, RefreshCw, RotateCcw, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
 
-import { getMatchReport, retryAnalysisTask } from '../../shared/api/analyses'
+import {
+  deleteAnalysisTask,
+  getMatchReport,
+  retryAnalysisTask,
+} from '../../shared/api/analyses'
 import { ApiError } from '../../shared/api/client'
 import type {
   AnalysisStatus,
@@ -253,8 +257,14 @@ function TaskStatusSection({
     return (
       <section className="analysis-detail__status" data-status={task.status}>
         <h2>分析已完成</h2>
-        <p>匹配报告已生成。</p>
+        <p>匹配报告已生成。再次分析会创建新任务，并重新选择简历。</p>
         <div className="analysis-detail__actions">
+          <Link className="button button--secondary" to="/analyses/new">
+            <span className="button__content">
+              <RotateCcw aria-hidden="true" size={17} />
+              <span>再次分析</span>
+            </span>
+          </Link>
           <CopyReference label="任务 ID" value={String(task.taskId)} />
         </div>
       </section>
@@ -360,11 +370,146 @@ function AnalysisReportSection({ taskId }: { taskId: number }) {
   )
 }
 
+interface DeleteAnalysisSectionProps {
+  deleteError: unknown
+  deletePending: boolean
+  onConfirm: () => void
+  task: AnalysisTask
+}
+
+function DeleteAnalysisSection({
+  deleteError,
+  deletePending,
+  onConfirm,
+  task,
+}: DeleteAnalysisSectionProps) {
+  const [confirming, setConfirming] = useState(false)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const deleteButtonRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const wasConfirmingRef = useRef(false)
+  const requestId = requestIdFrom(deleteError)
+
+  useEffect(() => {
+    if (!confirming) {
+      if (wasConfirmingRef.current) {
+        deleteButtonRef.current?.focus()
+        wasConfirmingRef.current = false
+      }
+      return
+    }
+    wasConfirmingRef.current = true
+    cancelButtonRef.current?.focus()
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !deletePending) {
+        setConfirming(false)
+      }
+      if (event.key !== 'Tab') {
+        return
+      }
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      )
+      const first = focusable.at(0)
+      const last = focusable.at(-1)
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [confirming, deletePending])
+
+  const close = () => {
+    if (!deletePending) {
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <section
+      aria-labelledby="analysis-data-management-heading"
+      className="analysis-detail__data-management"
+    >
+      <h2 id="analysis-data-management-heading">数据管理</h2>
+      <p>
+        删除报告、任务记录和只被本次分析使用的简历与岗位文本。此操作不可恢复。
+      </p>
+      <Button
+        onClick={() => setConfirming(true)}
+        ref={deleteButtonRef}
+        variant="danger"
+      >
+        <Trash2 aria-hidden="true" size={17} />
+        <span>删除分析</span>
+      </Button>
+
+      {confirming ? (
+        <div className="analysis-detail__dialog-backdrop">
+          <div
+            aria-describedby="delete-analysis-description"
+            aria-labelledby="delete-analysis-heading"
+            aria-modal="true"
+            className="analysis-detail__dialog"
+            ref={dialogRef}
+            role="dialog"
+          >
+            <div className="analysis-detail__dialog-heading">
+              <Trash2 aria-hidden="true" size={21} />
+              <h2 id="delete-analysis-heading">确认删除分析？</h2>
+            </div>
+            <p id="delete-analysis-description">
+              任务 #{task.taskId} 的持久化数据将立即删除。
+              {task.status === 'PENDING' || task.status === 'RUNNING'
+                ? ' 已发出的模型请求可能继续完成，但结果不会再保存。'
+                : null}
+            </p>
+            {deleteError !== null ? (
+              <div className="analysis-detail__inline-error" role="alert">
+                <p>删除失败，数据仍然保留，请稍后重试。</p>
+                {requestId !== undefined ? (
+                  <CopyReference label="请求 ID" value={requestId} />
+                ) : null}
+              </div>
+            ) : null}
+            <div className="analysis-detail__dialog-actions">
+              <Button
+                disabled={deletePending}
+                onClick={close}
+                ref={cancelButtonRef}
+                variant="secondary"
+              >
+                取消
+              </Button>
+              <Button
+                loading={deletePending}
+                onClick={onConfirm}
+                variant="danger"
+              >
+                确认永久删除
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 function ValidAnalysisDetail({ taskId }: { taskId: number }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const taskQuery = useAnalysisTask(taskId)
   const retryInFlightRef = useRef(false)
   const retryControllerRef = useRef<AbortController | null>(null)
+  const deleteControllerRef = useRef<AbortController | null>(null)
   const retryMutation = useMutation({
     mutationKey: ['retry-analysis-task', taskId],
     mutationFn: () => {
@@ -399,11 +544,58 @@ function ValidAnalysisDetail({ taskId }: { taskId: number }) {
       }
     },
   })
+  const deleteMutation = useMutation({
+    mutationKey: ['delete-analysis-task', taskId],
+    mutationFn: () => {
+      const controller = new AbortController()
+      deleteControllerRef.current = controller
+      return deleteAnalysisTask(taskId, controller.signal)
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.cancelQueries({
+          queryKey: analysisTaskQueryKey(taskId),
+          exact: true,
+        }),
+        queryClient.cancelQueries({
+          queryKey: analysisReportQueryKey(taskId),
+          exact: true,
+        }),
+      ])
+      void navigate('/analyses', { replace: true })
+      window.setTimeout(() => {
+        const queryCache = queryClient.getQueryCache()
+        const cachedTask = queryCache.find({
+          queryKey: analysisTaskQueryKey(taskId),
+          exact: true,
+        })
+        const cachedReport = queryCache.find({
+          queryKey: analysisReportQueryKey(taskId),
+          exact: true,
+        })
+        if (cachedTask !== undefined) {
+          queryCache.remove(cachedTask)
+        }
+        if (cachedReport !== undefined) {
+          queryCache.remove(cachedReport)
+        }
+      }, 0)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['analyses'] }),
+        queryClient.invalidateQueries({ queryKey: analysisSummaryQueryKey }),
+      ])
+    },
+    onSettled: () => {
+      deleteControllerRef.current = null
+    },
+  })
 
   useEffect(() => {
     return () => {
       retryControllerRef.current?.abort()
+      deleteControllerRef.current?.abort()
       retryControllerRef.current = null
+      deleteControllerRef.current = null
       retryInFlightRef.current = false
     }
   }, [])
@@ -475,6 +667,12 @@ function ValidAnalysisDetail({ taskId }: { taskId: number }) {
       {task.status === 'SUCCESS' ? (
         <AnalysisReportSection taskId={taskId} />
       ) : null}
+      <DeleteAnalysisSection
+        deleteError={deleteMutation.error}
+        deletePending={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+        task={task}
+      />
     </>
   )
 }

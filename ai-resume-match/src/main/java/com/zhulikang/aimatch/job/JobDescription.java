@@ -1,5 +1,6 @@
 package com.zhulikang.aimatch.job;
 
+import com.zhulikang.aimatch.security.OwnerId;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -14,6 +15,9 @@ public class JobDescription {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, length = 64, columnDefinition = "char(64)")
+    private String ownerId;
 
     @Column(nullable = false, length = 120)
     private String title;
@@ -32,6 +36,11 @@ public class JobDescription {
     }
 
     public JobDescription(String title, String content, String skillTags) {
+        this(OwnerId.LEGACY, title, content, skillTags);
+    }
+
+    public JobDescription(String ownerId, String title, String content, String skillTags) {
+        this.ownerId = OwnerId.requireValid(ownerId);
         this.title = title;
         this.content = content;
         this.skillTags = skillTags;
@@ -39,6 +48,10 @@ public class JobDescription {
 
     public Long getId() {
         return id;
+    }
+
+    public String getOwnerId() {
+        return ownerId;
     }
 
     public String getTitle() {

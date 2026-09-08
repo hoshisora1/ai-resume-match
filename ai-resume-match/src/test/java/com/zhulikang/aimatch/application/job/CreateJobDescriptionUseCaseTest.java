@@ -3,7 +3,9 @@ package com.zhulikang.aimatch.application.job;
 import com.zhulikang.aimatch.job.JdTagExtractor;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
+import com.zhulikang.aimatch.support.RequestOwnerExtension;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.List;
 
@@ -13,6 +15,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(RequestOwnerExtension.class)
 class CreateJobDescriptionUseCaseTest {
     @Test
     void extractsTagsSerializesThemAndSavesJobDescription() {

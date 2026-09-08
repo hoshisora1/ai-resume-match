@@ -9,12 +9,15 @@ import com.zhulikang.aimatch.job.JobDescriptionDisplayView;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.resume.ResumeDisplayView;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import com.zhulikang.aimatch.support.RequestOwnerExtension;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
+import static com.zhulikang.aimatch.support.RequestOwnerExtension.OWNER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -23,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(RequestOwnerExtension.class)
 class GetAnalysisTaskUseCaseTest {
     private AnalysisTaskRepository taskRepository;
     private ResumeRepository resumeRepository;
@@ -47,9 +51,9 @@ class GetAnalysisTaskUseCaseTest {
     @Test
     void returnsEnrichedTaskDetails() {
         AnalysisTask task = task(30L, 10L, 20L);
-        when(taskRepository.findById(30L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findDisplayViewById(10L)).thenReturn(Optional.of(resume(10L)));
-        when(jobRepository.findDisplayViewById(20L)).thenReturn(Optional.of(job(20L)));
+        when(taskRepository.findByIdAndOwnerId(30L, OWNER_ID)).thenReturn(Optional.of(task));
+        when(resumeRepository.findDisplayViewByIdAndOwnerId(10L, OWNER_ID)).thenReturn(Optional.of(resume(10L)));
+        when(jobRepository.findDisplayViewByIdAndOwnerId(20L, OWNER_ID)).thenReturn(Optional.of(job(20L)));
         when(reportRepository.findScoreViewByTaskId(30L)).thenReturn(Optional.of(new MatchScoreView(30L, 88)));
 
         Optional<AnalysisTaskDetails> details = useCase.find(30L);
@@ -60,8 +64,8 @@ class GetAnalysisTaskUseCaseTest {
             assertThat(value.resumeFileName()).isEqualTo("resume.pdf");
             assertThat(value.matchScore()).isEqualTo(88);
         });
-        verify(resumeRepository).findDisplayViewById(10L);
-        verify(jobRepository).findDisplayViewById(20L);
+        verify(resumeRepository).findDisplayViewByIdAndOwnerId(10L, OWNER_ID);
+        verify(jobRepository).findDisplayViewByIdAndOwnerId(20L, OWNER_ID);
         verify(reportRepository).findScoreViewByTaskId(30L);
         verify(resumeRepository, never()).findById(10L);
         verify(jobRepository, never()).findById(20L);
@@ -70,7 +74,7 @@ class GetAnalysisTaskUseCaseTest {
 
     @Test
     void returnsEmptyWhenTaskDoesNotExist() {
-        when(taskRepository.findById(404L)).thenReturn(Optional.empty());
+        when(taskRepository.findByIdAndOwnerId(404L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThat(useCase.find(404L)).isEmpty();
         verifyNoInteractions(resumeRepository, jobRepository, reportRepository);
@@ -79,9 +83,9 @@ class GetAnalysisTaskUseCaseTest {
     @Test
     void allowsTaskWithoutMatchReport() {
         AnalysisTask task = task(30L, 10L, 20L);
-        when(taskRepository.findById(30L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findDisplayViewById(10L)).thenReturn(Optional.of(resume(10L)));
-        when(jobRepository.findDisplayViewById(20L)).thenReturn(Optional.of(job(20L)));
+        when(taskRepository.findByIdAndOwnerId(30L, OWNER_ID)).thenReturn(Optional.of(task));
+        when(resumeRepository.findDisplayViewByIdAndOwnerId(10L, OWNER_ID)).thenReturn(Optional.of(resume(10L)));
+        when(jobRepository.findDisplayViewByIdAndOwnerId(20L, OWNER_ID)).thenReturn(Optional.of(job(20L)));
         when(reportRepository.findScoreViewByTaskId(30L)).thenReturn(Optional.empty());
 
         assertThat(useCase.find(30L)).get().extracting(AnalysisTaskDetails::matchScore).isNull();
@@ -90,8 +94,8 @@ class GetAnalysisTaskUseCaseTest {
     @Test
     void rejectsTaskWhoseResumeIsMissing() {
         AnalysisTask task = task(30L, 10L, 20L);
-        when(taskRepository.findById(30L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findDisplayViewById(10L)).thenReturn(Optional.empty());
+        when(taskRepository.findByIdAndOwnerId(30L, OWNER_ID)).thenReturn(Optional.of(task));
+        when(resumeRepository.findDisplayViewByIdAndOwnerId(10L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.find(30L))
             .isInstanceOf(ResourceNotFoundException.class)
@@ -101,9 +105,9 @@ class GetAnalysisTaskUseCaseTest {
     @Test
     void rejectsTaskWhoseJobDescriptionIsMissing() {
         AnalysisTask task = task(30L, 10L, 20L);
-        when(taskRepository.findById(30L)).thenReturn(Optional.of(task));
-        when(resumeRepository.findDisplayViewById(10L)).thenReturn(Optional.of(resume(10L)));
-        when(jobRepository.findDisplayViewById(20L)).thenReturn(Optional.empty());
+        when(taskRepository.findByIdAndOwnerId(30L, OWNER_ID)).thenReturn(Optional.of(task));
+        when(resumeRepository.findDisplayViewByIdAndOwnerId(10L, OWNER_ID)).thenReturn(Optional.of(resume(10L)));
+        when(jobRepository.findDisplayViewByIdAndOwnerId(20L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.find(30L))
             .isInstanceOf(ResourceNotFoundException.class)

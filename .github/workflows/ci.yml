@@ -80,6 +80,14 @@ jobs:
       - name: Run Agent tests
         run: python -m pytest
 
+      - name: Run deterministic retrieval baseline
+        run: >-
+          python evals/run_retrieval_eval.py
+          --min-recall 0.88
+          --min-mrr 0.86
+          --max-false-positive-rate 0
+          --summary-only
+
   frontend-quality:
     name: Frontend / quality and build
     runs-on: ubuntu-latest
@@ -100,6 +108,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Verify generated API contract
+        run: npm run api:check
 
       - name: Lint
         run: npm run lint
@@ -136,6 +147,16 @@ jobs:
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+
+      - name: Verify Compose configurations
+        working-directory: ai-resume-match
+        run: |
+          docker compose --env-file .env.example config --quiet
+          docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.demo.yml config --quiet
+          docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.e2e.yml config --quiet
+
+      - name: Verify deterministic model protocol
+        run: npm run test:e2e-protocol
 
       - name: Run deterministic browser tests
         run: npm run test:e2e

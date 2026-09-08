@@ -49,17 +49,47 @@ class FlywayMigrationIT {
             assertThat(tableExists(connection, "match_report")).isTrue();
             assertThat(tableExists(connection, "analysis_outbox")).isTrue();
             assertThat(indexExists(connection, "analysis_outbox", "idx_analysis_outbox_due")).isTrue();
+            assertThat(indexExists(connection, "analysis_outbox", "idx_analysis_outbox_lease")).isTrue();
+            assertThat(indexExists(connection, "analysis_outbox", "idx_analysis_outbox_terminal")).isTrue();
+            assertThat(indexExists(
+                connection,
+                "analysis_submission_idempotency",
+                "idx_analysis_idempotency_created"
+            )).isTrue();
             assertThat(indexExists(connection, "analysis_task", "idx_analysis_task_created_id")).isTrue();
             assertThat(indexExists(
                 connection,
                 "analysis_task",
                 "idx_analysis_task_status_created_id"
             )).isTrue();
+            assertThat(indexExists(
+                connection,
+                "analysis_task",
+                "idx_analysis_task_owner_status_created"
+            )).isTrue();
+            assertThat(indexExists(connection, "resume", "idx_resume_owner")).isTrue();
+            assertThat(columnExists(connection, "resume", "structured_summary")).isFalse();
             assertThat(jobTitle(connection, jobId)).isEqualTo("岗位 " + jobId);
+            assertThat(stringValue(connection, "job_description", "owner_id", jobId))
+                .isEqualTo("0".repeat(64));
 
             ColumnMetadata titleColumn = columnMetadata(connection, "job_description", "title");
             assertThat(titleColumn.length()).isEqualTo(120);
             assertThat(titleColumn.nullability()).isEqualTo(DatabaseMetaData.columnNoNulls);
+            ColumnMetadata leaseTokenColumn = columnMetadata(
+                connection,
+                "analysis_outbox",
+                "lease_token"
+            );
+            assertThat(leaseTokenColumn.length()).isEqualTo(36);
+            assertThat(leaseTokenColumn.nullability()).isEqualTo(DatabaseMetaData.columnNullable);
+            assertThat(columnMetadata(connection, "analysis_outbox", "lease_until").nullability())
+                .isEqualTo(DatabaseMetaData.columnNullable);
+            assertThat(columnMetadata(connection, "analysis_outbox", "terminal_at").nullability())
+                .isEqualTo(DatabaseMetaData.columnNullable);
+            ColumnMetadata ownerColumn = columnMetadata(connection, "analysis_task", "owner_id");
+            assertThat(ownerColumn.length()).isEqualTo(64);
+            assertThat(ownerColumn.nullability()).isEqualTo(DatabaseMetaData.columnNoNulls);
             assertThatThrownBy(() -> insertJobWithNullTitle(connection))
                 .isInstanceOf(SQLException.class);
         }
@@ -114,8 +144,27 @@ class FlywayMigrationIT {
         }
     }
 
+    private String stringValue(Connection connection, String table, String column, long id)
+        throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "select " + column + " from " + table + " where id = ?"
+        )) {
+            statement.setLong(1, id);
+            try (ResultSet rows = statement.executeQuery()) {
+                assertThat(rows.next()).isTrue();
+                return rows.getString(1);
+            }
+        }
+    }
+
     private boolean tableExists(Connection connection, String tableName) throws Exception {
         try (ResultSet rows = connection.getMetaData().getTables(null, null, tableName, null)) {
+            return rows.next();
+        }
+    }
+
+    private boolean columnExists(Connection connection, String tableName, String columnName) throws Exception {
+        try (ResultSet rows = connection.getMetaData().getColumns(null, null, tableName, columnName)) {
             return rows.next();
         }
     }

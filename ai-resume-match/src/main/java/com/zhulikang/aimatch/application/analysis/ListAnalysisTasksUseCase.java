@@ -9,6 +9,7 @@ import com.zhulikang.aimatch.job.JobDescriptionDisplayView;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.resume.ResumeDisplayView;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import com.zhulikang.aimatch.security.RequestIdentity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -49,9 +50,10 @@ public class ListAnalysisTasksUseCase {
             Sort.Order.desc("createdAt"),
             Sort.Order.desc("id")
         ));
+        String ownerId = RequestIdentity.currentOwnerId();
         Page<AnalysisTask> taskPage = status == null
-            ? taskRepository.findAll(pageable)
-            : taskRepository.findByStatus(status, pageable);
+            ? taskRepository.findByOwnerId(ownerId, pageable)
+            : taskRepository.findByOwnerIdAndStatus(ownerId, status, pageable);
 
         if (taskPage.isEmpty()) {
             return toPage(taskPage, List.of());
@@ -67,9 +69,11 @@ public class ListAnalysisTasksUseCase {
             .map(AnalysisTask::getId)
             .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        Map<Long, ResumeDisplayView> resumesById = resumeRepository.findDisplayViewsByIdIn(resumeIds).stream()
+        List<ResumeDisplayView> resumeViews = resumeRepository.findDisplayViewsByIdInAndOwnerId(resumeIds, ownerId);
+        List<JobDescriptionDisplayView> jobViews = jobRepository.findDisplayViewsByIdInAndOwnerId(jobIds, ownerId);
+        Map<Long, ResumeDisplayView> resumesById = resumeViews.stream()
             .collect(Collectors.toMap(ResumeDisplayView::id, Function.identity()));
-        Map<Long, JobDescriptionDisplayView> jobsById = jobRepository.findDisplayViewsByIdIn(jobIds).stream()
+        Map<Long, JobDescriptionDisplayView> jobsById = jobViews.stream()
             .collect(Collectors.toMap(JobDescriptionDisplayView::id, Function.identity()));
         Map<Long, MatchScoreView> scoresByTaskId = reportRepository.findScoreViewsByTaskIdIn(taskIds).stream()
             .collect(Collectors.toMap(MatchScoreView::taskId, Function.identity()));

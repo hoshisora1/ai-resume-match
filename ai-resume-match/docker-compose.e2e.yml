@@ -1,17 +1,25 @@
 services:
+  frontend:
+    ports: !override
+      - "127.0.0.1::8080"
+
   app:
+    ports: !reset []
     environment:
       AI_API_KEY: e2e-mock-key
       ANALYSIS_ENGINE: agent
       ANALYSIS_OUTBOX_FIXED_DELAY_MS: 500
       ANALYSIS_OUTBOX_RETRY_DELAY: 1s
       ANALYSIS_RETRY_DELAY: 1s
+      ANALYSIS_RETRY_MAX_DELAY: 8s
+      ANALYSIS_RETRY_JITTER_RATIO: 0
       ANALYSIS_RETRY_SCHEDULER_FIXED_DELAY_MS: 1000
     depends_on:
       mock-ai:
         condition: service_healthy
 
   agent:
+    ports: !reset []
     environment:
       AI_API_KEY: e2e-mock-key
       AI_ENDPOINT: http://mock-ai:18089/v1/chat/completions
@@ -28,6 +36,7 @@ services:
       PORT: 18089
     volumes:
       - ./e2e/mock-ai/server.mjs:/mock-ai/server.mjs:ro
+      - ./e2e/mock-ai/protocol.mjs:/mock-ai/protocol.mjs:ro
     healthcheck:
       test:
         - CMD
@@ -39,3 +48,12 @@ services:
       retries: 30
       start_period: 2s
     restart: "no"
+
+  mysql:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  rabbitmq:
+    ports: !reset []

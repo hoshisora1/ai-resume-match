@@ -14,11 +14,26 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  data:
+    redis:
+      # Redis is an optional cache. Bound both connection and command waits so a cache outage
+      # falls back to MySQL instead of occupying an HTTP worker for the Lettuce default timeout.
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:500ms}
+      timeout: ${REDIS_COMMAND_TIMEOUT:500ms}
   rabbitmq:
     publisher-confirm-type: correlated
     publisher-returns: true
+    listener:
+      simple:
+        observation-enabled: true
     template:
       mandatory: true
+      observation-enabled: true
+  task:
+    scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: ${SCHEDULER_SHUTDOWN_TIMEOUT:10s}
 
 ai:
   endpoint: ${AI_ENDPOINT:https://api.openai.com/v1/chat/completions}
@@ -33,6 +48,9 @@ agent:
 
 api:
   token: ${API_TOKEN}
+  session-signing-key: ${SESSION_SIGNING_KEY:dev-only-session-signing-key-change-me}
+  session-ttl: ${SESSION_TTL:30d}
+  session-cookie-secure: ${SESSION_COOKIE_SECURE:false}
 
 report:
   cache-ttl: ${REPORT_CACHE_TTL:10m}
@@ -42,7 +60,13 @@ logging:
     level: "%5p requestId=%X{requestId} correlationId=%X{correlationId}"
 
 analysis:
-  engine: ${ANALYSIS_ENGINE:legacy}
+  engine: ${ANALYSIS_ENGINE:agent}
+  rate-limit:
+    enabled: ${ANALYSIS_RATE_LIMIT_ENABLED:true}
+    max-requests: ${ANALYSIS_RATE_LIMIT_MAX_REQUESTS:5}
+    window: ${ANALYSIS_RATE_LIMIT_WINDOW:10m}
+  scheduling:
+    enabled: ${ANALYSIS_SCHEDULING_ENABLED:true}
   running-timeout: ${ANALYSIS_RUNNING_TIMEOUT:15m}
   running-recovery:
     scheduler-fixed-delay-ms: ${ANALYSIS_RUNNING_RECOVERY_FIXED_DELAY_MS:30000}
@@ -52,13 +76,34 @@ analysis:
     batch-size: ${ANALYSIS_OUTBOX_BATCH_SIZE:20}
     max-attempts: ${ANALYSIS_OUTBOX_MAX_ATTEMPTS:10}
     retry-delay: ${ANALYSIS_OUTBOX_RETRY_DELAY:30s}
+    retry-max-delay: ${ANALYSIS_OUTBOX_RETRY_MAX_DELAY:15m}
+    retry-jitter-ratio: ${ANALYSIS_OUTBOX_RETRY_JITTER_RATIO:0.2}
     confirm-timeout: ${ANALYSIS_OUTBOX_CONFIRM_TIMEOUT:5s}
+    lease-duration: ${ANALYSIS_OUTBOX_LEASE_DURATION:30s}
+  retention:
+    scheduler-fixed-delay-ms: ${ANALYSIS_RETENTION_FIXED_DELAY_MS:3600000}
+    batch-size: ${ANALYSIS_RETENTION_BATCH_SIZE:200}
+    outbox: ${ANALYSIS_OUTBOX_RETENTION:30d}
+    idempotency: ${ANALYSIS_IDEMPOTENCY_RETENTION:30d}
+    user-data: ${ANALYSIS_USER_DATA_RETENTION:30d}
   retry:
     delay: ${ANALYSIS_RETRY_DELAY:1m}
+    max-delay: ${ANALYSIS_RETRY_MAX_DELAY:15m}
+    jitter-ratio: ${ANALYSIS_RETRY_JITTER_RATIO:0.2}
     scheduler-fixed-delay-ms: ${ANALYSIS_RETRY_SCHEDULER_FIXED_DELAY_MS:30000}
     batch-size: ${ANALYSIS_RETRY_BATCH_SIZE:20}
 
 management:
+  tracing:
+    enabled: ${TRACING_ENABLED:false}
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+      timeout: ${OTEL_EXPORTER_OTLP_TRACES_TIMEOUT:5s}
   endpoint:
     health:
       probes:
@@ -67,8 +112,24 @@ management:
         liveness:
           include: livenessState
         readiness:
-          include: readinessState
+          include: readinessState,db
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        analysis.worker.duration: true
+        agent.call.duration: true
+        ai.call.duration: true
+
+resume:
+  upload:
+    max-file-size: ${RESUME_MAX_FILE_SIZE:5MB}
+    max-pdf-pages: ${RESUME_MAX_PDF_PAGES:50}
+    max-docx-entries: ${RESUME_MAX_DOCX_ENTRIES:512}
+    max-docx-entry-size: ${RESUME_MAX_DOCX_ENTRY_SIZE:10MB}
+    max-docx-uncompressed-size: ${RESUME_MAX_DOCX_UNCOMPRESSED_SIZE:20MB}

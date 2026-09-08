@@ -17,6 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
+import static com.zhulikang.aimatch.support.RequestOwnerExtension.OWNER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,13 +57,13 @@ class PersistIdempotentAnalysisSubmissionUseCaseTest {
 
     @Test
     void reservesUniqueKeyBeforeCreatingSubmission() {
-        PreparedResume prepared = new PreparedResume("resume.pdf", "Java", "Java");
+        PreparedResume prepared = new PreparedResume("resume.pdf", "Java");
         AnalysisSubmissionIdempotencyRecord record = new AnalysisSubmissionIdempotencyRecord(
             KEY_HASH, FINGERPRINT
         );
         AnalysisTask task = task(30L);
         AnalysisSubmission submission = new AnalysisSubmission(task, "Backend Engineer", "resume.pdf");
-        when(idempotencyRepository.findByIdempotencyKeyHash(KEY_HASH)).thenReturn(Optional.empty());
+        when(idempotencyRepository.findByOwnerIdAndIdempotencyKeyHash(OWNER_ID, KEY_HASH)).thenReturn(Optional.empty());
         when(idempotencyRepository.saveAndFlush(any(AnalysisSubmissionIdempotencyRecord.class)))
             .thenReturn(record);
         when(delegate.persist(prepared, "Backend Engineer", "Java")).thenReturn(submission);
@@ -81,15 +82,15 @@ class PersistIdempotentAnalysisSubmissionUseCaseTest {
     void returnsOriginalSubmissionForSameFingerprint() {
         AnalysisSubmissionIdempotencyRecord record = completedRecord(FINGERPRINT, 30L);
         AnalysisTask task = task(30L);
-        Resume resume = new Resume("resume.pdf", "Java", "Java");
+        Resume resume = new Resume("resume.pdf", "Java");
         JobDescription job = new JobDescription("Backend Engineer", "Java", "Java");
-        when(idempotencyRepository.findByIdempotencyKeyHash(KEY_HASH)).thenReturn(Optional.of(record));
-        when(taskRepository.findById(30L)).thenReturn(Optional.of(task));
+        when(idempotencyRepository.findByOwnerIdAndIdempotencyKeyHash(OWNER_ID, KEY_HASH)).thenReturn(Optional.of(record));
+        when(taskRepository.findByIdAndOwnerId(30L, OWNER_ID)).thenReturn(Optional.of(task));
         when(resumeRepository.findById(10L)).thenReturn(Optional.of(resume));
         when(jobRepository.findById(20L)).thenReturn(Optional.of(job));
 
         AnalysisSubmission result = useCase.persist(
-            new PreparedResume("ignored.pdf", "ignored", "ignored"),
+            new PreparedResume("ignored.pdf", "ignored"),
             "Ignored",
             "Ignored",
             context(FINGERPRINT)
@@ -103,11 +104,11 @@ class PersistIdempotentAnalysisSubmissionUseCaseTest {
 
     @Test
     void rejectsSameKeyWithDifferentFingerprint() {
-        when(idempotencyRepository.findByIdempotencyKeyHash(KEY_HASH))
+        when(idempotencyRepository.findByOwnerIdAndIdempotencyKeyHash(OWNER_ID, KEY_HASH))
             .thenReturn(Optional.of(completedRecord(FINGERPRINT, 30L)));
 
         assertThatThrownBy(() -> useCase.persist(
-            new PreparedResume("resume.pdf", "Java", "Java"),
+            new PreparedResume("resume.pdf", "Java"),
             "Backend Engineer",
             "Java",
             context("c".repeat(64))
@@ -118,12 +119,12 @@ class PersistIdempotentAnalysisSubmissionUseCaseTest {
 
     @Test
     void uniqueReservationFailureOccursBeforeAnyBusinessPersistence() {
-        when(idempotencyRepository.findByIdempotencyKeyHash(KEY_HASH)).thenReturn(Optional.empty());
+        when(idempotencyRepository.findByOwnerIdAndIdempotencyKeyHash(OWNER_ID, KEY_HASH)).thenReturn(Optional.empty());
         when(idempotencyRepository.saveAndFlush(any(AnalysisSubmissionIdempotencyRecord.class)))
             .thenThrow(new DataIntegrityViolationException("duplicate key"));
 
         assertThatThrownBy(() -> useCase.persist(
-            new PreparedResume("resume.pdf", "Java", "Java"),
+            new PreparedResume("resume.pdf", "Java"),
             "Backend Engineer",
             "Java",
             context(FINGERPRINT)
@@ -134,7 +135,7 @@ class PersistIdempotentAnalysisSubmissionUseCaseTest {
     }
 
     private AnalysisSubmissionIdempotencyContext context(String fingerprint) {
-        return new AnalysisSubmissionIdempotencyContext(KEY_HASH, fingerprint);
+        return new AnalysisSubmissionIdempotencyContext(OWNER_ID, KEY_HASH, fingerprint);
     }
 
     private AnalysisSubmissionIdempotencyRecord completedRecord(String fingerprint, Long taskId) {

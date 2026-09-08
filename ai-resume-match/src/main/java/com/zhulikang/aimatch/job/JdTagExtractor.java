@@ -2,8 +2,8 @@ package com.zhulikang.aimatch.job;
 
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Component
 public class JdTagExtractor {
@@ -14,14 +14,14 @@ public class JdTagExtractor {
     );
 
     public List<String> extractTags(String jdText) {
-        String lower = jdText == null ? "" : jdText.toLowerCase();
-        List<String> result = new ArrayList<>();
-        for (String tag : KNOWN_TAGS) {
-            if (lower.contains(tag.toLowerCase())) {
-                result.add(tag);
-            }
-        }
-        return result;
+        return KNOWN_TAGS.stream()
+            .filter(tag -> Pattern.compile(
+                (tag.charAt(0) < 128 ? "(?<![A-Za-z0-9_+#])" : "")
+                    + Pattern.quote(tag)
+                    + (tag.charAt(tag.length() - 1) < 128 ? "(?![A-Za-z0-9_+#])" : ""),
+                Pattern.CASE_INSENSITIVE
+            ).matcher(jdText).find())
+            .toList();
     }
 
     public String toStorageValue(List<String> tags) {

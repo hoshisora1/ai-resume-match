@@ -5,6 +5,7 @@ from typing import Any, Protocol
 import httpx
 
 from agent_service.models import AssistantTurn, ModelToolCall, ModelUsage
+from agent_service.tracing import AgentTracing
 
 
 class ChatModel(Protocol):
@@ -32,6 +33,7 @@ class OpenAICompatibleChatModel:
         timeout_seconds: float,
         max_completion_tokens: int = 1_200,
         transport: httpx.AsyncBaseTransport | None = None,
+        tracing: AgentTracing | None = None,
     ) -> None:
         if not 1 <= max_completion_tokens <= 32_768:
             raise ValueError("max_completion_tokens must be between 1 and 32768")
@@ -41,6 +43,8 @@ class OpenAICompatibleChatModel:
         self._max_completion_tokens = max_completion_tokens
         self._timeout = httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 5.0))
         self._client = httpx.AsyncClient(timeout=self._timeout, transport=transport)
+        if tracing is not None:
+            tracing.instrument_httpx_client(self._client)
 
     @property
     def model_name(self) -> str:

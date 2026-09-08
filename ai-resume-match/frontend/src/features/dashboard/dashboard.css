@@ -6,6 +6,8 @@
   display: flex;
   min-width: 0;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
   min-height: 2.25rem;
 }
 
@@ -15,6 +17,13 @@
   line-height: 1.25;
   letter-spacing: 0;
   overflow-wrap: anywhere;
+}
+
+.dashboard-page__demo-action {
+  min-height: 2.25rem;
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.875rem;
 }
 
 .dashboard-section {
@@ -143,8 +152,17 @@
 }
 
 @media (max-width: 48rem) {
+  .dashboard-page__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .dashboard-page__header h1 {
     font-size: 1.5rem;
+  }
+
+  .dashboard-page__demo-action {
+    width: 100%;
   }
 
   .metric-grid {

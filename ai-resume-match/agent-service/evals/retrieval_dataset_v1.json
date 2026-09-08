@@ -1,0 +1,1058 @@
+{
+  "datasetVersion": "retrieval-qrels-v1",
+  "documents": [
+    {
+      "documentId": "resume-java-platform",
+      "text": "Built Java 21 and Spring Boot services with REST APIs and MySQL transactions.\n\nImplemented RabbitMQ transactional outbox, publisher confirms, idempotency, and retry handling.\n\nAdded Micrometer metrics, correlation IDs, and Testcontainers integration tests.\n\nDeployed the service with Docker Compose for local demonstrations.",
+      "spans": [
+        {
+          "spanId": "resume-java-platform:architecture",
+          "start": 0,
+          "end": 77
+        },
+        {
+          "spanId": "resume-java-platform:messaging",
+          "start": 79,
+          "end": 174
+        },
+        {
+          "spanId": "resume-java-platform:observability",
+          "start": 176,
+          "end": 256
+        },
+        {
+          "spanId": "resume-java-platform:delivery",
+          "start": 258,
+          "end": 324
+        }
+      ]
+    },
+    {
+      "documentId": "resume-python-agent",
+      "text": "Created a Python FastAPI bounded Tool Calling Agent with three allowlisted tools and strict Pydantic schemas.\n\nRequired every positive claim to cite evidence IDs returned by resume retrieval.\n\nAdded pytest regression cases for prompt injection, forged citations, empty evidence, and token budgets.\n\nCaptured provider token usage, model name, step count, and sanitized tool traces.",
+      "spans": [
+        {
+          "spanId": "resume-python-agent:runtime",
+          "start": 0,
+          "end": 109
+        },
+        {
+          "spanId": "resume-python-agent:grounding",
+          "start": 111,
+          "end": 191
+        },
+        {
+          "spanId": "resume-python-agent:evaluation",
+          "start": 193,
+          "end": 297
+        },
+        {
+          "spanId": "resume-python-agent:usage",
+          "start": 299,
+          "end": 380
+        }
+      ]
+    },
+    {
+      "documentId": "resume-react-product",
+      "text": "Developed React and TypeScript pages with responsive layouts and reusable components.\n\nUsed TanStack Query for server state, cancellation, retry backoff, and cache invalidation.\n\nImplemented keyboard navigation, focus states, semantic labels, and screen reader announcements.\n\nRendered sanitized Markdown under a restrictive Content Security Policy to reduce XSS risk.",
+      "spans": [
+        {
+          "spanId": "resume-react-product:frontend",
+          "start": 0,
+          "end": 85
+        },
+        {
+          "spanId": "resume-react-product:server-state",
+          "start": 87,
+          "end": 177
+        },
+        {
+          "spanId": "resume-react-product:accessibility",
+          "start": 179,
+          "end": 275
+        },
+        {
+          "spanId": "resume-react-product:security",
+          "start": 277,
+          "end": 368
+        }
+      ]
+    },
+    {
+      "documentId": "resume-ml-engineering",
+      "text": "Fine-tuned a PyTorch transformer model and tracked validation loss across experiments.\n\nBuilt scikit-learn classification baselines with cross-validation and feature pipelines.\n\nScheduled batch inference and data quality checks with Apache Airflow.\n\nServed versioned models behind a Python API and monitored prediction latency.",
+      "spans": [
+        {
+          "spanId": "resume-ml-engineering:deep-learning",
+          "start": 0,
+          "end": 86
+        },
+        {
+          "spanId": "resume-ml-engineering:classical-ml",
+          "start": 88,
+          "end": 176
+        },
+        {
+          "spanId": "resume-ml-engineering:orchestration",
+          "start": 178,
+          "end": 248
+        },
+        {
+          "spanId": "resume-ml-engineering:serving",
+          "start": 250,
+          "end": 327
+        }
+      ]
+    },
+    {
+      "documentId": "resume-cloud-platform",
+      "text": "Packaged services as non-root Docker images and coordinated dependencies with Compose.\n\nDeployed workloads to Kubernetes with Helm values, health probes, and resource limits.\n\nCreated GitHub Actions pipelines for tests, dependency caching, images, and release artifacts.\n\nConnected OpenTelemetry traces, Prometheus metrics, and Grafana dashboards.",
+      "spans": [
+        {
+          "spanId": "resume-cloud-platform:containers",
+          "start": 0,
+          "end": 86
+        },
+        {
+          "spanId": "resume-cloud-platform:kubernetes",
+          "start": 88,
+          "end": 174
+        },
+        {
+          "spanId": "resume-cloud-platform:ci",
+          "start": 176,
+          "end": 270
+        },
+        {
+          "spanId": "resume-cloud-platform:telemetry",
+          "start": 272,
+          "end": 347
+        }
+      ]
+    },
+    {
+      "documentId": "resume-data-platform",
+      "text": "Modeled analytics tables in SQL and dbt with tested incremental transformations.\n\nProcessed Kafka events with Spark Structured Streaming and checkpoint recovery.\n\nDefined freshness, schema, and null-rate data quality checks with alerting.\n\nAnalyzed product funnels and A/B experiments with confidence intervals.",
+      "spans": [
+        {
+          "spanId": "resume-data-platform:warehouse",
+          "start": 0,
+          "end": 80
+        },
+        {
+          "spanId": "resume-data-platform:streaming",
+          "start": 82,
+          "end": 161
+        },
+        {
+          "spanId": "resume-data-platform:quality",
+          "start": 163,
+          "end": 238
+        },
+        {
+          "spanId": "resume-data-platform:experimentation",
+          "start": 240,
+          "end": 311
+        }
+      ]
+    },
+    {
+      "documentId": "resume-zh-reliability",
+      "text": "设计任务状态机，通过条件更新完成任务认领和状态迁移。\n\n实现事务型 Outbox、发布确认、失败重试与幂等消费。\n\n使用 Redis 构建旁路缓存，缓存故障时回源 MySQL。\n\n接入关联 ID、Micrometer 指标和结构化日志。",
+      "spans": [
+        {
+          "spanId": "resume-zh-reliability:state-machine",
+          "start": 0,
+          "end": 26
+        },
+        {
+          "spanId": "resume-zh-reliability:outbox",
+          "start": 28,
+          "end": 56
+        },
+        {
+          "spanId": "resume-zh-reliability:cache",
+          "start": 58,
+          "end": 88
+        },
+        {
+          "spanId": "resume-zh-reliability:observability",
+          "start": 90,
+          "end": 118
+        }
+      ]
+    },
+    {
+      "documentId": "resume-zh-rag",
+      "text": "实现文档清洗、分段切分和来源位置记录。\n\n使用多语种向量模型完成语义检索，并缓存文档向量。\n\n融合 BM25 与向量召回，并使用重排模型优化 Top-K。\n\n建立检索评测集，计算 Recall、MRR 和无关查询误召回率。",
+      "spans": [
+        {
+          "spanId": "resume-zh-rag:chunking",
+          "start": 0,
+          "end": 19
+        },
+        {
+          "spanId": "resume-zh-rag:dense",
+          "start": 21,
+          "end": 45
+        },
+        {
+          "spanId": "resume-zh-rag:hybrid",
+          "start": 47,
+          "end": 77
+        },
+        {
+          "spanId": "resume-zh-rag:evaluation",
+          "start": 79,
+          "end": 111
+        }
+      ]
+    },
+    {
+      "documentId": "resume-mixed-fullstack",
+      "text": "负责 Java backend，使用 Spring Boot、MySQL 和 RabbitMQ。\n\n编写 Python Agent 服务，实现 tool calling 与 evidence grounding。\n\n交付 React 前端，支持异步轮询、失败重试和报告展示。\n\nCI 中运行 JUnit、pytest、Vitest and Playwright tests。",
+      "spans": [
+        {
+          "spanId": "resume-mixed-fullstack:backend",
+          "start": 0,
+          "end": 48
+        },
+        {
+          "spanId": "resume-mixed-fullstack:agent",
+          "start": 50,
+          "end": 106
+        },
+        {
+          "spanId": "resume-mixed-fullstack:frontend",
+          "start": 108,
+          "end": 137
+        },
+        {
+          "spanId": "resume-mixed-fullstack:quality",
+          "start": 139,
+          "end": 187
+        }
+      ]
+    },
+    {
+      "documentId": "resume-negative-evidence",
+      "text": "该项目未使用 Kubernetes，仅通过 Docker Compose 在本地运行。\n\n没有真实生产流量，所有性能数据均来自本机测试。\n\n未接入向量数据库，当前检索使用本地 hashing 方法。\n\n没有团队管理经历，项目由个人独立完成。",
+      "spans": [
+        {
+          "spanId": "resume-negative-evidence:kubernetes",
+          "start": 0,
+          "end": 43
+        },
+        {
+          "spanId": "resume-negative-evidence:traffic",
+          "start": 45,
+          "end": 68
+        },
+        {
+          "spanId": "resume-negative-evidence:vector-db",
+          "start": 70,
+          "end": 99
+        },
+        {
+          "spanId": "resume-negative-evidence:management",
+          "start": 101,
+          "end": 120
+        }
+      ]
+    },
+    {
+      "documentId": "resume-long-noisy",
+      "text": "neutralword0 neutralword1 neutralword2 neutralword3 neutralword4 neutralword5 neutralword6 neutralword7 neutralword8 neutralword9 neutralword10 neutralword11 neutralword12 neutralword13 neutralword14 neutralword15 neutralword16 neutralword17 neutralword18 neutralword19 neutralword20 neutralword21 neutralword22 neutralword23 neutralword24 neutralword25 neutralword26 neutralword27 neutralword28 neutralword29 neutralword30 neutralword31 neutralword32 neutralword33 neutralword34 neutralword35 neutralword36 neutralword37 neutralword38 neutralword39 neutralword40 neutralword41 neutralword42 neutralword43 neutralword44 neutralword45 neutralword46 neutralword47 neutralword48 neutralword49 neutralword50 neutralword51 neutralword52 neutralword53 neutralword54 neutralword55 neutralword56 neutralword57 neutralword58 neutralword59 neutralword60 neutralword61 neutralword62 neutralword63 neutralword64 neutralword65 neutralword66 neutralword67 neutralword68 neutralword69 neutralword70 neutralword71 neutralword72 neutralword73 neutralword74 neutralword75 neutralword76 neutralword77 neutralword78 neutralword79 neutralword80 neutralword81 neutralword82 neutralword83 neutralword84 neutralword85 neutralword86 neutralword87 neutralword88 neutralword89 neutralword90 neutralword91 neutralword92 neutralword93 neutralword94 neutralword95 neutralword96 neutralword97 neutralword98 neutralword99 neutralword100 neutralword101 neutralword102 neutralword103 neutralword104 neutralword105 neutralword106 neutralword107 neutralword108 neutralword109 neutralword110 neutralword111 neutralword112 neutralword113 neutralword114 neutralword115 neutralword116 neutralword117 neutralword118 neutralword119 neutralword120 neutralword121 neutralword122 neutralword123 neutralword124 neutralword125 neutralword126 neutralword127 neutralword128 neutralword129 neutralword130 neutralword131 neutralword132 neutralword133 neutralword134 neutralword135 neutralword136 neutralword137 neutralword138 neutralword139 neutralword140 neutralword141 neutralword142 neutralword143 neutralword144 neutralword145 neutralword146 neutralword147 neutralword148 neutralword149 neutralword150 neutralword151 neutralword152 neutralword153 neutralword154 neutralword155 neutralword156 neutralword157 neutralword158 neutralword159 neutralword160 neutralword161 neutralword162 neutralword163 neutralword164 neutralword165 neutralword166 neutralword167 neutralword168 neutralword169 neutralword170 neutralword171 neutralword172 neutralword173 neutralword174 neutralword175 neutralword176 neutralword177 neutralword178 neutralword179 Implemented Temporal workflow orchestration and durable timers.\n\nBuilt Elasticsearch search relevance tests. fillerword0 fillerword1 fillerword2 fillerword3 fillerword4 fillerword5 fillerword6 fillerword7 fillerword8 fillerword9 fillerword10 fillerword11 fillerword12 fillerword13 fillerword14 fillerword15 fillerword16 fillerword17 fillerword18 fillerword19 fillerword20 fillerword21 fillerword22 fillerword23 fillerword24 fillerword25 fillerword26 fillerword27 fillerword28 fillerword29 fillerword30 fillerword31 fillerword32 fillerword33 fillerword34 fillerword35 fillerword36 fillerword37 fillerword38 fillerword39 fillerword40 fillerword41 fillerword42 fillerword43 fillerword44 fillerword45 fillerword46 fillerword47 fillerword48 fillerword49 fillerword50 fillerword51 fillerword52 fillerword53 fillerword54 fillerword55 fillerword56 fillerword57 fillerword58 fillerword59 fillerword60 fillerword61 fillerword62 fillerword63 fillerword64 fillerword65 fillerword66 fillerword67 fillerword68 fillerword69 fillerword70 fillerword71 fillerword72 fillerword73 fillerword74 fillerword75 fillerword76 fillerword77 fillerword78 fillerword79 fillerword80 fillerword81 fillerword82 fillerword83 fillerword84 fillerword85 fillerword86 fillerword87 fillerword88 fillerword89 fillerword90 fillerword91 fillerword92 fillerword93 fillerword94 fillerword95 fillerword96 fillerword97 fillerword98 fillerword99 fillerword100 fillerword101 fillerword102 fillerword103 fillerword104 fillerword105 fillerword106 fillerword107 fillerword108 fillerword109 fillerword110 fillerword111 fillerword112 fillerword113 fillerword114 fillerword115 fillerword116 fillerword117 fillerword118 fillerword119 fillerword120 fillerword121 fillerword122 fillerword123 fillerword124 fillerword125 fillerword126 fillerword127 fillerword128 fillerword129 fillerword130 fillerword131 fillerword132 fillerword133 fillerword134 fillerword135 fillerword136 fillerword137 fillerword138 fillerword139 fillerword140 fillerword141 fillerword142 fillerword143 fillerword144 fillerword145 fillerword146 fillerword147 fillerword148 fillerword149 fillerword150 fillerword151 fillerword152 fillerword153 fillerword154 fillerword155 fillerword156 fillerword157 fillerword158 fillerword159 fillerword160 fillerword161 fillerword162 fillerword163 fillerword164 fillerword165 fillerword166 fillerword167 fillerword168 fillerword169 fillerword170 fillerword171 fillerword172 fillerword173 fillerword174 fillerword175 fillerword176 fillerword177 fillerword178 fillerword179\n\nMaintained concise ADR documents for architecture decisions.",
+      "spans": [
+        {
+          "spanId": "resume-long-noisy:long-tail",
+          "start": 0,
+          "end": 2653
+        },
+        {
+          "spanId": "resume-long-noisy:long-head",
+          "start": 2655,
+          "end": 5108
+        },
+        {
+          "spanId": "resume-long-noisy:compact",
+          "start": 5110,
+          "end": 5170
+        }
+      ]
+    },
+    {
+      "documentId": "resume-general-operations",
+      "text": "Coordinated weekly schedules and documented meeting decisions.\n\nAnswered customer questions and maintained a searchable help center.\n\nPrepared monthly spreadsheet reports for inventory and purchasing.",
+      "spans": [
+        {
+          "spanId": "resume-general-operations:coordination",
+          "start": 0,
+          "end": 62
+        },
+        {
+          "spanId": "resume-general-operations:support",
+          "start": 64,
+          "end": 132
+        },
+        {
+          "spanId": "resume-general-operations:reporting",
+          "start": 134,
+          "end": 200
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "resume-java-platform:java-spring",
+      "documentId": "resume-java-platform",
+      "query": "Java Spring Boot",
+      "relevantSpanIds": [
+        "resume-java-platform:architecture"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-java-platform:rabbit-outbox",
+      "documentId": "resume-java-platform",
+      "query": "RabbitMQ outbox idempotency",
+      "relevantSpanIds": [
+        "resume-java-platform:messaging"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-java-platform:reliable-events",
+      "documentId": "resume-java-platform",
+      "query": "reliable event delivery",
+      "relevantSpanIds": [
+        "resume-java-platform:messaging"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-java-platform:monitoring-traces",
+      "documentId": "resume-java-platform",
+      "query": "monitoring and distributed traces",
+      "relevantSpanIds": [
+        "resume-java-platform:observability"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-java-platform:no-mainframe",
+      "documentId": "resume-java-platform",
+      "query": "COBOL mainframe zOS",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-python-agent:fastapi-tools",
+      "documentId": "resume-python-agent",
+      "query": "FastAPI tool calling",
+      "relevantSpanIds": [
+        "resume-python-agent:runtime"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-python-agent:claim-citations",
+      "documentId": "resume-python-agent",
+      "query": "claim evidence citations",
+      "relevantSpanIds": [
+        "resume-python-agent:grounding"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-python-agent:adversarial-eval",
+      "documentId": "resume-python-agent",
+      "query": "adversarial prompt safety evaluation",
+      "relevantSpanIds": [
+        "resume-python-agent:evaluation"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-python-agent:token-cost",
+      "documentId": "resume-python-agent",
+      "query": "token usage cost tracking",
+      "relevantSpanIds": [
+        "resume-python-agent:usage"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "partial"
+      ]
+    },
+    {
+      "id": "resume-python-agent:no-robotics",
+      "documentId": "resume-python-agent",
+      "query": "ROS robotics SLAM",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-react-product:react-ts",
+      "documentId": "resume-react-product",
+      "query": "React TypeScript responsive UI",
+      "relevantSpanIds": [
+        "resume-react-product:frontend"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-react-product:request-cache",
+      "documentId": "resume-react-product",
+      "query": "server state request caching",
+      "relevantSpanIds": [
+        "resume-react-product:server-state"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-react-product:a11y-keyboard",
+      "documentId": "resume-react-product",
+      "query": "accessible keyboard interaction",
+      "relevantSpanIds": [
+        "resume-react-product:accessibility"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-react-product:safe-markdown",
+      "documentId": "resume-react-product",
+      "query": "XSS safe Markdown CSP",
+      "relevantSpanIds": [
+        "resume-react-product:security"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-react-product:no-fortran",
+      "documentId": "resume-react-product",
+      "query": "Fortran numerical solver",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-ml-engineering:pytorch-transformer",
+      "documentId": "resume-ml-engineering",
+      "query": "PyTorch transformer",
+      "relevantSpanIds": [
+        "resume-ml-engineering:deep-learning"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-ml-engineering:classification-baseline",
+      "documentId": "resume-ml-engineering",
+      "query": "classification baseline cross validation",
+      "relevantSpanIds": [
+        "resume-ml-engineering:classical-ml"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-ml-engineering:workflow-scheduler",
+      "documentId": "resume-ml-engineering",
+      "query": "ML workflow scheduler",
+      "relevantSpanIds": [
+        "resume-ml-engineering:orchestration"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-ml-engineering:model-serving",
+      "documentId": "resume-ml-engineering",
+      "query": "model serving latency",
+      "relevantSpanIds": [
+        "resume-ml-engineering:serving"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-ml-engineering:no-vision",
+      "documentId": "resume-ml-engineering",
+      "query": "OpenCV image segmentation",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-cloud-platform:docker-compose",
+      "documentId": "resume-cloud-platform",
+      "query": "Docker Compose containers",
+      "relevantSpanIds": [
+        "resume-cloud-platform:containers"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-cloud-platform:k8s-helm",
+      "documentId": "resume-cloud-platform",
+      "query": "Kubernetes Helm deployment",
+      "relevantSpanIds": [
+        "resume-cloud-platform:kubernetes"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-cloud-platform:build-pipeline",
+      "documentId": "resume-cloud-platform",
+      "query": "continuous integration pipeline",
+      "relevantSpanIds": [
+        "resume-cloud-platform:ci"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-cloud-platform:observability-stack",
+      "documentId": "resume-cloud-platform",
+      "query": "distributed tracing Prometheus Grafana",
+      "relevantSpanIds": [
+        "resume-cloud-platform:telemetry"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "partial"
+      ]
+    },
+    {
+      "id": "resume-cloud-platform:no-design",
+      "documentId": "resume-cloud-platform",
+      "query": "Photoshop illustration",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-data-platform:dbt-sql",
+      "documentId": "resume-data-platform",
+      "query": "SQL dbt transformations",
+      "relevantSpanIds": [
+        "resume-data-platform:warehouse"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-data-platform:kafka-spark",
+      "documentId": "resume-data-platform",
+      "query": "Kafka Spark streaming",
+      "relevantSpanIds": [
+        "resume-data-platform:streaming"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-data-platform:data-validation",
+      "documentId": "resume-data-platform",
+      "query": "dataset validation alerts",
+      "relevantSpanIds": [
+        "resume-data-platform:quality"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-data-platform:ab-testing",
+      "documentId": "resume-data-platform",
+      "query": "A/B experiment confidence interval",
+      "relevantSpanIds": [
+        "resume-data-platform:experimentation"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-data-platform:no-mobile",
+      "documentId": "resume-data-platform",
+      "query": "SwiftUI iOS application",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-zh-reliability:state-claim",
+      "documentId": "resume-zh-reliability",
+      "query": "任务状态机 条件认领",
+      "relevantSpanIds": [
+        "resume-zh-reliability:state-machine"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "zh",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-zh-reliability:outbox-retry",
+      "documentId": "resume-zh-reliability",
+      "query": "事务消息 幂等 重试",
+      "relevantSpanIds": [
+        "resume-zh-reliability:outbox"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "zh",
+        "partial"
+      ]
+    },
+    {
+      "id": "resume-zh-reliability:cache-fallback",
+      "documentId": "resume-zh-reliability",
+      "query": "缓存故障 数据库回源",
+      "relevantSpanIds": [
+        "resume-zh-reliability:cache"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "zh",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-zh-reliability:trace-metrics",
+      "documentId": "resume-zh-reliability",
+      "query": "链路追踪 监控指标",
+      "relevantSpanIds": [
+        "resume-zh-reliability:observability"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "zh",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-zh-reliability:no-game",
+      "documentId": "resume-zh-reliability",
+      "query": "Unity 游戏引擎",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "zh",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-zh-rag:document-chunk",
+      "documentId": "resume-zh-rag",
+      "query": "文档切分 来源位置",
+      "relevantSpanIds": [
+        "resume-zh-rag:chunking"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "zh",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-zh-rag:semantic-search",
+      "documentId": "resume-zh-rag",
+      "query": "语义搜索 多语言 embedding",
+      "relevantSpanIds": [
+        "resume-zh-rag:dense"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "mixed",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-zh-rag:hybrid-rerank",
+      "documentId": "resume-zh-rag",
+      "query": "BM25 向量混合检索 重排",
+      "relevantSpanIds": [
+        "resume-zh-rag:hybrid"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "mixed",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-zh-rag:retrieval-metrics",
+      "documentId": "resume-zh-rag",
+      "query": "召回率 MRR 评测",
+      "relevantSpanIds": [
+        "resume-zh-rag:evaluation"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "mixed",
+        "partial"
+      ]
+    },
+    {
+      "id": "resume-zh-rag:no-accounting",
+      "documentId": "resume-zh-rag",
+      "query": "财务审计 税务申报",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "zh",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-mixed-fullstack:java-mq",
+      "documentId": "resume-mixed-fullstack",
+      "query": "Java RabbitMQ 后端",
+      "relevantSpanIds": [
+        "resume-mixed-fullstack:backend"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "mixed",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-mixed-fullstack:agent-grounding",
+      "documentId": "resume-mixed-fullstack",
+      "query": "Agent 工具调用 证据约束",
+      "relevantSpanIds": [
+        "resume-mixed-fullstack:agent"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "mixed",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-mixed-fullstack:react-poll",
+      "documentId": "resume-mixed-fullstack",
+      "query": "React polling retry",
+      "relevantSpanIds": [
+        "resume-mixed-fullstack:frontend"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "mixed",
+        "partial"
+      ]
+    },
+    {
+      "id": "resume-mixed-fullstack:test-stack",
+      "documentId": "resume-mixed-fullstack",
+      "query": "pytest Playwright CI",
+      "relevantSpanIds": [
+        "resume-mixed-fullstack:quality"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "mixed",
+        "exact"
+      ]
+    },
+    {
+      "id": "resume-mixed-fullstack:no-blockchain",
+      "documentId": "resume-mixed-fullstack",
+      "query": "Solidity smart contract",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-negative-evidence:k8s-negative",
+      "documentId": "resume-negative-evidence",
+      "query": "Kubernetes 使用经验",
+      "relevantSpanIds": [
+        "resume-negative-evidence:kubernetes"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "zh",
+        "negation"
+      ]
+    },
+    {
+      "id": "resume-negative-evidence:traffic-negative",
+      "documentId": "resume-negative-evidence",
+      "query": "生产流量 性能",
+      "relevantSpanIds": [
+        "resume-negative-evidence:traffic"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "zh",
+        "negation"
+      ]
+    },
+    {
+      "id": "resume-negative-evidence:vector-negative",
+      "documentId": "resume-negative-evidence",
+      "query": "向量数据库",
+      "relevantSpanIds": [
+        "resume-negative-evidence:vector-db"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "zh",
+        "negation"
+      ]
+    },
+    {
+      "id": "resume-negative-evidence:leadership-negative",
+      "documentId": "resume-negative-evidence",
+      "query": "团队管理",
+      "relevantSpanIds": [
+        "resume-negative-evidence:management"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "zh",
+        "negation"
+      ]
+    },
+    {
+      "id": "resume-negative-evidence:no-sap",
+      "documentId": "resume-negative-evidence",
+      "query": "SAP ABAP",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-long-noisy:tail-temporal",
+      "documentId": "resume-long-noisy",
+      "query": "Temporal durable workflow",
+      "relevantSpanIds": [
+        "resume-long-noisy:long-tail"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "long"
+      ]
+    },
+    {
+      "id": "resume-long-noisy:head-elastic",
+      "documentId": "resume-long-noisy",
+      "query": "Elasticsearch relevance",
+      "relevantSpanIds": [
+        "resume-long-noisy:long-head"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "long"
+      ]
+    },
+    {
+      "id": "resume-long-noisy:adr",
+      "documentId": "resume-long-noisy",
+      "query": "architecture decision records",
+      "relevantSpanIds": [
+        "resume-long-noisy:compact"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "synonym"
+      ]
+    },
+    {
+      "id": "resume-long-noisy:both-long",
+      "documentId": "resume-long-noisy",
+      "query": "workflow search relevance",
+      "relevantSpanIds": [
+        "resume-long-noisy:long-tail",
+        "resume-long-noisy:long-head"
+      ],
+      "noRelevantEvidence": false,
+      "tags": [
+        "en",
+        "multi-span"
+      ]
+    },
+    {
+      "id": "resume-long-noisy:no-quantum",
+      "documentId": "resume-long-noisy",
+      "query": "quantum circuit Qiskit",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-general-operations:no-rust",
+      "documentId": "resume-general-operations",
+      "query": "Rust Tokio async runtime",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-general-operations:no-llm",
+      "documentId": "resume-general-operations",
+      "query": "large language model fine tuning",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-general-operations:no-rabbit",
+      "documentId": "resume-general-operations",
+      "query": "RabbitMQ transactional outbox",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-general-operations:no-k8s",
+      "documentId": "resume-general-operations",
+      "query": "Kubernetes Helm",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "en",
+        "no-evidence"
+      ]
+    },
+    {
+      "id": "resume-general-operations:no-rag",
+      "documentId": "resume-general-operations",
+      "query": "向量检索 重排",
+      "relevantSpanIds": [],
+      "noRelevantEvidence": true,
+      "tags": [
+        "zh",
+        "no-evidence"
+      ]
+    }
+  ]
+}

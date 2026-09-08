@@ -204,6 +204,51 @@ class AnalysisTaskServiceTest {
     }
 
     @Test
+    void schedulesRetryUsingAttemptAndProviderRetryAfter() {
+        AnalysisTaskRepository taskRepository = mock(AnalysisTaskRepository.class);
+        MatchReportRepository reportRepository = mock(MatchReportRepository.class);
+        AnalysisRetryPolicy retryPolicy = mock(AnalysisRetryPolicy.class);
+        AnalysisTaskService service = new AnalysisTaskService(
+            taskRepository,
+            reportRepository,
+            Duration.ofMinutes(15),
+            retryPolicy
+        );
+        AnalysisTask task = new AnalysisTask(1L, 2L);
+        task.markRunning();
+        when(taskRepository.findById(99L)).thenReturn(Optional.of(task));
+        when(retryPolicy.delayForAttempt(1, 90)).thenReturn(Duration.ofSeconds(90));
+        when(taskRepository.markFailure(
+            eq(99L),
+            eq(AnalysisTask.Status.FAILED_RETRYABLE),
+            eq(AnalysisTask.Status.RUNNING),
+            eq(1),
+            eq(AnalysisFailureCode.AI_UNAVAILABLE),
+            eq("Analysis service is temporarily unavailable"),
+            any(),
+            any()
+        )).thenReturn(1);
+        LocalDateTime earliest = LocalDateTime.now().plusSeconds(89);
+        LocalDateTime latest = LocalDateTime.now().plusSeconds(91);
+
+        assertThat(service.markRetryableFailure(99L, 1, AnalysisFailureCode.AI_UNAVAILABLE, 90)).isTrue();
+
+        ArgumentCaptor<LocalDateTime> nextRetryAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(retryPolicy).delayForAttempt(1, 90);
+        verify(taskRepository).markFailure(
+            eq(99L),
+            eq(AnalysisTask.Status.FAILED_RETRYABLE),
+            eq(AnalysisTask.Status.RUNNING),
+            eq(1),
+            eq(AnalysisFailureCode.AI_UNAVAILABLE),
+            eq("Analysis service is temporarily unavailable"),
+            nextRetryAtCaptor.capture(),
+            any()
+        );
+        assertThat(nextRetryAtCaptor.getValue()).isBetween(earliest, latest);
+    }
+
+    @Test
     void staleAttemptCannotFailCurrentLease() {
         AnalysisTaskRepository taskRepository = mock(AnalysisTaskRepository.class);
         MatchReportRepository reportRepository = mock(MatchReportRepository.class);

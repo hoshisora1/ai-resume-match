@@ -1,0 +1,1279 @@
+{
+  "schemaVersion": "retrieval-eval-result-v1",
+  "datasetVersion": "retrieval-qrels-v1",
+  "datasetSha256": "c8423cc910a6959cae9697ea341e8cc489b7c37d80f408c5927ccc05c334932c",
+  "retriever": {
+    "name": "HashingRetriever",
+    "version": "hashing-blake2b-256-v1",
+    "topK": 5,
+    "dimensions": 256,
+    "minimumRelevanceScore": 0.08,
+    "chunkSize": 600,
+    "chunkOverlap": 100
+  },
+  "metrics": {
+    "cases": 60,
+    "positiveCases": 44,
+    "noEvidenceCases": 16,
+    "recallAt5": 0.886364,
+    "mrrAt5": 0.863636,
+    "falsePositiveRate": 0.0,
+    "falsePositiveCases": 0,
+    "retrievalP95Ms": 0.0452
+  },
+  "results": [
+    {
+      "id": "resume-java-platform:java-spring",
+      "documentId": "resume-java-platform",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.547723,
+          "sourceStart": 0,
+          "sourceEnd": 77,
+          "matchedRelevantSpanIds": [
+            "resume-java-platform:architecture"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-java-platform:rabbit-outbox",
+      "documentId": "resume-java-platform",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:1",
+          "score": 0.57735,
+          "sourceStart": 79,
+          "sourceEnd": 174,
+          "matchedRelevantSpanIds": [
+            "resume-java-platform:messaging"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-java-platform:reliable-events",
+      "documentId": "resume-java-platform",
+      "tags": [
+        "en",
+        "synonym"
+      ],
+      "retrieved": [],
+      "recall": 0.0,
+      "reciprocalRank": 0.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-java-platform:monitoring-traces",
+      "documentId": "resume-java-platform",
+      "tags": [
+        "en",
+        "synonym"
+      ],
+      "retrieved": [],
+      "recall": 0.0,
+      "reciprocalRank": 0.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-java-platform:no-mainframe",
+      "documentId": "resume-java-platform",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-python-agent:fastapi-tools",
+      "documentId": "resume-python-agent",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.480384,
+          "sourceStart": 0,
+          "sourceEnd": 109,
+          "matchedRelevantSpanIds": [
+            "resume-python-agent:runtime"
+          ]
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:3",
+          "score": 0.174078,
+          "sourceStart": 299,
+          "sourceEnd": 380,
+          "matchedRelevantSpanIds": []
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-python-agent:claim-citations",
+      "documentId": "resume-python-agent",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:2",
+          "score": 0.333333,
+          "sourceStart": 193,
+          "sourceEnd": 297,
+          "matchedRelevantSpanIds": []
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:1",
+          "score": 0.320256,
+          "sourceStart": 111,
+          "sourceEnd": 191,
+          "matchedRelevantSpanIds": [
+            "resume-python-agent:grounding"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 0.5,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-python-agent:adversarial-eval",
+      "documentId": "resume-python-agent",
+      "tags": [
+        "en",
+        "synonym"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:2",
+          "score": 0.144338,
+          "sourceStart": 193,
+          "sourceEnd": 297,
+          "matchedRelevantSpanIds": [
+            "resume-python-agent:evaluation"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-python-agent:token-cost",
+      "documentId": "resume-python-agent",
+      "tags": [
+        "en",
+        "partial"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:3",
+          "score": 0.301511,
+          "sourceStart": 299,
+          "sourceEnd": 380,
+          "matchedRelevantSpanIds": [
+            "resume-python-agent:usage"
+          ]
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:2",
+          "score": 0.144338,
+          "sourceStart": 193,
+          "sourceEnd": 297,
+          "matchedRelevantSpanIds": []
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-python-agent:no-robotics",
+      "documentId": "resume-python-agent",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-react-product:react-ts",
+      "documentId": "resume-react-product",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.53033,
+          "sourceStart": 0,
+          "sourceEnd": 85,
+          "matchedRelevantSpanIds": [
+            "resume-react-product:frontend"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-react-product:request-cache",
+      "documentId": "resume-react-product",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:1",
+          "score": 0.288675,
+          "sourceStart": 87,
+          "sourceEnd": 177,
+          "matchedRelevantSpanIds": [
+            "resume-react-product:server-state"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-react-product:a11y-keyboard",
+      "documentId": "resume-react-product",
+      "tags": [
+        "en",
+        "synonym"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:2",
+          "score": 0.182574,
+          "sourceStart": 179,
+          "sourceEnd": 275,
+          "matchedRelevantSpanIds": [
+            "resume-react-product:accessibility"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-react-product:safe-markdown",
+      "documentId": "resume-react-product",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:3",
+          "score": 0.301511,
+          "sourceStart": 277,
+          "sourceEnd": 368,
+          "matchedRelevantSpanIds": [
+            "resume-react-product:security"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-react-product:no-fortran",
+      "documentId": "resume-react-product",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-ml-engineering:pytorch-transformer",
+      "documentId": "resume-ml-engineering",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.471405,
+          "sourceStart": 0,
+          "sourceEnd": 86,
+          "matchedRelevantSpanIds": [
+            "resume-ml-engineering:deep-learning"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-ml-engineering:classification-baseline",
+      "documentId": "resume-ml-engineering",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:1",
+          "score": 0.188982,
+          "sourceStart": 88,
+          "sourceEnd": 176,
+          "matchedRelevantSpanIds": [
+            "resume-ml-engineering:classical-ml"
+          ]
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:0",
+          "score": 0.166667,
+          "sourceStart": 0,
+          "sourceEnd": 86,
+          "matchedRelevantSpanIds": []
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-ml-engineering:workflow-scheduler",
+      "documentId": "resume-ml-engineering",
+      "tags": [
+        "en",
+        "synonym"
+      ],
+      "retrieved": [],
+      "recall": 0.0,
+      "reciprocalRank": 0.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-ml-engineering:model-serving",
+      "documentId": "resume-ml-engineering",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.19245,
+          "sourceStart": 0,
+          "sourceEnd": 86,
+          "matchedRelevantSpanIds": []
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:3",
+          "score": 0.19245,
+          "sourceStart": 250,
+          "sourceEnd": 327,
+          "matchedRelevantSpanIds": [
+            "resume-ml-engineering:serving"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 0.5,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-ml-engineering:no-vision",
+      "documentId": "resume-ml-engineering",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-cloud-platform:docker-compose",
+      "documentId": "resume-cloud-platform",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.3849,
+          "sourceStart": 0,
+          "sourceEnd": 86,
+          "matchedRelevantSpanIds": [
+            "resume-cloud-platform:containers"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-cloud-platform:k8s-helm",
+      "documentId": "resume-cloud-platform",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:1",
+          "score": 0.3849,
+          "sourceStart": 88,
+          "sourceEnd": 174,
+          "matchedRelevantSpanIds": [
+            "resume-cloud-platform:kubernetes"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-cloud-platform:build-pipeline",
+      "documentId": "resume-cloud-platform",
+      "tags": [
+        "en",
+        "synonym"
+      ],
+      "retrieved": [],
+      "recall": 0.0,
+      "reciprocalRank": 0.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-cloud-platform:observability-stack",
+      "documentId": "resume-cloud-platform",
+      "tags": [
+        "en",
+        "partial"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:3",
+          "score": 0.377964,
+          "sourceStart": 272,
+          "sourceEnd": 347,
+          "matchedRelevantSpanIds": [
+            "resume-cloud-platform:telemetry"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-cloud-platform:no-design",
+      "documentId": "resume-cloud-platform",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-data-platform:dbt-sql",
+      "documentId": "resume-data-platform",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.612372,
+          "sourceStart": 0,
+          "sourceEnd": 80,
+          "matchedRelevantSpanIds": [
+            "resume-data-platform:warehouse"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-data-platform:kafka-spark",
+      "documentId": "resume-data-platform",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:1",
+          "score": 0.547723,
+          "sourceStart": 82,
+          "sourceEnd": 161,
+          "matchedRelevantSpanIds": [
+            "resume-data-platform:streaming"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-data-platform:data-validation",
+      "documentId": "resume-data-platform",
+      "tags": [
+        "en",
+        "synonym"
+      ],
+      "retrieved": [],
+      "recall": 0.0,
+      "reciprocalRank": 0.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-data-platform:ab-testing",
+      "documentId": "resume-data-platform",
+      "tags": [
+        "en",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:3",
+          "score": 0.377964,
+          "sourceStart": 240,
+          "sourceEnd": 311,
+          "matchedRelevantSpanIds": [
+            "resume-data-platform:experimentation"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-data-platform:no-mobile",
+      "documentId": "resume-data-platform",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-zh-reliability:state-claim",
+      "documentId": "resume-zh-reliability",
+      "tags": [
+        "zh",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.592999,
+          "sourceStart": 0,
+          "sourceEnd": 26,
+          "matchedRelevantSpanIds": [
+            "resume-zh-reliability:state-machine"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-zh-reliability:outbox-retry",
+      "documentId": "resume-zh-reliability",
+      "tags": [
+        "zh",
+        "partial"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:1",
+          "score": 0.421637,
+          "sourceStart": 28,
+          "sourceEnd": 56,
+          "matchedRelevantSpanIds": [
+            "resume-zh-reliability:outbox"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-zh-reliability:cache-fallback",
+      "documentId": "resume-zh-reliability",
+      "tags": [
+        "zh",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:2",
+          "score": 0.472456,
+          "sourceStart": 58,
+          "sourceEnd": 88,
+          "matchedRelevantSpanIds": [
+            "resume-zh-reliability:cache"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-zh-reliability:trace-metrics",
+      "documentId": "resume-zh-reliability",
+      "tags": [
+        "zh",
+        "synonym"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:3",
+          "score": 0.117851,
+          "sourceStart": 90,
+          "sourceEnd": 118,
+          "matchedRelevantSpanIds": [
+            "resume-zh-reliability:observability"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-zh-reliability:no-game",
+      "documentId": "resume-zh-reliability",
+      "tags": [
+        "zh",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-zh-rag:document-chunk",
+      "documentId": "resume-zh-rag",
+      "tags": [
+        "zh",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.527046,
+          "sourceStart": 0,
+          "sourceEnd": 19,
+          "matchedRelevantSpanIds": [
+            "resume-zh-rag:chunking"
+          ]
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:1",
+          "score": 0.087039,
+          "sourceStart": 21,
+          "sourceEnd": 45,
+          "matchedRelevantSpanIds": []
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-zh-rag:semantic-search",
+      "documentId": "resume-zh-rag",
+      "tags": [
+        "mixed",
+        "synonym"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:1",
+          "score": 0.261116,
+          "sourceStart": 21,
+          "sourceEnd": 45,
+          "matchedRelevantSpanIds": [
+            "resume-zh-rag:dense"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-zh-rag:hybrid-rerank",
+      "documentId": "resume-zh-rag",
+      "tags": [
+        "mixed",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:2",
+          "score": 0.27501,
+          "sourceStart": 47,
+          "sourceEnd": 77,
+          "matchedRelevantSpanIds": [
+            "resume-zh-rag:hybrid"
+          ]
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:1",
+          "score": 0.241747,
+          "sourceStart": 21,
+          "sourceEnd": 45,
+          "matchedRelevantSpanIds": []
+        },
+        {
+          "rank": 3,
+          "evidenceId": "resume:3",
+          "score": 0.09167,
+          "sourceStart": 79,
+          "sourceEnd": 111,
+          "matchedRelevantSpanIds": []
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-zh-rag:retrieval-metrics",
+      "documentId": "resume-zh-rag",
+      "tags": [
+        "mixed",
+        "partial"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:3",
+          "score": 0.485071,
+          "sourceStart": 79,
+          "sourceEnd": 111,
+          "matchedRelevantSpanIds": [
+            "resume-zh-rag:evaluation"
+          ]
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:2",
+          "score": 0.121268,
+          "sourceStart": 47,
+          "sourceEnd": 77,
+          "matchedRelevantSpanIds": []
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-zh-rag:no-accounting",
+      "documentId": "resume-zh-rag",
+      "tags": [
+        "zh",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-mixed-fullstack:java-mq",
+      "documentId": "resume-mixed-fullstack",
+      "tags": [
+        "mixed",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.522233,
+          "sourceStart": 0,
+          "sourceEnd": 48,
+          "matchedRelevantSpanIds": [
+            "resume-mixed-fullstack:backend"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-mixed-fullstack:agent-grounding",
+      "documentId": "resume-mixed-fullstack",
+      "tags": [
+        "mixed",
+        "synonym"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:1",
+          "score": 0.119523,
+          "sourceStart": 50,
+          "sourceEnd": 106,
+          "matchedRelevantSpanIds": [
+            "resume-mixed-fullstack:agent"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-mixed-fullstack:react-poll",
+      "documentId": "resume-mixed-fullstack",
+      "tags": [
+        "mixed",
+        "partial"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:2",
+          "score": 0.144338,
+          "sourceStart": 108,
+          "sourceEnd": 137,
+          "matchedRelevantSpanIds": [
+            "resume-mixed-fullstack:frontend"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-mixed-fullstack:test-stack",
+      "documentId": "resume-mixed-fullstack",
+      "tags": [
+        "mixed",
+        "exact"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:3",
+          "score": 0.547723,
+          "sourceStart": 139,
+          "sourceEnd": 187,
+          "matchedRelevantSpanIds": [
+            "resume-mixed-fullstack:quality"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-mixed-fullstack:no-blockchain",
+      "documentId": "resume-mixed-fullstack",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-negative-evidence:k8s-negative",
+      "documentId": "resume-negative-evidence",
+      "tags": [
+        "zh",
+        "negation"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:0",
+          "score": 0.25,
+          "sourceStart": 0,
+          "sourceEnd": 43,
+          "matchedRelevantSpanIds": [
+            "resume-negative-evidence:kubernetes"
+          ]
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:2",
+          "score": 0.125,
+          "sourceStart": 70,
+          "sourceEnd": 99,
+          "matchedRelevantSpanIds": []
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-negative-evidence:traffic-negative",
+      "documentId": "resume-negative-evidence",
+      "tags": [
+        "zh",
+        "negation"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:1",
+          "score": 0.545545,
+          "sourceStart": 45,
+          "sourceEnd": 68,
+          "matchedRelevantSpanIds": [
+            "resume-negative-evidence:traffic"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-negative-evidence:vector-negative",
+      "documentId": "resume-negative-evidence",
+      "tags": [
+        "zh",
+        "negation"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:2",
+          "score": 0.5,
+          "sourceStart": 70,
+          "sourceEnd": 99,
+          "matchedRelevantSpanIds": [
+            "resume-negative-evidence:vector-db"
+          ]
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:1",
+          "score": 0.109109,
+          "sourceStart": 45,
+          "sourceEnd": 68,
+          "matchedRelevantSpanIds": []
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-negative-evidence:leadership-negative",
+      "documentId": "resume-negative-evidence",
+      "tags": [
+        "zh",
+        "negation"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:3",
+          "score": 0.447214,
+          "sourceStart": 101,
+          "sourceEnd": 120,
+          "matchedRelevantSpanIds": [
+            "resume-negative-evidence:management"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-negative-evidence:no-sap",
+      "documentId": "resume-negative-evidence",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-long-noisy:tail-temporal",
+      "documentId": "resume-long-noisy",
+      "tags": [
+        "en",
+        "long"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:5",
+          "score": 0.5,
+          "sourceStart": 2500,
+          "sourceEnd": 2653,
+          "matchedRelevantSpanIds": [
+            "resume-long-noisy:long-tail"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-long-noisy:head-elastic",
+      "documentId": "resume-long-noisy",
+      "tags": [
+        "en",
+        "long"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:6",
+          "score": 0.187317,
+          "sourceStart": 2655,
+          "sourceEnd": 3255,
+          "matchedRelevantSpanIds": [
+            "resume-long-noisy:long-head"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-long-noisy:adr",
+      "documentId": "resume-long-noisy",
+      "tags": [
+        "en",
+        "synonym"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:11",
+          "score": 0.235702,
+          "sourceStart": 5110,
+          "sourceEnd": 5170,
+          "matchedRelevantSpanIds": [
+            "resume-long-noisy:compact"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-long-noisy:both-long",
+      "documentId": "resume-long-noisy",
+      "tags": [
+        "en",
+        "multi-span"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "evidenceId": "resume:5",
+          "score": 0.333333,
+          "sourceStart": 2500,
+          "sourceEnd": 2653,
+          "matchedRelevantSpanIds": [
+            "resume-long-noisy:long-tail"
+          ]
+        },
+        {
+          "rank": 2,
+          "evidenceId": "resume:6",
+          "score": 0.152944,
+          "sourceStart": 2655,
+          "sourceEnd": 3255,
+          "matchedRelevantSpanIds": [
+            "resume-long-noisy:long-head"
+          ]
+        }
+      ],
+      "recall": 1.0,
+      "reciprocalRank": 1.0,
+      "falsePositive": null
+    },
+    {
+      "id": "resume-long-noisy:no-quantum",
+      "documentId": "resume-long-noisy",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-general-operations:no-rust",
+      "documentId": "resume-general-operations",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-general-operations:no-llm",
+      "documentId": "resume-general-operations",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-general-operations:no-rabbit",
+      "documentId": "resume-general-operations",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-general-operations:no-k8s",
+      "documentId": "resume-general-operations",
+      "tags": [
+        "en",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    },
+    {
+      "id": "resume-general-operations:no-rag",
+      "documentId": "resume-general-operations",
+      "tags": [
+        "zh",
+        "no-evidence"
+      ],
+      "retrieved": [],
+      "recall": null,
+      "reciprocalRank": null,
+      "falsePositive": false
+    }
+  ],
+  "run": {
+    "commit": "9d9296c9a4ba705d13b16bd42555db72aea4cf25",
+    "workingTreeDirty": true,
+    "generatedAt": "2026-08-12T18:35:21.993401+00:00",
+    "runtime": "python"
+  }
+}

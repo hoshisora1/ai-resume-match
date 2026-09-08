@@ -100,7 +100,8 @@
 
 .analysis-detail__status,
 .analysis-detail__metadata,
-.analysis-detail__report {
+.analysis-detail__report,
+.analysis-detail__data-management {
   min-width: 0;
   padding: var(--space-6) 0;
   border-bottom: 1px solid var(--color-border);
@@ -120,7 +121,8 @@
 
 .analysis-detail__status h2,
 .analysis-detail__metadata h2,
-.analysis-detail__report h2 {
+.analysis-detail__report h2,
+.analysis-detail__data-management h2 {
   margin: 0;
   font-size: 1rem;
   line-height: 1.35;
@@ -201,6 +203,65 @@
   gap: var(--space-4);
 }
 
+.analysis-detail__data-management {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.analysis-detail__data-management > p {
+  max-width: 46rem;
+  margin: 0;
+  color: var(--color-ink-soft);
+}
+
+.analysis-detail__dialog-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgb(15 31 35 / 58%);
+}
+
+.analysis-detail__dialog {
+  display: grid;
+  width: min(100%, 31rem);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  box-shadow: 0 1.25rem 3rem rgb(15 31 35 / 24%);
+}
+
+.analysis-detail__dialog-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-danger);
+}
+
+.analysis-detail__dialog-heading h2,
+.analysis-detail__dialog > p {
+  margin: 0;
+}
+
+.analysis-detail__dialog > p {
+  color: var(--color-ink-soft);
+  line-height: 1.65;
+}
+
+.analysis-detail__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 .analysis-detail__report-error {
   display: flex;
   min-width: 0;
@@ -252,7 +313,8 @@
 
   .analysis-detail__status,
   .analysis-detail__metadata,
-  .analysis-detail__report {
+  .analysis-detail__report,
+  .analysis-detail__data-management {
     padding-block: var(--space-5);
   }
 
@@ -268,8 +330,13 @@
   }
 
   .analysis-detail__actions > .button,
-  .analysis-detail__connection-actions > .button {
+  .analysis-detail__connection-actions > .button,
+  .analysis-detail__dialog-actions > .button {
     width: 100%;
+  }
+
+  .analysis-detail__dialog-actions {
+    flex-direction: column-reverse;
   }
 }
 

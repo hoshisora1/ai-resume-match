@@ -1,10 +1,10 @@
 package com.zhulikang.aimatch.analysis;
 
 import com.zhulikang.aimatch.application.analysis.AnalysisTaskPublisher;
+import com.zhulikang.aimatch.config.AnalysisProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -31,10 +31,15 @@ public class RunningTaskRecoveryScheduler {
     public RunningTaskRecoveryScheduler(
         AnalysisTaskRepository taskRepository,
         AnalysisTaskPublisher publisher,
-        @Value("${analysis.running-timeout:15m}") Duration runningTimeout,
-        @Value("${analysis.running-recovery.batch-size:20}") int batchSize
+        AnalysisProperties properties
     ) {
-        this(taskRepository, publisher, runningTimeout, batchSize, Clock.systemDefaultZone());
+        this(
+            taskRepository,
+            publisher,
+            properties.runningTimeout(),
+            properties.runningRecovery().batchSize(),
+            Clock.systemDefaultZone()
+        );
     }
 
     RunningTaskRecoveryScheduler(

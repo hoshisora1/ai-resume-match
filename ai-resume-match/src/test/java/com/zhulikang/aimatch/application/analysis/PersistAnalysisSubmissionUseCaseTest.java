@@ -6,7 +6,9 @@ import com.zhulikang.aimatch.application.resume.PreparedResume;
 import com.zhulikang.aimatch.job.JobDescription;
 import com.zhulikang.aimatch.resume.Resume;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import com.zhulikang.aimatch.support.RequestOwnerExtension;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -16,6 +18,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(RequestOwnerExtension.class)
 class PersistAnalysisSubmissionUseCaseTest {
     @Test
     void persistsResumeJobAndTaskAsOneSubmission() {
@@ -27,8 +30,8 @@ class PersistAnalysisSubmissionUseCaseTest {
             createJobDescriptionUseCase,
             taskCreator
         );
-        PreparedResume prepared = new PreparedResume("resume.pdf", "Java Redis", "Java Redis");
-        Resume savedResume = new Resume("resume.pdf", "Java Redis", "Java Redis");
+        PreparedResume prepared = new PreparedResume("resume.pdf", "Java Redis");
+        Resume savedResume = new Resume("resume.pdf", "Java Redis");
         ReflectionTestUtils.setField(savedResume, "id", 10L);
         JobDescription savedJob = new JobDescription("Backend Engineer", "Java Redis", "Java,Redis");
         ReflectionTestUtils.setField(savedJob, "id", 20L);

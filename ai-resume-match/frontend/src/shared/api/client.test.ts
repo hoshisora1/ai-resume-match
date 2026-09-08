@@ -198,6 +198,11 @@ describe('apiRequest', () => {
       http.get('/api/analysis/404', () =>
         HttpResponse.json(
           {
+            type: 'urn:ai-resume-match:problem:not-found',
+            title: 'Not Found',
+            status: 404,
+            detail: 'Analysis task not found',
+            instance: '/api/analysis/404',
             code: 'NOT_FOUND',
             message: 'Analysis task not found',
             requestId: 'req-404',
@@ -624,6 +629,9 @@ describe('analysis endpoints', () => {
       taskId: 30,
       matchScore: 88,
       reportContent: '# 匹配报告',
+      reportSchemaVersion: 'markdown-v1',
+      structuredReport: null,
+      provenance: null,
       createdAt: '2026-07-10T09:05:00',
     }
     server.use(
@@ -651,6 +659,9 @@ describe('analysis endpoints', () => {
         taskId: 30,
         matchScore: 88,
         reportContent: '# 匹配报告',
+        reportSchemaVersion: 'markdown-v1',
+        structuredReport: null,
+        provenance: null,
         createdAt: '2026-07-10T09:05:00',
       },
     ],

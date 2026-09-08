@@ -1,4 +1,5 @@
 import { apiRequest } from './client'
+import { z } from 'zod'
 import {
   analysisPageSchema,
   analysisSummarySchema,
@@ -77,6 +78,13 @@ export function getAnalysisTask(taskId: number, signal?: AbortSignal) {
 export function retryAnalysisTask(taskId: number, signal?: AbortSignal) {
   return apiRequest(`/api/analysis/${taskId}/retry`, analysisTaskSchema, {
     method: 'POST',
+    ...(signal ? { signal } : {}),
+  })
+}
+
+export function deleteAnalysisTask(taskId: number, signal?: AbortSignal) {
+  return apiRequest(`/api/analysis/${taskId}`, z.null(), {
+    method: 'DELETE',
     ...(signal ? { signal } : {}),
   })
 }

@@ -10,10 +10,13 @@ import com.zhulikang.aimatch.application.analysis.AnalysisTaskDetails;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisSubmissionUseCase;
 import com.zhulikang.aimatch.application.analysis.IdempotencyConflictException;
 import com.zhulikang.aimatch.application.analysis.CreateAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.DeleteAnalysisUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisSummaryUseCase;
 import com.zhulikang.aimatch.application.analysis.GetAnalysisTaskUseCase;
 import com.zhulikang.aimatch.application.analysis.ListAnalysisTasksUseCase;
 import com.zhulikang.aimatch.application.analysis.RetryAnalysisTaskUseCase;
+import com.zhulikang.aimatch.application.analysis.AnalysisRequestRateLimiter;
+import com.zhulikang.aimatch.application.analysis.RateLimitExceededException;
 import com.zhulikang.aimatch.application.job.CreateJobDescriptionUseCase;
 import com.zhulikang.aimatch.application.report.GetMatchReportUseCase;
 import com.zhulikang.aimatch.application.resume.UploadResumeUseCase;
@@ -44,11 +47,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @WebMvcTest(ResumeMatchController.class)
 @TestPropertySource(properties = "api.token=test-token")
@@ -74,11 +79,55 @@ class ResumeMatchControllerTest {
     GetMatchReportUseCase getMatchReportUseCase;
     @MockBean
     RetryAnalysisTaskUseCase retryAnalysisTaskUseCase;
+    @MockBean
+    DeleteAnalysisUseCase deleteAnalysisUseCase;
+    @MockBean
+    AnalysisRequestRateLimiter analysisRequestRateLimiter;
+
+    @Test
+    void issuesHttpOnlyAnonymousSessionOnlyAfterGatewayAuthentication() throws Exception {
+        when(getAnalysisSummaryUseCase.get()).thenReturn(new AnalysisSummary(0, 0, 0, 0, null));
+        mockMvc.perform(get("/api/analysis/summary")
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.allOf(
+                org.hamcrest.Matchers.containsString("AI_MATCH_SESSION="),
+                org.hamcrest.Matchers.containsString("HttpOnly"),
+                org.hamcrest.Matchers.containsString("SameSite=Strict")
+            )));
+
+        mockMvc.perform(get("/api/analysis/summary"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(header().doesNotExist("Set-Cookie"));
+    }
+
+    @Test
+    void rejectsOverQuotaAnalysisBeforeCreatingTask() throws Exception {
+        doThrow(new RateLimitExceededException(42))
+            .when(analysisRequestRateLimiter).consume(any());
+
+        mockMvc.perform(post("/api/analysis")
+                .header("X-API-Token", "test-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"resumeId\":1,\"jobDescriptionId\":2}"))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("Retry-After", "42"))
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"));
+
+        verifyNoInteractions(createAnalysisTaskUseCase);
+    }
 
     @Test
     void rejectsRequestWithoutApiToken() throws Exception {
         mockMvc.perform(get("/api/analysis/1/report"))
             .andExpect(status().isUnauthorized())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.type").value("urn:ai-resume-match:problem:unauthorized"))
+            .andExpect(jsonPath("$.title").value("Unauthorized"))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.detail").value("Unauthorized"))
+            .andExpect(jsonPath("$.instance").value("/api/analysis/1/report"))
             .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
             .andExpect(jsonPath("$.message").value("Unauthorized"));
     }
@@ -132,7 +181,7 @@ class ResumeMatchControllerTest {
             "application/pdf",
             new byte[] {1, 2, 3}
         );
-        Resume savedResume = new Resume("resume.pdf", "Java Redis", "Java Redis");
+        Resume savedResume = new Resume("resume.pdf", "Java Redis");
         ReflectionTestUtils.setField(savedResume, "id", 10L);
         when(uploadResumeUseCase.upload(file)).thenReturn(savedResume);
 
@@ -206,7 +255,8 @@ class ResumeMatchControllerTest {
                 .header("X-API-Token", "test-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"resumeId\":10,\"jobDescriptionId\":20}"))
-            .andExpect(status().isOk())
+            .andExpect(status().isAccepted())
+            .andExpect(header().string("Location", "/api/analysis/30"))
             .andExpect(jsonPath("$.taskId").value(30))
             .andExpect(jsonPath("$.status").value("PENDING"))
             .andExpect(jsonPath("$.resumeId").value(10))
@@ -221,7 +271,8 @@ class ResumeMatchControllerTest {
             .thenReturn(submission);
 
         mockMvc.perform(analysisSubmissionRequest(file, "Backend Engineer", "Java Redis"))
-            .andExpect(status().isOk())
+            .andExpect(status().isAccepted())
+            .andExpect(header().string("Location", "/api/analysis/30"))
             .andExpect(jsonPath("$.taskId").value(30))
             .andExpect(jsonPath("$.resumeId").value(10))
             .andExpect(jsonPath("$.jobDescriptionId").value(20))
@@ -250,7 +301,8 @@ class ResumeMatchControllerTest {
 
         mockMvc.perform(analysisSubmissionRequest(file, "Backend Engineer", "Java Redis")
                 .header("Idempotency-Key", "client-request_123:v1"))
-            .andExpect(status().isOk())
+            .andExpect(status().isAccepted())
+            .andExpect(header().string("Location", "/api/analysis/30"))
             .andExpect(jsonPath("$.taskId").value(30));
 
         verify(createAnalysisSubmissionUseCase).create(
@@ -296,6 +348,10 @@ class ResumeMatchControllerTest {
         mockMvc.perform(analysisSubmissionRequest(file, "Backend Engineer", "Java Redis")
                 .header("Idempotency-Key", "request-123"))
             .andExpect(status().isConflict())
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(409))
+            .andExpect(jsonPath("$.detail").value(IdempotencyConflictException.MESSAGE))
+            .andExpect(jsonPath("$.instance").value("/api/analysis-submissions"))
             .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"))
             .andExpect(jsonPath("$.message").value(IdempotencyConflictException.MESSAGE));
     }
@@ -373,7 +429,7 @@ class ResumeMatchControllerTest {
             .thenReturn(submission(title, "resume.pdf"));
 
         mockMvc.perform(analysisSubmissionRequest(file, title, "Java Redis"))
-            .andExpect(status().isOk())
+            .andExpect(status().isAccepted())
             .andExpect(jsonPath("$.jobTitle").value(title));
     }
 
@@ -395,7 +451,7 @@ class ResumeMatchControllerTest {
             .thenReturn(submission("Backend Engineer", "resume.pdf"));
 
         mockMvc.perform(analysisSubmissionRequest(file, "Backend Engineer", jobContent))
-            .andExpect(status().isOk())
+            .andExpect(status().isAccepted())
             .andExpect(jsonPath("$.taskId").value(30));
     }
 
@@ -597,8 +653,71 @@ class ResumeMatchControllerTest {
     void returnsReportBodyWhenReportExists() throws Exception {
         MatchReportView report = new MatchReportView(
             30L,
-            88,
-            "匹配分数：88",
+            100,
+            "匹配分数：100",
+            "match-report-v2",
+            """
+                {
+                  "schemaVersion":"match-report-v2",
+                  "matchScore":100,
+                  "requirements":[{
+                    "requirementId":"requirement:0",
+                    "text":"Java",
+                    "mustHave":true,
+                    "weight":2,
+                    "modelStatus":"supported",
+                    "status":"supported",
+                    "explanation":"supported",
+                    "evidenceIds":["resume:0"],
+                    "verification":{
+                      "verifierVersion":"verifier-v1",
+                      "status":"supported",
+                      "termCoverage":1.0,
+                      "reason":"supported",
+                      "evidenceIds":["resume:0"]
+                    }
+                  }],
+                  "coreClaims":[{"claim":"Java supported","evidenceIds":["resume:0"]}],
+                  "matchedSkills":[],
+                  "skillGaps":["none"],
+                  "recommendations":["one","two","three"],
+                  "interviewQuestions":["one?","two?","three?"],
+                  "evidence":[{
+                    "evidenceId":"resume:0",
+                    "excerpt":"Built Java services.",
+                    "score":0.9,
+                    "sourceStart":0,
+                    "sourceEnd":20
+                  }],
+                  "scoreBreakdown":{
+                    "rawScore":100,
+                    "finalScore":100,
+                    "totalWeight":2,
+                    "supportedWeight":2,
+                    "partialWeight":0,
+                    "missingWeight":0,
+                    "mustHaveCapApplied":false
+                  }
+                }
+                """,
+            """
+                {
+                  "schemaVersion":"analysis-run-v1",
+                  "correlationId":"correlation-30",
+                  "model":"test-model",
+                  "promptVersion":"prompt-v1",
+                  "retrieverVersion":"retriever-v1",
+                  "verifierVersion":"verifier-v1",
+                  "steps":3,
+                  "modelUsage":{
+                    "promptTokens":100,
+                    "completionTokens":30,
+                    "totalTokens":130,
+                    "providerReported":true
+                  },
+                  "toolTrace":[]
+                }
+                """,
             LocalDateTime.of(2026, 7, 4, 9, 30)
         );
         when(getMatchReportUseCase.find(30L)).thenReturn(Optional.of(report));
@@ -606,8 +725,12 @@ class ResumeMatchControllerTest {
         mockMvc.perform(get("/api/analysis/30/report").header("X-API-Token", "test-token"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.taskId").value(30))
-            .andExpect(jsonPath("$.matchScore").value(88))
-            .andExpect(jsonPath("$.reportContent").value("匹配分数：88"))
+            .andExpect(jsonPath("$.matchScore").value(100))
+            .andExpect(jsonPath("$.reportContent").value("匹配分数：100"))
+            .andExpect(jsonPath("$.reportSchemaVersion").value("match-report-v2"))
+            .andExpect(jsonPath("$.structuredReport.schemaVersion").value("match-report-v2"))
+            .andExpect(jsonPath("$.provenance.schemaVersion").value("analysis-run-v1"))
+            .andExpect(jsonPath("$.provenance.model").value("test-model"))
             .andExpect(jsonPath("$.createdAt").exists());
     }
 
@@ -732,6 +855,29 @@ class ResumeMatchControllerTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
             .andExpect(jsonPath("$.message").value("Invalid request"));
+    }
+
+    @Test
+    void deletesOwnedAnalysisWithoutReturningDeletedData() throws Exception {
+        mockMvc.perform(delete("/api/analysis/30")
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isNoContent())
+            .andExpect(content().string(""));
+
+        verify(deleteAnalysisUseCase).delete(30L);
+    }
+
+    @Test
+    void hidesMissingOrCrossSessionAnalysisDuringDeletion() throws Exception {
+        doThrow(new ResourceNotFoundException("Analysis task not found"))
+            .when(deleteAnalysisUseCase).delete(30L);
+
+        mockMvc.perform(delete("/api/analysis/30")
+                .header("X-API-Token", "test-token"))
+            .andExpect(status().isNotFound())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+            .andExpect(jsonPath("$.message").value("Analysis task not found"));
     }
 
     @Test

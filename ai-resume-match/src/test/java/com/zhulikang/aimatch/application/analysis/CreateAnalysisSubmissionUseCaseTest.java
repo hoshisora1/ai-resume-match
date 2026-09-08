@@ -3,9 +3,11 @@ package com.zhulikang.aimatch.application.analysis;
 import com.zhulikang.aimatch.analysis.AnalysisTask;
 import com.zhulikang.aimatch.application.resume.PrepareResumeUseCase;
 import com.zhulikang.aimatch.application.resume.PreparedResume;
+import com.zhulikang.aimatch.support.RequestOwnerExtension;
 import org.junit.jupiter.api.Test;
-import org.mockito.InOrder;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -18,6 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(RequestOwnerExtension.class)
 class CreateAnalysisSubmissionUseCaseTest {
     @Test
     void preparesResumeBeforeEnteringPersistenceBoundary() {
@@ -36,7 +39,7 @@ class CreateAnalysisSubmissionUseCaseTest {
             "application/pdf",
             new byte[] {1}
         );
-        PreparedResume prepared = new PreparedResume("resume.pdf", "Java Redis", "Java Redis");
+        PreparedResume prepared = new PreparedResume("resume.pdf", "Java Redis");
         AnalysisSubmission submission = new AnalysisSubmission(
             new AnalysisTask(1L, 2L),
             "Backend Engineer",
@@ -70,7 +73,7 @@ class CreateAnalysisSubmissionUseCaseTest {
             "application/pdf",
             new byte[] {1, 2, 3}
         );
-        PreparedResume prepared = new PreparedResume("resume.pdf", "Java Redis", "Java Redis");
+        PreparedResume prepared = new PreparedResume("resume.pdf", "Java Redis");
         AnalysisSubmission submission = new AnalysisSubmission(
             new AnalysisTask(1L, 2L),
             "Backend Engineer",
@@ -146,7 +149,7 @@ class CreateAnalysisSubmissionUseCaseTest {
             idempotentPersistUseCase
         );
         MockMultipartFile file = new MockMultipartFile("file", "resume.pdf", "application/pdf", new byte[] {1});
-        PreparedResume prepared = new PreparedResume("resume.pdf", "Java", "Java");
+        PreparedResume prepared = new PreparedResume("resume.pdf", "Java");
         AnalysisSubmission winner = new AnalysisSubmission(
             new AnalysisTask(1L, 2L),
             "Backend Engineer",

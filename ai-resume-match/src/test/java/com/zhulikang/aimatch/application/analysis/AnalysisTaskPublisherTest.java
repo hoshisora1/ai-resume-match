@@ -5,6 +5,9 @@ import com.zhulikang.aimatch.analysis.AnalysisOutboxEventType;
 import com.zhulikang.aimatch.analysis.AnalysisOutboxRepository;
 import com.zhulikang.aimatch.analysis.AnalysisOutboxStatus;
 import com.zhulikang.aimatch.observability.RequestCorrelation;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -46,5 +49,27 @@ class AnalysisTaskPublisherTest {
         assertThat(eventCaptor.getValue().getPayloadJson())
             .contains("\"taskId\":99")
             .contains("\"correlationId\":\"correlation-1\"");
+    }
+
+    @Test
+    void persistsCurrentTraceParentForDelayedOutboxPublication() {
+        AnalysisOutboxRepository outboxRepository = mock(AnalysisOutboxRepository.class);
+        AnalysisTaskPublisher publisher = new AnalysisTaskPublisher(outboxRepository);
+        try (SdkTracerProvider provider = SdkTracerProvider.builder().build()) {
+            Span span = provider.get("outbox-test").spanBuilder("submission").startSpan();
+            try (Scope ignored = span.makeCurrent()) {
+                publisher.publishAfterCommit(99L);
+            } finally {
+                span.end();
+            }
+
+            ArgumentCaptor<AnalysisOutboxEvent> eventCaptor = ArgumentCaptor.forClass(
+                AnalysisOutboxEvent.class
+            );
+            verify(outboxRepository).save(eventCaptor.capture());
+            assertThat(eventCaptor.getValue().getPayloadJson())
+                .contains("\"traceparent\":\"00-" + span.getSpanContext().getTraceId())
+                .contains(span.getSpanContext().getSpanId() + "-01\"");
+        }
     }
 }

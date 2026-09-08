@@ -43,14 +43,18 @@ public class PersistIdempotentAnalysisSubmissionUseCase {
         String jobContent,
         AnalysisSubmissionIdempotencyContext context
     ) {
-        Optional<AnalysisSubmissionIdempotencyRecord> existing =
-            idempotencyRepository.findByIdempotencyKeyHash(context.keyHash());
+        Optional<AnalysisSubmissionIdempotencyRecord> existing = idempotencyRepository
+            .findByOwnerIdAndIdempotencyKeyHash(context.ownerId(), context.keyHash());
         if (existing.isPresent()) {
             return resolve(existing.orElseThrow(), context.requestFingerprint());
         }
 
         AnalysisSubmissionIdempotencyRecord record = idempotencyRepository.saveAndFlush(
-            new AnalysisSubmissionIdempotencyRecord(context.keyHash(), context.requestFingerprint())
+            new AnalysisSubmissionIdempotencyRecord(
+                context.ownerId(),
+                context.keyHash(),
+                context.requestFingerprint()
+            )
         );
         AnalysisSubmission submission = persistUseCase.persist(preparedResume, jobTitle, jobContent);
         record.complete(submission.task().getId());
@@ -60,7 +64,7 @@ public class PersistIdempotentAnalysisSubmissionUseCase {
 
     @Transactional(readOnly = true)
     public Optional<AnalysisSubmission> findExisting(AnalysisSubmissionIdempotencyContext context) {
-        return idempotencyRepository.findByIdempotencyKeyHash(context.keyHash())
+        return idempotencyRepository.findByOwnerIdAndIdempotencyKeyHash(context.ownerId(), context.keyHash())
             .map(record -> resolve(record, context.requestFingerprint()));
     }
 
@@ -74,11 +78,13 @@ public class PersistIdempotentAnalysisSubmissionUseCase {
         if (record.getTaskId() == null) {
             throw new IllegalStateException("Idempotency record is incomplete");
         }
-        AnalysisTask task = taskRepository.findById(record.getTaskId())
+        AnalysisTask task = taskRepository.findByIdAndOwnerId(record.getTaskId(), record.getOwnerId())
             .orElseThrow(() -> new IllegalStateException("Idempotency record references a missing task"));
         Resume resume = resumeRepository.findById(task.getResumeId())
+            .filter(candidate -> candidate.getOwnerId().equals(record.getOwnerId()))
             .orElseThrow(() -> new IllegalStateException("Idempotency task references a missing resume"));
         JobDescription job = jobRepository.findById(task.getJobDescriptionId())
+            .filter(candidate -> candidate.getOwnerId().equals(record.getOwnerId()))
             .orElseThrow(() -> new IllegalStateException("Idempotency task references a missing job"));
         return new AnalysisSubmission(task, job.getTitle(), resume.getFileName());
     }

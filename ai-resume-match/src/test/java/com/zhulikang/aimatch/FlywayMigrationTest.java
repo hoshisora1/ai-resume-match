@@ -26,8 +26,10 @@ class FlywayMigrationTest {
             .migrate();
 
         long jobId;
+        long reportId;
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
             jobId = insertLegacyJob(connection);
+            reportId = insertLegacyReport(connection, jobId);
         }
 
         Flyway.configure()
@@ -41,13 +43,30 @@ class FlywayMigrationTest {
             assertThat(tableExists(connection, "analysis_outbox")).isTrue();
             assertThat(tableExists(connection, "analysis_submission_idempotency")).isTrue();
             assertThat(indexExists(connection, "analysis_outbox", "idx_analysis_outbox_due")).isTrue();
+            assertThat(indexExists(connection, "analysis_outbox", "idx_analysis_outbox_lease")).isTrue();
+            assertThat(indexExists(connection, "analysis_outbox", "idx_analysis_outbox_terminal")).isTrue();
+            assertThat(indexExists(
+                connection,
+                "analysis_submission_idempotency",
+                "idx_analysis_idempotency_created"
+            )).isTrue();
             assertThat(indexExists(connection, "analysis_task", "idx_analysis_task_created_id")).isTrue();
             assertThat(indexExists(
                 connection,
                 "analysis_task",
                 "idx_analysis_task_status_created_id"
             )).isTrue();
+            assertThat(indexExists(
+                connection,
+                "analysis_task",
+                "idx_analysis_task_owner_status_created"
+            )).isTrue();
+            assertThat(indexExists(connection, "resume", "idx_resume_owner")).isTrue();
+            assertThat(columnExists(connection, "resume", "structured_summary")).isFalse();
             assertThat(jobTitle(connection, jobId)).isEqualTo("岗位 " + jobId);
+            assertThat(stringValue(connection, "job_description", "owner_id", jobId))
+                .isEqualTo("0".repeat(64));
+            assertThat(reportSchemaVersion(connection, reportId)).isEqualTo("markdown-v1");
 
             ColumnMetadata titleColumn = columnMetadata(connection, "job_description", "title");
             assertThat(titleColumn.length()).isEqualTo(120);
@@ -62,6 +81,30 @@ class FlywayMigrationTest {
             );
             assertThat(keyHashColumn.length()).isEqualTo(64);
             assertThat(keyHashColumn.nullability()).isEqualTo(DatabaseMetaData.columnNoNulls);
+
+            ColumnMetadata ownerColumn = columnMetadata(connection, "analysis_task", "owner_id");
+            assertThat(ownerColumn.length()).isEqualTo(64);
+            assertThat(ownerColumn.nullability()).isEqualTo(DatabaseMetaData.columnNoNulls);
+
+            ColumnMetadata reportVersionColumn = columnMetadata(
+                connection,
+                "match_report",
+                "report_schema_version"
+            );
+            assertThat(reportVersionColumn.length()).isEqualTo(32);
+            assertThat(reportVersionColumn.nullability()).isEqualTo(DatabaseMetaData.columnNoNulls);
+
+            ColumnMetadata leaseTokenColumn = columnMetadata(
+                connection,
+                "analysis_outbox",
+                "lease_token"
+            );
+            assertThat(leaseTokenColumn.length()).isEqualTo(36);
+            assertThat(leaseTokenColumn.nullability()).isEqualTo(DatabaseMetaData.columnNullable);
+            assertThat(columnMetadata(connection, "analysis_outbox", "lease_until").nullability())
+                .isEqualTo(DatabaseMetaData.columnNullable);
+            assertThat(columnMetadata(connection, "analysis_outbox", "terminal_at").nullability())
+                .isEqualTo(DatabaseMetaData.columnNullable);
 
             insertIdempotencyRecord(connection, "a".repeat(64), "b".repeat(64));
             assertThatThrownBy(() -> insertIdempotencyRecord(
@@ -117,6 +160,75 @@ class FlywayMigrationTest {
         }
     }
 
+    private long insertLegacyReport(Connection connection, long jobId) throws SQLException {
+        long resumeId;
+        try (PreparedStatement statement = connection.prepareStatement(
+            "insert into resume (file_name, raw_text, structured_summary, created_at) "
+                + "values ('legacy.pdf', 'Java', 'Java', current_timestamp)",
+            Statement.RETURN_GENERATED_KEYS
+        )) {
+            assertThat(statement.executeUpdate()).isOne();
+            try (ResultSet keys = statement.getGeneratedKeys()) {
+                assertThat(keys.next()).isTrue();
+                resumeId = keys.getLong(1);
+            }
+        }
+
+        long taskId;
+        try (PreparedStatement statement = connection.prepareStatement(
+            "insert into analysis_task "
+                + "(resume_id, job_description_id, status, created_at, updated_at) "
+                + "values (?, ?, 'SUCCESS', current_timestamp, current_timestamp)",
+            Statement.RETURN_GENERATED_KEYS
+        )) {
+            statement.setLong(1, resumeId);
+            statement.setLong(2, jobId);
+            assertThat(statement.executeUpdate()).isOne();
+            try (ResultSet keys = statement.getGeneratedKeys()) {
+                assertThat(keys.next()).isTrue();
+                taskId = keys.getLong(1);
+            }
+        }
+
+        try (PreparedStatement statement = connection.prepareStatement(
+            "insert into match_report (task_id, match_score, report_content, created_at) "
+                + "values (?, 80, 'legacy report', current_timestamp)",
+            Statement.RETURN_GENERATED_KEYS
+        )) {
+            statement.setLong(1, taskId);
+            assertThat(statement.executeUpdate()).isOne();
+            try (ResultSet keys = statement.getGeneratedKeys()) {
+                assertThat(keys.next()).isTrue();
+                return keys.getLong(1);
+            }
+        }
+    }
+
+    private String reportSchemaVersion(Connection connection, long reportId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "select report_schema_version from match_report where id = ?"
+        )) {
+            statement.setLong(1, reportId);
+            try (ResultSet rows = statement.executeQuery()) {
+                assertThat(rows.next()).isTrue();
+                return rows.getString("report_schema_version");
+            }
+        }
+    }
+
+    private String stringValue(Connection connection, String table, String column, long id)
+        throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "select " + column + " from " + table + " where id = ?"
+        )) {
+            statement.setLong(1, id);
+            try (ResultSet rows = statement.executeQuery()) {
+                assertThat(rows.next()).isTrue();
+                return rows.getString(1);
+            }
+        }
+    }
+
     private void insertIdempotencyRecord(
         Connection connection,
         String keyHash,
@@ -134,6 +246,12 @@ class FlywayMigrationTest {
 
     private boolean tableExists(Connection connection, String tableName) throws Exception {
         try (ResultSet rows = connection.getMetaData().getTables(null, null, tableName, null)) {
+            return rows.next();
+        }
+    }
+
+    private boolean columnExists(Connection connection, String tableName, String columnName) throws Exception {
+        try (ResultSet rows = connection.getMetaData().getColumns(null, null, tableName, columnName)) {
             return rows.next();
         }
     }

@@ -1,6 +1,6 @@
 package com.zhulikang.aimatch.analysis;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.zhulikang.aimatch.config.AnalysisProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -23,19 +23,47 @@ public class AnalysisTaskService {
     private final AnalysisTaskRepository taskRepository;
     private final MatchReportRepository reportRepository;
     private final Duration runningTimeout;
-    private final Duration retryDelay;
+    private final AnalysisRetryPolicy retryPolicy;
 
     @Autowired
     public AnalysisTaskService(
         AnalysisTaskRepository taskRepository,
         MatchReportRepository reportRepository,
-        @Value("${analysis.running-timeout:15m}") Duration runningTimeout,
-        @Value("${analysis.retry.delay:1m}") Duration retryDelay
+        AnalysisProperties properties,
+        AnalysisRetryPolicy retryPolicy
+    ) {
+        this(
+            taskRepository,
+            reportRepository,
+            properties.runningTimeout(),
+            retryPolicy
+        );
+    }
+
+    AnalysisTaskService(
+        AnalysisTaskRepository taskRepository,
+        MatchReportRepository reportRepository,
+        Duration runningTimeout,
+        AnalysisRetryPolicy retryPolicy
     ) {
         this.taskRepository = taskRepository;
         this.reportRepository = reportRepository;
         this.runningTimeout = runningTimeout;
-        this.retryDelay = retryDelay;
+        this.retryPolicy = Objects.requireNonNull(retryPolicy, "retryPolicy must not be null");
+    }
+
+    AnalysisTaskService(
+        AnalysisTaskRepository taskRepository,
+        MatchReportRepository reportRepository,
+        Duration runningTimeout,
+        Duration retryDelay
+    ) {
+        this(
+            taskRepository,
+            reportRepository,
+            runningTimeout,
+            new AnalysisRetryPolicy(retryDelay, retryDelay, 0.0, () -> 0.5)
+        );
     }
 
     AnalysisTaskService(
@@ -92,6 +120,16 @@ public class AnalysisTaskService {
         int expectedAttempt,
         AnalysisFailureCode failureCode
     ) {
+        return markRetryableFailure(taskId, expectedAttempt, failureCode, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean markRetryableFailure(
+        Long taskId,
+        int expectedAttempt,
+        AnalysisFailureCode failureCode,
+        Integer retryAfterSeconds
+    ) {
         AnalysisTask task = taskRepository.findById(taskId).orElse(null);
         if (task == null
             || task.getStatus() != AnalysisTask.Status.RUNNING
@@ -107,7 +145,9 @@ public class AnalysisTaskService {
             expectedAttempt,
             failureCode,
             userMessageFor(failureCode),
-            attemptsExhausted ? null : now.plus(retryDelay),
+            attemptsExhausted
+                ? null
+                : now.plus(retryPolicy.delayForAttempt(task.getAttemptCount(), retryAfterSeconds)),
             now
         );
         return updated == 1;

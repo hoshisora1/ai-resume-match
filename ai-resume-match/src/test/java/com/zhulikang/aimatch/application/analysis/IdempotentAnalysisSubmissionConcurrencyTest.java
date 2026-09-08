@@ -9,9 +9,12 @@ import com.zhulikang.aimatch.application.resume.PreparedResume;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.observability.AnalysisMetrics;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import com.zhulikang.aimatch.security.RequestIdentity;
+import com.zhulikang.aimatch.support.RequestOwnerExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +29,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static com.zhulikang.aimatch.support.RequestOwnerExtension.OWNER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,6 +37,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
+@ExtendWith(RequestOwnerExtension.class)
 class IdempotentAnalysisSubmissionConcurrencyTest {
     @Autowired
     CreateAnalysisSubmissionUseCase createUseCase;
@@ -66,7 +71,7 @@ class IdempotentAnalysisSubmissionConcurrencyTest {
         resumeRepository.deleteAll();
         executor = Executors.newFixedThreadPool(2);
         when(prepareResumeUseCase.prepare(any())).thenReturn(
-            new PreparedResume("resume.pdf", "Java Redis", "Java Redis")
+            new PreparedResume("resume.pdf", "Java Redis")
         );
     }
 
@@ -160,16 +165,21 @@ class IdempotentAnalysisSubmissionConcurrencyTest {
         CountDownLatch start
     ) {
         return executor.submit(() -> {
-            ready.countDown();
-            if (!start.await(5, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("Timed out waiting to start concurrent submission");
+            RequestIdentity.set(OWNER_ID);
+            try {
+                ready.countDown();
+                if (!start.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Timed out waiting to start concurrent submission");
+                }
+                return createUseCase.create(
+                    file,
+                    "Backend Engineer",
+                    "Java Redis",
+                    "concurrent-request-1"
+                );
+            } finally {
+                RequestIdentity.clear();
             }
-            return createUseCase.create(
-                file,
-                "Backend Engineer",
-                "Java Redis",
-                "concurrent-request-1"
-            );
         });
     }
 

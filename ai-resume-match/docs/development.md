@@ -87,7 +87,7 @@ Set-Location ..
 
 PowerShell 中 `-Dtest=A,B` 推荐整体加引号，避免参数解析问题。
 
-当前 fast test suite 使用 JUnit 5、Mockito、AssertJ、MockMvc、H2。集成测试使用 Failsafe 和 Testcontainers，当前覆盖 MySQL Flyway 校验、MySQL+RabbitMQ outbox 生命周期、publisher confirm/return 行为、Redis cache-aside，以及 mock AI HTTP server 驱动的 PDF/DOCX 端到端分析流：
+当前 fast test suite 使用 JUnit 5、Mockito、AssertJ、MockMvc、H2，并包含 V1→V9 schema 升级、43 个类型化配置叶子的逐项缺失启动失败、28 个非法值/跨字段预算拒绝、AI 任务指数退避/jitter/上游 Retry-After 边界、Java/Python telemetry source-level 泄漏门禁、日志正文 canary、Prometheus endpoint/低基数标签与正文 canary、W3C HTTP/outbox/Rabbit/provider trace 传播和 span 属性 canary、版本化 Decimal 成本估算/滚动兼容，以及 100 组受保护属性 provider-bound 输入一致性验证。集成测试使用 Failsafe 和 Testcontainers，当前覆盖真实 MySQL Flyway 校验、MySQL+RabbitMQ outbox 生命周期、publisher confirm/return、短事务并发认领、ACK 后终止的 lease 恢复、指数退避策略、终态 outbox/幂等记录的安全清理、陈旧 `RUNNING` 恢复、Agent HTTP 读超时、Redis pause 下的有界回源/恢复，以及 mock AI HTTP server 驱动的 PDF/DOCX 端到端分析流：
 
 ```powershell
 mvn verify
@@ -100,9 +100,21 @@ npm --prefix frontend ci
 npm --prefix frontend run dev
 npm --prefix frontend run lint
 npm --prefix frontend run typecheck
+npm --prefix frontend run api:check
 npm --prefix frontend run test
 npm --prefix frontend run build
 ```
+
+有意修改 HTTP 契约时，先更新后端规范快照，再重新生成前端类型：
+
+```powershell
+mvn "-Dopenapi.update=true" "-Dtest=OpenApiContractTest" test
+npm --prefix frontend run api:generate
+mvn "-Dtest=OpenApiContractTest" test
+npm --prefix frontend run api:check
+```
+
+`api/openapi.json` 与 `frontend/src/shared/api/generated/` 都必须随契约变更提交；CI 会同时拒绝未更新的后端快照和前端生成类型。报告/provenance 的 Zod schema 还与生成类型执行双向精确类型断言，因此字段可选性、nullable、重命名或版本 literal 单边变化会在 `npm run typecheck` 失败。
 
 浏览器测试分两层：
 
@@ -110,11 +122,19 @@ npm --prefix frontend run build
 # 同源 API 使用确定性 mock，覆盖主流程、错误分支和桌面/移动布局
 npm --prefix frontend run test:e2e
 
-# 构建独立 Compose 项目，覆盖真实 Spring/outbox/RabbitMQ/Redis/Agent/AI mock 链路
+# 构建独立 Compose 项目，覆盖真实 Spring/outbox/RabbitMQ/Redis/Python Agent 链路
 npm --prefix frontend run test:e2e:full-stack
 ```
 
-`test:e2e:full-stack` 需要 Docker Desktop，使用专用端口和 volume，并在 `finally` 中清理。不要把 full-stack spec 并入普通浏览器套件运行。
+`test:e2e:full-stack` 需要 Docker Desktop。MySQL、Redis、RabbitMQ、Java 与 Agent 只在 Compose 网络内可见；前端由 Docker 分配动态回环端口，运行器读取实际地址后启动 Playwright。场景使用真实 Python Agent，仅以确定性本地服务替代外部 chat provider；失败时输出关键容器状态/日志，最后在 `finally` 中清理独立 volume 和网络。不要把 full-stack spec 并入普通浏览器套件运行。
+
+需要给非开发者演示时，使用独立无付费 Compose：
+
+```powershell
+docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.demo.yml up -d --build --wait
+```
+
+该模式只把前端绑定到 `127.0.0.1:${DEMO_PORT:-3000}`，使用真实 Agent runtime 和确定性本地 chat provider。从 Dashboard 点击“体验合成演示”可通过 `/analyses/new?demo=1` 自动填入一次示例；页面内的“一键填入合成示例”仍可手动重置。两种入口都会生成可被 PDFBox 解析的合成 PDF；不要把该模式的分数当作真实模型质量结果。
 
 ## 4. 代码约定
 
@@ -122,8 +142,10 @@ API 层：
 
 - Controller 返回显式 DTO，不返回临时 `Map`。
 - 成功响应使用 `ResumeUploadResponse`、`JobDescriptionResponse`、`AnalysisTaskResponse` 等明确类型。
-- 错误响应使用 `ApiErrorResponse`，至少包含 `code` 和 `message`。
-- `401`、参数校验 `400`、业务 `400`、资源不存在 `404` 都应有结构化响应。
+- 异步创建返回 `202 Accepted`，同时提供任务 DTO 与状态资源 `Location`。
+- 已处理的错误使用 `ApiProblemDetail` 和 `application/problem+json`；除 RFC 9457 标准字段外必须包含稳定 `code`、可空 `requestId`，滚动升级期保留 `message`。
+- `401`、参数校验 `400`、业务 `400`、资源不存在 `404` 和幂等冲突 `409` 都应有结构化响应。
+- Controller/OpenAPI/前端运行时 schema 发生变化时，同步更新规范快照和生成类型。
 
 上传与文档解析：
 
@@ -142,6 +164,10 @@ API 层：
 
 Agent runtime：
 
+- Java Agent 边界分为 `AgentServiceAnalysisEngine`（HTTP、错误分类、调用指标）、`AgentProtocol`（wire DTO）、`AgentReportMapper`（响应转换和序列化）、`AgentReportValidator`（证据、评分和 provenance 校验）。外部数据在边界校验，业务用例使用校验后的 `AnalysisResult`。
+- 请求身份由拦截器建立并清理。业务查询统一使用 owner-scoped repository 方法；缺少身份立即报错，不能回退到全局查询。直接调用用例的测试显式使用 `RequestOwnerExtension`，并发提交测试在各请求线程中设置和清理身份。
+- 必需依赖通过构造器显式传入，不为旧测试增加 `null` 依赖或临时创建依赖的重载。缓存不可用时回源、有限重试及历史报告兼容各自保留在对应边界，避免在业务层重复兜底。
+
 - 初始模型上下文只放 task ID；简历、JD、标题和标签必须通过工具作为 untrusted data 返回。
 - 新工具必须加入白名单、Pydantic schema、调用前置条件、预算和确定性测试，不能只写进 prompt。
 - 普通模型文本不能作为最终报告；最终结果只能由 `submit_match_report` 的有效结构化参数产生。
@@ -155,6 +181,7 @@ Agent runtime：
 - 本地默认值只用于 `dev` profile；`docker` 和 `prod` profile 通过环境变量注入运行配置。
 - `prod` profile 使用 `ddl-auto=validate` 和 Flyway migration，不包含 `root`、`guest`、`localhost` 或开发 token 默认值。
 - `.env` 不得提交，`.env.example` 只保存示例值。
+- tracing 基础默认关闭；需要本地跨服务 trace 时叠加 observability Compose。自定义 exporter endpoint 只能使用不含凭据/query/fragment 的 HTTP(S) URL，span 不得新增正文、工具参数、token 或动态高基数 ID 属性。
 
 前端：
 

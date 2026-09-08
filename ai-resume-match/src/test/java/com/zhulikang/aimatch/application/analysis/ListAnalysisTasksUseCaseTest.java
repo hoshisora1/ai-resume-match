@@ -9,8 +9,10 @@ import com.zhulikang.aimatch.job.JobDescriptionDisplayView;
 import com.zhulikang.aimatch.job.JobDescriptionRepository;
 import com.zhulikang.aimatch.resume.ResumeDisplayView;
 import com.zhulikang.aimatch.resume.ResumeRepository;
+import com.zhulikang.aimatch.support.RequestOwnerExtension;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.data.domain.PageImpl;
@@ -22,6 +24,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static com.zhulikang.aimatch.support.RequestOwnerExtension.OWNER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +37,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(RequestOwnerExtension.class)
 class ListAnalysisTasksUseCaseTest {
     private AnalysisTaskRepository taskRepository;
     private ResumeRepository resumeRepository;
@@ -61,13 +65,13 @@ class ListAnalysisTasksUseCaseTest {
         ResumeDisplayView resume = resume(10L, "resume.pdf");
         JobDescriptionDisplayView job = job(20L, "高级后端工程师");
         MatchScoreView score = new MatchScoreView(30L, 88);
-        when(taskRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(
+        when(taskRepository.findByOwnerId(eq(OWNER_ID), any(Pageable.class))).thenReturn(new PageImpl<>(
             List.of(task),
             PageRequest.of(0, 20),
             41
         ));
-        when(resumeRepository.findDisplayViewsByIdIn(anyCollection())).thenReturn(List.of(resume));
-        when(jobRepository.findDisplayViewsByIdIn(anyCollection())).thenReturn(List.of(job));
+        when(resumeRepository.findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID))).thenReturn(List.of(resume));
+        when(jobRepository.findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID))).thenReturn(List.of(job));
         when(reportRepository.findScoreViewsByTaskIdIn(anyCollection())).thenReturn(List.of(score));
 
         AnalysisPage page = useCase.list(null, 0, 20);
@@ -88,13 +92,13 @@ class ListAnalysisTasksUseCaseTest {
         assertThat(page.totalPages()).isEqualTo(3);
 
         var pageableCaptor = org.mockito.ArgumentCaptor.forClass(Pageable.class);
-        verify(taskRepository).findAll(pageableCaptor.capture());
+        verify(taskRepository).findByOwnerId(eq(OWNER_ID), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getSort()).containsExactly(
             Sort.Order.desc("createdAt"),
             Sort.Order.desc("id")
         );
-        verify(resumeRepository).findDisplayViewsByIdIn(anyCollection());
-        verify(jobRepository).findDisplayViewsByIdIn(anyCollection());
+        verify(resumeRepository).findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID));
+        verify(jobRepository).findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID));
         verify(reportRepository).findScoreViewsByTaskIdIn(anyCollection());
         verify(resumeRepository, never()).findAllById(any());
         verify(jobRepository, never()).findAllById(any());
@@ -104,14 +108,14 @@ class ListAnalysisTasksUseCaseTest {
 
     @Test
     void filtersTasksByStatus() {
-        when(taskRepository.findByStatus(eq(AnalysisTask.Status.SUCCESS), any(Pageable.class)))
+        when(taskRepository.findByOwnerIdAndStatus(eq(OWNER_ID), eq(AnalysisTask.Status.SUCCESS), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         AnalysisPage page = useCase.list(AnalysisTask.Status.SUCCESS, 0, 20);
 
         assertThat(page.items()).isEmpty();
-        verify(taskRepository).findByStatus(eq(AnalysisTask.Status.SUCCESS), any(Pageable.class));
-        verify(taskRepository, never()).findAll(any(Pageable.class));
+        verify(taskRepository).findByOwnerIdAndStatus(eq(OWNER_ID), eq(AnalysisTask.Status.SUCCESS), any(Pageable.class));
+        verify(taskRepository, never()).findByOwnerId(eq(OWNER_ID), any(Pageable.class));
         verifyNoInteractions(resumeRepository, jobRepository, reportRepository);
     }
 
@@ -120,9 +124,9 @@ class ListAnalysisTasksUseCaseTest {
         AnalysisTask task = new AnalysisTask(10L, 20L);
         ReflectionTestUtils.setField(task, "id", 30L);
         stubSingleTaskPage(task);
-        when(resumeRepository.findDisplayViewsByIdIn(anyCollection()))
+        when(resumeRepository.findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID)))
             .thenReturn(List.of(resume(10L, "resume.pdf")));
-        when(jobRepository.findDisplayViewsByIdIn(anyCollection()))
+        when(jobRepository.findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID)))
             .thenReturn(List.of(job(20L, "Backend Engineer")));
         when(reportRepository.findScoreViewsByTaskIdIn(anyCollection())).thenReturn(List.of());
 
@@ -136,8 +140,8 @@ class ListAnalysisTasksUseCaseTest {
         AnalysisTask task = new AnalysisTask(10L, 20L);
         ReflectionTestUtils.setField(task, "id", 30L);
         stubSingleTaskPage(task);
-        when(resumeRepository.findDisplayViewsByIdIn(anyCollection())).thenReturn(List.of());
-        when(jobRepository.findDisplayViewsByIdIn(anyCollection()))
+        when(resumeRepository.findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID))).thenReturn(List.of());
+        when(jobRepository.findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID)))
             .thenReturn(List.of(job(20L, "Backend Engineer")));
         when(reportRepository.findScoreViewsByTaskIdIn(anyCollection())).thenReturn(List.of());
 
@@ -151,9 +155,9 @@ class ListAnalysisTasksUseCaseTest {
         AnalysisTask task = new AnalysisTask(10L, 20L);
         ReflectionTestUtils.setField(task, "id", 30L);
         stubSingleTaskPage(task);
-        when(resumeRepository.findDisplayViewsByIdIn(anyCollection()))
+        when(resumeRepository.findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID)))
             .thenReturn(List.of(resume(10L, "resume.pdf")));
-        when(jobRepository.findDisplayViewsByIdIn(anyCollection())).thenReturn(List.of());
+        when(jobRepository.findDisplayViewsByIdInAndOwnerId(anyCollection(), eq(OWNER_ID))).thenReturn(List.of());
         when(reportRepository.findScoreViewsByTaskIdIn(anyCollection())).thenReturn(List.of());
 
         assertThatThrownBy(() -> useCase.list(null, 0, 20))
@@ -171,7 +175,7 @@ class ListAnalysisTasksUseCaseTest {
     }
 
     private void stubSingleTaskPage(AnalysisTask task) {
-        when(taskRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(
+        when(taskRepository.findByOwnerId(eq(OWNER_ID), any(Pageable.class))).thenReturn(new PageImpl<>(
             List.of(task),
             PageRequest.of(0, 20),
             1
